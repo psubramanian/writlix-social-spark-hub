@@ -1,4 +1,3 @@
-
 import React, { useState } from 'react';
 import Sidebar from '../components/Sidebar';
 import TopBar from '../components/TopBar';
@@ -10,11 +9,13 @@ import { Slider } from '@/components/ui/slider';
 import { Textarea } from '@/components/ui/textarea';
 import { useToast } from '@/components/ui/use-toast';
 import CSVImport from '../components/CSVImport';
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
+import { Trash } from 'lucide-react';
 
 interface ContentItem {
   id: string;
   title: string;
-  selected: boolean;
+  status: 'Review' | 'Scheduled';
 }
 
 const DataSeed = () => {
@@ -36,11 +37,10 @@ const DataSeed = () => {
     
     setGenerating(true);
     setTimeout(() => {
-      // Mock AI generation results
       const mockResults = Array.from({ length: quantity }).map((_, index) => ({
         id: `content-${Date.now()}-${index}`,
         title: getMockTitle(seed, index),
-        selected: false,
+        status: 'Review' as const,
       }));
       
       setGeneratedContent(mockResults);
@@ -75,40 +75,30 @@ const DataSeed = () => {
     return titles[index % titles.length];
   };
   
-  const toggleSelection = (id: string) => {
-    setGeneratedContent(prev => 
-      prev.map(item => 
-        item.id === id ? { ...item, selected: !item.selected } : item
+  const toggleStatus = (id: string) => {
+    setGeneratedContent(prev =>
+      prev.map(item =>
+        item.id === id
+          ? { ...item, status: item.status === 'Review' ? 'Scheduled' : 'Review' }
+          : item
       )
     );
   };
   
-  const handleSaveToSchedule = () => {
-    const selectedItems = generatedContent.filter(item => item.selected);
-    if (selectedItems.length === 0) {
-      toast({
-        title: "No items selected",
-        description: "Please select at least one content idea to schedule",
-        variant: "destructive",
-      });
-      return;
-    }
-    
-    // Here you would typically save to a database
-    // For this demo, we'll just show a success toast
+  const handleDelete = (id: string) => {
+    setGeneratedContent(prev => prev.filter(item => item.id !== id));
     toast({
-      title: "Content Saved",
-      description: `${selectedItems.length} post ideas saved for scheduling.`,
+      title: "Topic Deleted",
+      description: "The selected topic has been removed.",
     });
   };
   
   const handleCsvData = (data: any[]) => {
     if (data && data.length > 0) {
-      // Extract titles from CSV and convert to content items
       const contentFromCsv = data.map((row, index) => ({
         id: `csv-${Date.now()}-${index}`,
         title: row.title || row[0] || `Imported Topic ${index + 1}`,
-        selected: false,
+        status: 'Review' as const,
       }));
       
       setGeneratedContent(contentFromCsv);
@@ -184,25 +174,41 @@ const DataSeed = () => {
               </CardHeader>
               <CardContent>
                 {generatedContent.length > 0 ? (
-                  <div className="space-y-2">
-                    {generatedContent.map((item) => (
-                      <div 
-                        key={item.id} 
-                        className={`p-3 border rounded-md flex items-center gap-3 cursor-pointer ${
-                          item.selected ? 'border-writlix-purple bg-writlix-purple bg-opacity-5' : ''
-                        }`}
-                        onClick={() => toggleSelection(item.id)}
-                      >
-                        <input 
-                          type="checkbox" 
-                          checked={item.selected}
-                          onChange={() => toggleSelection(item.id)}
-                          className="h-4 w-4 text-writlix-purple"
-                        />
-                        <p>{item.title}</p>
-                      </div>
-                    ))}
-                  </div>
+                  <Table>
+                    <TableHeader>
+                      <TableRow>
+                        <TableHead>Topic</TableHead>
+                        <TableHead>Status</TableHead>
+                        <TableHead className="w-[100px]">Actions</TableHead>
+                      </TableRow>
+                    </TableHeader>
+                    <TableBody>
+                      {generatedContent.map((item) => (
+                        <TableRow key={item.id}>
+                          <TableCell className="font-medium">{item.title}</TableCell>
+                          <TableCell>
+                            <Button
+                              variant="ghost"
+                              className={item.status === 'Scheduled' ? 'text-green-600' : 'text-yellow-600'}
+                              onClick={() => toggleStatus(item.id)}
+                            >
+                              {item.status}
+                            </Button>
+                          </TableCell>
+                          <TableCell>
+                            <Button
+                              variant="ghost"
+                              size="icon"
+                              className="hover:text-red-600"
+                              onClick={() => handleDelete(item.id)}
+                            >
+                              <Trash className="h-4 w-4" />
+                            </Button>
+                          </TableCell>
+                        </TableRow>
+                      ))}
+                    </TableBody>
+                  </Table>
                 ) : (
                   <div className="text-center py-12">
                     <p className="text-muted-foreground">
@@ -214,17 +220,6 @@ const DataSeed = () => {
                   </div>
                 )}
               </CardContent>
-              {generatedContent.length > 0 && (
-                <CardFooter>
-                  <Button 
-                    onClick={handleSaveToSchedule}
-                    disabled={!generatedContent.some(item => item.selected)}
-                    className="w-full"
-                  >
-                    Save Selected Ideas
-                  </Button>
-                </CardFooter>
-              )}
             </Card>
           </div>
         </main>
