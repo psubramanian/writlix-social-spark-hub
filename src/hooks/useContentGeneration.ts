@@ -1,3 +1,4 @@
+
 import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useToast } from '@/components/ui/use-toast';
@@ -78,6 +79,20 @@ export const useContentGeneration = () => {
     setGenerating(true);
     
     try {
+      // Get the current user first
+      const { data: { user }, error: authError } = await supabase.auth.getUser();
+      
+      if (authError || !user) {
+        console.error("Authentication error:", authError);
+        toast({
+          title: "Authentication Error",
+          description: "You must be logged in to generate content",
+          variant: "destructive",
+        });
+        navigate('/login');
+        return;
+      }
+
       const { data: generationData, error: generationError } = await supabase.functions.invoke('generate-content', {
         body: {
           topic: seed,
