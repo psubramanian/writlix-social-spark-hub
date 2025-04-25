@@ -281,8 +281,15 @@ export function useScheduledPosts() {
       
       console.log(`Attempting to post content with ID: ${postId} to LinkedIn`);
       
+      const { data: { user }, error: authError } = await supabase.auth.getUser();
+      
+      if (authError || !user) {
+        console.error("Authentication error:", authError);
+        throw new Error("Authentication required");
+      }
+      
       const { data, error } = await supabase.functions.invoke('post-to-linkedin', {
-        body: { postId }
+        body: { postId, userId: user.id }
       });
 
       if (error) {

@@ -13,7 +13,11 @@ serve(async (req) => {
   }
 
   try {
-    const { postId } = await req.json();
+    const { postId, userId } = await req.json();
+    
+    if (!postId) {
+      throw new Error('Post ID is required');
+    }
     
     // Initialize Supabase client
     const supabaseUrl = Deno.env.get('SUPABASE_URL')!;
@@ -25,6 +29,7 @@ serve(async (req) => {
       .from('scheduled_posts')
       .select(`
         id,
+        user_id,
         content_ideas (
           id,
           title,
@@ -44,6 +49,24 @@ serve(async (req) => {
     }
 
     console.log('Post content retrieved successfully:', post.content_ideas.title);
+    
+    // Get the user's LinkedIn credentials
+    const { data: credentials, error: credentialsError } = await supabase
+      .from('user_linkedin_credentials')
+      .select('client_id, client_secret')
+      .eq('user_id', post.user_id)
+      .maybeSingle();
+      
+    if (credentialsError) {
+      console.error('Error fetching LinkedIn credentials:', credentialsError);
+      throw new Error('Failed to retrieve LinkedIn credentials');
+    }
+    
+    if (!credentials) {
+      throw new Error('LinkedIn credentials not found for this user. Please add your LinkedIn API credentials in the Settings page.');
+    }
+    
+    console.log('LinkedIn credentials found for user');
 
     // Call the database function to update status to Published
     const { error: triggerError } = await supabase
@@ -54,16 +77,49 @@ serve(async (req) => {
       throw triggerError;
     }
 
-    // In a real implementation, here we would call the LinkedIn API
-    // For now, we'll simulate a successful post
+    // In a real implementation, here we would call the LinkedIn API using the user's credentials
+    // For now, we'll provide more detailed logging about what would happen
+    
+    // This is where we would make the actual LinkedIn API call
+    // Example (not actually executed):
+    /*
+    const linkedInResponse = await fetch('https://api.linkedin.com/v2/ugcPosts', {
+      method: 'POST',
+      headers: {
+        'Authorization': `Bearer ${accessToken}`, // We would need OAuth flow to get this
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({
+        author: `urn:li:person:${userId}`,
+        lifecycleState: 'PUBLISHED',
+        specificContent: {
+          'com.linkedin.ugc.ShareContent': {
+            shareCommentary: {
+              text: post.content_ideas.content
+            },
+            shareMediaCategory: 'NONE'
+          }
+        },
+        visibility: {
+          'com.linkedin.ugc.MemberNetworkVisibility': 'PUBLIC'
+        }
+      })
+    });
+    */
+    
     const simulatedLinkedInResponse = {
       success: true,
       post_id: `linkedin-${Date.now()}`,
       url: `https://linkedin.com/post/${Date.now()}`,
-      timestamp: new Date().toISOString()
+      timestamp: new Date().toISOString(),
+      clientIdUsed: credentials.client_id.substring(0, 5) + '...' // Only showing part of the client ID for security
     };
 
-    console.log('Successfully simulated posting to LinkedIn:', simulatedLinkedInResponse);
+    console.log('LinkedIn post simulation details:', simulatedLinkedInResponse);
+    console.log('IMPORTANT: This is still a simulation! To post to LinkedIn for real, you need to:');
+    console.log('1. Complete the LinkedIn OAuth flow to get an access token');
+    console.log('2. Use the proper LinkedIn API endpoints to post content');
+    console.log('3. Set up proper error handling and rate limiting');
 
     // Update the content_ideas status to reflect it's been published
     const { error: updateError } = await supabase
@@ -78,7 +134,8 @@ serve(async (req) => {
 
     return new Response(JSON.stringify({ 
       success: true,
-      message: 'Post successfully shared to LinkedIn',
+      message: 'Post successfully shared to LinkedIn (simulated)',
+      note: 'Real LinkedIn integration requires OAuth flow completion',
       linkedInDetails: simulatedLinkedInResponse 
     }), {
       headers: { ...corsHeaders, 'Content-Type': 'application/json' },
