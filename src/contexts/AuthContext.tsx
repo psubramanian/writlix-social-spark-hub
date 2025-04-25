@@ -1,3 +1,4 @@
+
 import React, { createContext, useContext, useState, useEffect } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { Session, User as SupabaseUser } from "@supabase/supabase-js";
@@ -78,7 +79,10 @@ export const AuthProvider: React.FC<{children: React.ReactNode}> = ({ children }
         provider,
         options: {
           redirectTo: `${window.location.origin}/dashboard`,
-          captchaToken: true // Enable CAPTCHA verification
+          // Use queryParams for captcha instead of captchaToken
+          queryParams: {
+            captchaRequired: 'true'
+          }
         }
       });
 
