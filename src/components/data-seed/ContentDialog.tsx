@@ -37,11 +37,11 @@ const ContentDialog = ({ content, onClose, onUpdate }: ContentDialogProps) => {
   return (
     <Dialog open={!!content} onOpenChange={onClose}>
       {content && (
-        <DialogContent className="max-w-2xl max-h-[90vh] fixed top-[50%] left-[50%] transform -translate-x-1/2 -translate-y-1/2]">
+        <DialogContent className="max-w-4xl w-[90vw] h-auto max-h-[90vh] overflow-hidden">
           <DialogHeader>
             <DialogTitle>{content.title}</DialogTitle>
           </DialogHeader>
-          <div className="mt-4">
+          <div className="mt-4 overflow-y-auto">
             <RichTextEditor 
               content={editedContent} 
               onChange={setEditedContent}

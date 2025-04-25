@@ -1,5 +1,5 @@
 
-import React, { useState } from 'react';
+import React from 'react';
 import Sidebar from '../components/Sidebar';
 import TopBar from '../components/TopBar';
 import GenerationForm from '../components/data-seed/GenerationForm';
@@ -18,6 +18,7 @@ interface ContentItem {
 const DataSeed = () => {
   const {
     generating,
+    loading,
     generatedContent,
     generateContent,
     toggleStatus,
@@ -26,7 +27,7 @@ const DataSeed = () => {
     updateContent,
   } = useContentGeneration();
   
-  const [selectedContent, setSelectedContent] = useState<ContentItem | null>(null);
+  const [selectedContent, setSelectedContent] = React.useState<ContentItem | null>(null);
 
   return (
     <div className="flex h-screen bg-writlix-lightgray">
@@ -53,7 +54,7 @@ const DataSeed = () => {
               onStatusToggle={toggleStatus}
               onDelete={deleteContent}
               onPreview={setSelectedContent}
-              isGenerating={generating}
+              isGenerating={loading || generating}
             />
           </div>
         </main>
