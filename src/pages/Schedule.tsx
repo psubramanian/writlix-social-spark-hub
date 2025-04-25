@@ -1,3 +1,4 @@
+
 import React from 'react';
 import Sidebar from '../components/Sidebar';
 import TopBar from '../components/TopBar';
@@ -12,6 +13,9 @@ import { Badge } from '@/components/ui/badge';
 
 const Schedule = () => {
   const { posts, loading, createScheduledPost, postToLinkedIn, userSettings } = useScheduledPosts();
+
+  // Filter out posts that are already published
+  const scheduledPosts = posts.filter(post => post.content_ideas?.status !== 'Published');
 
   const formatScheduleTime = (post: any) => {
     if (!post.schedule_settings?.[0]) return 'Not scheduled';
@@ -118,9 +122,9 @@ const Schedule = () => {
                   <CardContent>
                     {loading ? (
                       <div className="text-center py-12">Loading...</div>
-                    ) : posts.length > 0 ? (
+                    ) : scheduledPosts.length > 0 ? (
                       <div className="space-y-4">
-                        {posts.map((post) => (
+                        {scheduledPosts.map((post) => (
                           <div 
                             key={post.id} 
                             className="border rounded-md p-4"
