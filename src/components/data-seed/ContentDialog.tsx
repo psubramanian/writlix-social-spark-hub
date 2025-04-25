@@ -9,7 +9,7 @@ interface ContentItem {
   title: string;
   preview: string;
   content: string;
-  status: 'Review' | 'Scheduled';
+  status: 'Review' | 'Scheduled' | 'Published';
 }
 
 interface ContentDialogProps {
@@ -45,15 +45,18 @@ const ContentDialog = ({ content, onClose, onUpdate }: ContentDialogProps) => {
             <RichTextEditor 
               content={editedContent} 
               onChange={setEditedContent}
+              readOnly={content.status === 'Published'}
             />
           </div>
           <div className="mt-4 flex justify-end space-x-2">
             <Button variant="outline" onClick={onClose}>
-              Cancel
+              {content.status === 'Published' ? 'Close' : 'Cancel'}
             </Button>
-            <Button onClick={handleSave}>
-              Save Changes
-            </Button>
+            {content.status !== 'Published' && (
+              <Button onClick={handleSave}>
+                Save Changes
+              </Button>
+            )}
           </div>
         </DialogContent>
       )}
