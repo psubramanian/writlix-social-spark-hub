@@ -1,8 +1,7 @@
-
 import React from 'react';
 import { Link, useLocation } from "react-router-dom";
 import { useAuth } from '../contexts/AuthContext';
-import { Calendar, BarChart, Settings, LogOut } from 'lucide-react';
+import { Calendar, BarChart, Settings, LogOut, FileText } from 'lucide-react';
 
 const Sidebar = () => {
   const location = useLocation();
@@ -45,6 +44,11 @@ const Sidebar = () => {
           <Link to="/settings" className={`sidebar-item ${isActive('/settings') ? 'active' : ''}`}>
             <Settings size={18} />
             <span>Settings</span>
+          </Link>
+          
+          <Link to="/published" className={`sidebar-item ${isActive('/published') ? 'active' : ''}`}>
+            <FileText size={18} />
+            <span>Published</span>
           </Link>
         </nav>
       </div>

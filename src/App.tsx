@@ -1,4 +1,3 @@
-
 import { Toaster } from "@/components/ui/toaster";
 import { Toaster as Sonner } from "@/components/ui/sonner";
 import { TooltipProvider } from "@/components/ui/tooltip";
@@ -13,6 +12,7 @@ import DataSeed from "./pages/DataSeed";
 import Schedule from "./pages/Schedule";
 import Settings from "./pages/Settings";
 import NotFound from "./pages/NotFound";
+import PublishedContent from "./pages/PublishedContent";
 
 const queryClient = new QueryClient({
   defaultOptions: {
@@ -23,11 +23,9 @@ const queryClient = new QueryClient({
   },
 });
 
-// Protected route wrapper using the useAuth hook
 const ProtectedRoute = ({ children }: { children: React.ReactNode }) => {
   const { isAuthenticated, isLoading } = useAuth();
   
-  // Show loading state while checking authentication
   if (isLoading) {
     return (
       <div className="flex items-center justify-center h-screen">
@@ -44,14 +42,12 @@ const ProtectedRoute = ({ children }: { children: React.ReactNode }) => {
   return <>{children}</>;
 };
 
-// We need this wrapper since the useAuth hook must be used inside AuthProvider
 const AppRoutes = () => {
   return (
     <Routes>
       <Route path="/" element={<Index />} />
       <Route path="/login" element={<Login />} />
       
-      {/* Protected Routes */}
       <Route path="/dashboard" element={
         <ProtectedRoute>
           <Dashboard />
@@ -76,7 +72,12 @@ const AppRoutes = () => {
         </ProtectedRoute>
       } />
       
-      {/* 404 Route */}
+      <Route path="/published" element={
+        <ProtectedRoute>
+          <PublishedContent />
+        </ProtectedRoute>
+      } />
+      
       <Route path="*" element={<NotFound />} />
     </Routes>
   );

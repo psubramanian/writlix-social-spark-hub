@@ -1,4 +1,3 @@
-
 import React, { useState } from 'react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
@@ -33,10 +32,10 @@ const ContentTable = ({
 }: ContentTableProps) => {
   const [currentPage, setCurrentPage] = useState<number>(1);
 
-  const totalPages = Math.max(1, Math.ceil(content.length / ITEMS_PER_PAGE));
+  const filteredContent = content.filter(item => item.status !== 'Published');
+  const totalPages = Math.max(1, Math.ceil(filteredContent.length / ITEMS_PER_PAGE));
   
-  // Get paginated content
-  const paginatedContent = content.slice(
+  const paginatedContent = filteredContent.slice(
     (currentPage - 1) * ITEMS_PER_PAGE,
     currentPage * ITEMS_PER_PAGE
   );
@@ -52,7 +51,7 @@ const ContentTable = ({
         <CardDescription>Select ideas to save for scheduling</CardDescription>
       </CardHeader>
       <CardContent>
-        {content.length > 0 ? (
+        {filteredContent.length > 0 ? (
           <>
             <Table>
               <TableHeader>
