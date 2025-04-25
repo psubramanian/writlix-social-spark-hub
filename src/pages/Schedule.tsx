@@ -1,9 +1,8 @@
-
 import React from 'react';
 import Sidebar from '../components/Sidebar';
 import TopBar from '../components/TopBar';
 import { format } from 'date-fns';
-import { Calendar, Send, Clock } from 'lucide-react';
+import { Send, Clock } from 'lucide-react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
@@ -63,11 +62,6 @@ const Schedule = () => {
               <TabsList>
                 <TabsTrigger value="scheduled">Scheduled Posts</TabsTrigger>
               </TabsList>
-              
-              <Button>
-                <Calendar className="mr-2 h-4 w-4" />
-                Calendar View
-              </Button>
             </div>
             
             <TabsContent value="scheduled" className="mt-0">
