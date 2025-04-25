@@ -73,7 +73,9 @@ export type Database = {
           next_run_at: string
           post_id: string | null
           time_of_day: string
+          timezone: string | null
           updated_at: string
+          user_id: string | null
         }
         Insert: {
           created_at?: string
@@ -84,7 +86,9 @@ export type Database = {
           next_run_at: string
           post_id?: string | null
           time_of_day: string
+          timezone?: string | null
           updated_at?: string
+          user_id?: string | null
         }
         Update: {
           created_at?: string
@@ -95,7 +99,9 @@ export type Database = {
           next_run_at?: string
           post_id?: string | null
           time_of_day?: string
+          timezone?: string | null
           updated_at?: string
+          user_id?: string | null
         }
         Relationships: [
           {

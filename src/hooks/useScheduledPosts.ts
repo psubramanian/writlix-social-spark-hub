@@ -1,4 +1,3 @@
-
 import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useToast } from '@/components/ui/use-toast';
@@ -22,10 +21,11 @@ interface ScheduledPost {
     status: string;
   };
   schedule_settings: {
+    id: string;
     frequency: 'daily' | 'weekly' | 'monthly';
     time_of_day: string;
-    day_of_week?: number;
-    day_of_month?: number;
+    day_of_week?: number | null;
+    day_of_month?: number | null;
     next_run_at: string;
     timezone: string;
   }[];
@@ -61,13 +61,16 @@ export function useScheduledPosts() {
         return {
           frequency: data.frequency,
           timeOfDay: data.time_of_day,
-          dayOfWeek: data.day_of_week,
-          dayOfMonth: data.day_of_month,
+          dayOfWeek: data.day_of_week ?? undefined,
+          dayOfMonth: data.day_of_month ?? undefined,
           timezone: data.timezone || 'Asia/Kolkata'
         } as ScheduleSettings;
       } else {
-        // Create default settings if none exist
-        const defaultSettings = DEFAULT_SCHEDULE_SETTINGS;
+        const defaultSettings = {
+          ...DEFAULT_SCHEDULE_SETTINGS,
+          dayOfWeek: undefined,
+          dayOfMonth: undefined
+        };
         const nextRunAt = calculateNextRunTime(defaultSettings);
         
         const { data: newSettings, error: insertError } = await supabase
@@ -114,6 +117,7 @@ export function useScheduledPosts() {
             status
           ),
           schedule_settings (
+            id,
             frequency,
             time_of_day,
             day_of_week,
@@ -157,10 +161,8 @@ export function useScheduledPosts() {
         return;
       }
 
-      // First save the user settings (overwrite existing ones if any)
       await saveUserSettings(settings);
 
-      // Then update all scheduled posts with new timings
       await updateAllScheduledPosts(settings);
       
       toast({
@@ -187,7 +189,6 @@ export function useScheduledPosts() {
 
     const nextRunAt = calculateNextRunTime(settings);
 
-    // Check if settings already exist for this user
     const { data, error } = await supabase
       .from('schedule_settings')
       .select('id')
@@ -198,7 +199,6 @@ export function useScheduledPosts() {
     if (error) throw error;
 
     if (data) {
-      // Update existing settings
       const { error: updateError } = await supabase
         .from('schedule_settings')
         .update({
@@ -213,12 +213,11 @@ export function useScheduledPosts() {
 
       if (updateError) throw updateError;
     } else {
-      // Insert new settings
       const { error: insertError } = await supabase
         .from('schedule_settings')
         .insert({
           user_id: user.id,
-          post_id: null, // null indicates these are user defaults
+          post_id: null,
           frequency: settings.frequency,
           time_of_day: settings.timeOfDay,
           day_of_week: settings.dayOfWeek,
@@ -230,7 +229,6 @@ export function useScheduledPosts() {
       if (insertError) throw insertError;
     }
 
-    // Update local state
     setUserSettings(settings);
   };
 
@@ -242,7 +240,6 @@ export function useScheduledPosts() {
       throw new Error("Authentication required");
     }
 
-    // Get all scheduled posts for this user
     const { data: postsData, error: postsError } = await supabase
       .from('scheduled_posts')
       .select('id, schedule_settings(id)')
@@ -250,12 +247,10 @@ export function useScheduledPosts() {
 
     if (postsError) throw postsError;
 
-    // No posts to update
     if (!postsData || postsData.length === 0) {
       return;
     }
 
-    // For each post, update its schedule settings
     for (const post of postsData) {
       if (post.schedule_settings && post.schedule_settings.length > 0) {
         for (const setting of post.schedule_settings) {
@@ -280,7 +275,6 @@ export function useScheduledPosts() {
       }
     }
 
-    // Refresh the posts list
     await fetchPosts();
   };
 
@@ -318,13 +312,11 @@ export function useScheduledPosts() {
         return;
       }
 
-      // Get the current user settings
       const settings = await fetchUserSettings();
       if (!settings) {
         throw new Error("Could not retrieve user schedule settings");
       }
 
-      // Create a scheduled post for this content
       const { data: postData, error: postError } = await supabase
         .from('scheduled_posts')
         .insert({
@@ -337,10 +329,8 @@ export function useScheduledPosts() {
 
       if (postError) throw postError;
 
-      // Calculate next run time based on user settings
       const nextRunAt = calculateNextRunTime(settings);
 
-      // Create schedule settings for this post
       const { error: settingsError } = await supabase
         .from('schedule_settings')
         .insert({
