@@ -24,14 +24,19 @@ const PublishedContent = () => {
   const { data: publishedPosts, isLoading } = useQuery({
     queryKey: ['published-posts'],
     queryFn: async () => {
-      // Use a generic approach since TypeScript doesn't know about our new table
-      const { data, error } = await supabase
-        .from('published_content')
-        .select('*')
-        .order('published_at', { ascending: false }) as any;
+      // Using a more generic approach to avoid TypeScript errors with tables not in the type definitions
+      const response = await fetch(`${supabase.supabaseUrl}/rest/v1/published_content?order=published_at.desc`, {
+        headers: {
+          'apikey': supabase.supabaseKey,
+          'Content-Type': 'application/json'
+        }
+      });
       
-      if (error) throw error;
-      // Cast the data to our expected type
+      if (!response.ok) {
+        throw new Error('Failed to fetch published content');
+      }
+      
+      const data = await response.json();
       return data as PublishedPost[];
     }
   });
