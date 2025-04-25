@@ -1,10 +1,8 @@
-
 import React, { useState } from 'react';
 import Sidebar from '../components/Sidebar';
 import TopBar from '../components/TopBar';
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
-import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Slider } from '@/components/ui/slider';
 import { Textarea } from '@/components/ui/textarea';
@@ -13,6 +11,7 @@ import CSVImport from '../components/CSVImport';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { Maximize2, Trash } from 'lucide-react';
+import { supabase } from '@/integrations/supabase/client';
 
 interface ContentItem {
   id: string;
@@ -43,20 +42,15 @@ const DataSeed = () => {
     setGenerating(true);
     
     try {
-      const response = await fetch('/api/generate-content', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({
+      const { data, error } = await supabase.functions.invoke('generate-content', {
+        body: {
           topic: seed,
           quantity,
-        }),
+        },
       });
 
-      if (!response.ok) throw new Error('Failed to generate content');
+      if (error) throw new Error(error.message || 'Failed to generate content');
 
-      const data = await response.json();
       setGeneratedContent(data.map((item: any, index: number) => ({
         id: `content-${Date.now()}-${index}`,
         title: item.title,
@@ -70,9 +64,10 @@ const DataSeed = () => {
         description: `${quantity} post ideas have been generated.`,
       });
     } catch (error) {
+      console.error('Content generation error:', error);
       toast({
         title: "Generation Failed",
-        description: error.message,
+        description: error.message || 'Failed to connect to AI service',
         variant: "destructive",
       });
     } finally {
