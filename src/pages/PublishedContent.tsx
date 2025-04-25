@@ -24,12 +24,14 @@ const PublishedContent = () => {
   const { data: publishedPosts, isLoading } = useQuery({
     queryKey: ['published-posts'],
     queryFn: async () => {
+      // Use a generic approach since TypeScript doesn't know about our new table
       const { data, error } = await supabase
         .from('published_content')
         .select('*')
-        .order('published_at', { ascending: false });
+        .order('published_at', { ascending: false }) as any;
       
       if (error) throw error;
+      // Cast the data to our expected type
       return data as PublishedPost[];
     }
   });

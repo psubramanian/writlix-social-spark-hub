@@ -1,3 +1,4 @@
+
 import React, { useState } from 'react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
@@ -32,6 +33,7 @@ const ContentTable = ({
 }: ContentTableProps) => {
   const [currentPage, setCurrentPage] = useState<number>(1);
 
+  // Filter out published content from the main view
   const filteredContent = content.filter(item => item.status !== 'Published');
   const totalPages = Math.max(1, Math.ceil(filteredContent.length / ITEMS_PER_PAGE));
   
@@ -81,29 +83,24 @@ const ContentTable = ({
                       <Button
                         variant="ghost"
                         className={
-                          item.status === 'Published' 
-                            ? 'text-blue-600' 
-                            : item.status === 'Scheduled' 
-                              ? 'text-green-600' 
-                              : 'text-yellow-600'
+                          item.status === 'Scheduled' 
+                            ? 'text-green-600' 
+                            : 'text-yellow-600'
                         }
-                        onClick={() => item.status !== 'Published' && onStatusToggle(item.id)}
-                        disabled={item.status === 'Published'}
+                        onClick={() => onStatusToggle(item.id)}
                       >
                         {item.status}
                       </Button>
                     </TableCell>
                     <TableCell>
-                      {item.status !== 'Published' && (
-                        <Button
-                          variant="ghost"
-                          size="icon"
-                          className="hover:text-red-600"
-                          onClick={() => onDelete(item.id)}
-                        >
-                          <Trash className="h-4 w-4" />
-                        </Button>
-                      )}
+                      <Button
+                        variant="ghost"
+                        size="icon"
+                        className="hover:text-red-600"
+                        onClick={() => onDelete(item.id)}
+                      >
+                        <Trash className="h-4 w-4" />
+                      </Button>
                     </TableCell>
                   </TableRow>
                 ))}
