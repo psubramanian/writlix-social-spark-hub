@@ -51,17 +51,20 @@ const DataSeed = () => {
 
       if (error) throw new Error(error.message || 'Failed to generate content');
 
-      setGeneratedContent(data.map((item: any, index: number) => ({
-        id: `content-${Date.now()}-${index}`,
-        title: item.title,
-        preview: item.preview,
-        content: item.content,
-        status: 'Review' as const,
-      })));
+      setGeneratedContent(prevContent => [
+        ...prevContent,
+        ...data.map((item: any, index: number) => ({
+          id: `content-${Date.now()}-${index}`,
+          title: item.title,
+          preview: item.preview,
+          content: item.content,
+          status: 'Review' as const,
+        }))
+      ]);
 
       toast({
         title: "Content Generated",
-        description: `${quantity} post ideas have been generated.`,
+        description: `${quantity} new post ideas have been added.`,
       });
     } catch (error) {
       console.error('Content generation error:', error);
