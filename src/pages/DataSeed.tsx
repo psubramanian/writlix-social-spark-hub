@@ -1,3 +1,4 @@
+
 import React, { useState } from 'react';
 import Sidebar from '../components/Sidebar';
 import TopBar from '../components/TopBar';
@@ -16,6 +17,7 @@ import { Maximize2, Trash } from 'lucide-react';
 interface ContentItem {
   id: string;
   title: string;
+  preview: string;
   content: string;
   status: 'Review' | 'Scheduled';
 }
@@ -58,6 +60,7 @@ const DataSeed = () => {
       setGeneratedContent(data.map((item: any, index: number) => ({
         id: `content-${Date.now()}-${index}`,
         title: item.title,
+        preview: item.preview,
         content: item.content,
         status: 'Review' as const,
       })));
@@ -75,28 +78,6 @@ const DataSeed = () => {
     } finally {
       setGenerating(false);
     }
-  };
-
-  const getMockTitle = (seed: string, index: number) => {
-    const titles = [
-      `10 Ways ${seed} Can Transform Your Business in 2025`,
-      `The Future of ${seed}: Trends to Watch`,
-      `How ${seed} is Disrupting Traditional Industries`,
-      `${seed} Best Practices: A Comprehensive Guide`,
-      `Why Every Professional Should Understand ${seed}`,
-      `${seed} Case Study: Success Stories from Industry Leaders`,
-      `The Hidden Opportunities in ${seed} That Most People Miss`,
-      `${seed} vs Traditional Approaches: A Comparative Analysis`,
-      `Implementing ${seed} in Your Organization: Step-by-Step Guide`,
-      `The ROI of ${seed}: Measuring Business Impact`,
-      `${seed} Mistakes to Avoid: Lessons Learned`,
-      `How to Become a ${seed} Expert in Just 30 Days`,
-      `${seed} Tools and Resources Every Professional Should Know`,
-      `The Psychology Behind Successful ${seed} Strategies`,
-      `${seed} Myths Debunked: Separating Fact from Fiction`,
-    ];
-    
-    return titles[index % titles.length];
   };
 
   const toggleStatus = (id: string) => {
@@ -122,6 +103,7 @@ const DataSeed = () => {
       const contentFromCsv = data.map((row, index) => ({
         id: `csv-${Date.now()}-${index}`,
         title: row.title || row[0] || `Imported Topic ${index + 1}`,
+        preview: row.preview || '',
         content: row.content || '',
         status: 'Review' as const,
       }));
@@ -202,8 +184,8 @@ const DataSeed = () => {
                   <Table>
                     <TableHeader>
                       <TableRow>
-                        <TableHead className="w-[50%]">Topic</TableHead>
-                        <TableHead className="w-[30%]">Content Preview</TableHead>
+                        <TableHead className="w-[40%]">Topic</TableHead>
+                        <TableHead className="w-[40%]">Preview</TableHead>
                         <TableHead>Status</TableHead>
                         <TableHead className="w-[100px]">Actions</TableHead>
                       </TableRow>
@@ -213,7 +195,7 @@ const DataSeed = () => {
                         <TableRow key={item.id}>
                           <TableCell className="font-medium">{item.title}</TableCell>
                           <TableCell className="relative">
-                            <div className="line-clamp-2">{item.content}</div>
+                            <div className="line-clamp-2">{item.preview}</div>
                             <Button
                               variant="ghost"
                               size="icon"

@@ -28,11 +28,16 @@ serve(async (req) => {
         messages: [
           {
             role: 'system',
-            content: `You are a professional LinkedIn content creator. Generate engaging and professional LinkedIn posts about the given topic. Each post should have a title and content. The content should be informative, engaging, and formatted for LinkedIn.`
+            content: `You are a professional LinkedIn content creator. Generate engaging and professional LinkedIn posts about the given topic. Each post should have a title, a short preview, and a full detailed content. 
+            
+            Format the response as a strict JSON array with each object having these fields:
+            - title: A catchy, professional title
+            - preview: A 2-3 sentence summary that can be displayed in a list view
+            - content: A full, detailed post with multiple paragraphs that provides deep insights`
           },
           {
             role: 'user',
-            content: `Generate ${quantity} LinkedIn posts about "${topic}". For each post, provide a title and the post content. Format the response as a JSON array with each object having "title" and "content" fields.`
+            content: `Generate ${quantity} LinkedIn posts about "${topic}". Ensure each post is unique, informative, and provides actionable insights.`
           }
         ],
         temperature: 0.7,
