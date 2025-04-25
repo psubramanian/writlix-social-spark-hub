@@ -77,15 +77,21 @@ serve(async (req) => {
       throw new Error('Failed to verify LinkedIn connection');
     }
 
+    // Calculate expires_at from expires_in
+    const expiresAt = new Date();
+    expiresAt.setSeconds(expiresAt.getSeconds() + tokenData.expires_in);
+
     // Store the access token in user credentials
-    // Since we don't have a user_linkedin_tokens table, we'll store it temporarily in the credentials table
     const { error: tokenSaveError } = await supabase
       .from('user_linkedin_credentials')
       .update({
         client_id: credentials.client_id,
         client_secret: credentials.client_secret,
-        // We would normally store these in the user_linkedin_tokens table
-        // For now, just update what we already have
+        access_token: tokenData.access_token,
+        refresh_token: tokenData.refresh_token,
+        expires_at: expiresAt.toISOString(),
+        linkedin_profile_id: profileData.id,
+        linkedin_profile_data: profileData
       })
       .eq('user_id', user_id);
       

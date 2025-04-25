@@ -36,16 +36,27 @@ const LinkedInOAuth = () => {
         // Check if we have LinkedIn credentials stored
         const { data, error } = await supabase
           .from('user_linkedin_credentials')
-          .select('client_id, client_secret')
+          .select('client_id, access_token, linkedin_profile_data')
           .eq('user_id', user.id)
           .maybeSingle();
           
         if (error) throw error;
         
-        if (data) {
-          // If we have credentials, consider the user connected
+        if (data && data.access_token) {
+          // If we have credentials with an access token, consider the user connected
           setIsConnected(true);
-          setProfileName(user.email || 'LinkedIn User');
+          
+          // Try to get profile name from stored data
+          if (data.linkedin_profile_data) {
+            const profileData = data.linkedin_profile_data;
+            if (profileData.localizedFirstName) {
+              setProfileName(`${profileData.localizedFirstName} ${profileData.localizedLastName || ''}`);
+            } else {
+              setProfileName(user.email || 'LinkedIn User');
+            }
+          } else {
+            setProfileName(user.email || 'LinkedIn User');
+          }
         }
       } catch (error) {
         console.error('Error checking LinkedIn connection:', error);
@@ -184,11 +195,16 @@ const LinkedInOAuth = () => {
     try {
       if (!user) return;
       
-      // Instead of deleting from user_linkedin_tokens (which doesn't exist in types),
-      // we'll just update our LinkedIn credentials status
+      // Update LinkedIn credentials to remove access token
       const { error } = await supabase
         .from('user_linkedin_credentials')
-        .update({ client_id: null, client_secret: null })
+        .update({ 
+          access_token: null,
+          refresh_token: null,
+          expires_at: null,
+          linkedin_profile_id: null,
+          linkedin_profile_data: null
+        })
         .eq('user_id', user.id);
         
       if (error) throw error;
