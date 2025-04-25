@@ -63,6 +63,80 @@ export type Database = {
         }
         Relationships: []
       }
+      schedule_settings: {
+        Row: {
+          created_at: string
+          day_of_month: number | null
+          day_of_week: number | null
+          frequency: Database["public"]["Enums"]["schedule_frequency"]
+          id: string
+          next_run_at: string
+          post_id: string | null
+          time_of_day: string
+          updated_at: string
+        }
+        Insert: {
+          created_at?: string
+          day_of_month?: number | null
+          day_of_week?: number | null
+          frequency: Database["public"]["Enums"]["schedule_frequency"]
+          id?: string
+          next_run_at: string
+          post_id?: string | null
+          time_of_day: string
+          updated_at?: string
+        }
+        Update: {
+          created_at?: string
+          day_of_month?: number | null
+          day_of_week?: number | null
+          frequency?: Database["public"]["Enums"]["schedule_frequency"]
+          id?: string
+          next_run_at?: string
+          post_id?: string | null
+          time_of_day?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "schedule_settings_post_id_fkey"
+            columns: ["post_id"]
+            isOneToOne: false
+            referencedRelation: "scheduled_posts"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      scheduled_posts: {
+        Row: {
+          content: string
+          created_at: string
+          id: string
+          status: string
+          title: string
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          content: string
+          created_at?: string
+          id?: string
+          status?: string
+          title: string
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          content?: string
+          created_at?: string
+          id?: string
+          status?: string
+          title?: string
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
     }
     Views: {
       [_ in never]: never
@@ -71,7 +145,7 @@ export type Database = {
       [_ in never]: never
     }
     Enums: {
-      [_ in never]: never
+      schedule_frequency: "daily" | "weekly" | "monthly"
     }
     CompositeTypes: {
       [_ in never]: never
@@ -186,6 +260,8 @@ export type CompositeTypes<
 
 export const Constants = {
   public: {
-    Enums: {},
+    Enums: {
+      schedule_frequency: ["daily", "weekly", "monthly"],
+    },
   },
 } as const
