@@ -8,12 +8,15 @@ import { cn } from "@/lib/utils";
 interface RichTextEditorProps {
   content: string;
   onChange: (content: string) => void;
+  readOnly?: boolean;
 }
 
-const RichTextEditor = ({ content, onChange }: RichTextEditorProps) => {
+const RichTextEditor = ({ content, onChange, readOnly = false }: RichTextEditorProps) => {
   const [showToolbar, setShowToolbar] = useState(true);
 
   const handleCommand = (command: string, value: string | null = null) => {
+    if (readOnly) return;
+    
     document.execCommand(command, false, value);
     // Get the updated content from the contentEditable div
     const editorElement = document.getElementById('rich-text-editor');
@@ -24,7 +27,7 @@ const RichTextEditor = ({ content, onChange }: RichTextEditorProps) => {
 
   return (
     <div className="w-full border rounded-md">
-      {showToolbar && (
+      {showToolbar && !readOnly && (
         <div className="flex flex-wrap gap-1 p-2 border-b bg-muted/20">
           <Button
             type="button"
@@ -101,11 +104,12 @@ const RichTextEditor = ({ content, onChange }: RichTextEditorProps) => {
           className={cn(
             "w-full p-4 focus:outline-none min-h-[320px]",
             "prose prose-sm max-w-none",
-            "focus:ring-0"
+            "focus:ring-0",
+            readOnly ? "bg-muted/10 cursor-default" : ""
           )}
-          contentEditable
+          contentEditable={!readOnly}
           dangerouslySetInnerHTML={{ __html: content }}
-          onBlur={(e) => onChange(e.currentTarget.innerHTML)}
+          onBlur={(e) => !readOnly && onChange(e.currentTarget.innerHTML)}
           suppressContentEditableWarning
         />
       </ScrollArea>
