@@ -16,6 +16,16 @@ serve(async (req) => {
 
   try {
     const { topic, quantity } = await req.json();
+    
+    if (!openAIApiKey) {
+      console.error('OPENAI_API_KEY is not set in environment variables');
+      return new Response(
+        JSON.stringify({ error: 'OpenAI API key is not configured' }), 
+        { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      );
+    }
+
+    console.log(`Generating ${quantity} content ideas about "${topic}"`);
 
     const response = await fetch('https://api.openai.com/v1/chat/completions', {
       method: 'POST',
@@ -45,16 +55,41 @@ serve(async (req) => {
     });
 
     const data = await response.json();
-    const generatedContent = JSON.parse(data.choices[0].message.content);
-
-    return new Response(JSON.stringify(generatedContent), {
-      headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-    });
+    console.log('OpenAI API response received');
+    
+    if (!data || !data.choices || !data.choices[0] || !data.choices[0].message) {
+      console.error('Unexpected API response format:', JSON.stringify(data));
+      return new Response(
+        JSON.stringify({ error: 'Invalid response from AI service', details: data }), 
+        { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      );
+    }
+    
+    const content = data.choices[0].message.content;
+    console.log('Parsing content from API response');
+    
+    try {
+      const generatedContent = JSON.parse(content);
+      console.log(`Successfully generated ${generatedContent.length} content items`);
+      
+      return new Response(JSON.stringify(generatedContent), {
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+      });
+    } catch (parseError) {
+      console.error('Failed to parse JSON content:', parseError, 'Content:', content);
+      return new Response(
+        JSON.stringify({ 
+          error: 'Failed to parse content from AI service',
+          rawContent: content.substring(0, 500) + (content.length > 500 ? '...' : '')
+        }), 
+        { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      );
+    }
   } catch (error) {
-    console.error('Error:', error);
-    return new Response(JSON.stringify({ error: error.message }), {
-      status: 500,
-      headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-    });
+    console.error('Error in generate-content function:', error);
+    return new Response(
+      JSON.stringify({ error: error.message || 'An unexpected error occurred' }), 
+      { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+    );
   }
 });
