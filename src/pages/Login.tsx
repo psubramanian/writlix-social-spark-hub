@@ -5,7 +5,8 @@ import { useNavigate } from 'react-router-dom';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from '@/components/ui/card';
 import { useToast } from '@/components/ui/use-toast';
-import { Loader2 } from 'lucide-react';
+import { Loader2, AlertCircle } from 'lucide-react';
+import { Alert, AlertDescription } from '@/components/ui/alert';
 
 const Login = () => {
   const { login, isAuthenticated } = useAuth();
@@ -13,8 +14,12 @@ const Login = () => {
   const { toast } = useToast();
   const [isLoading, setIsLoading] = useState(false);
   const [provider, setProvider] = useState<string | null>(null);
+  const [errorMessage, setErrorMessage] = useState<string | null>(null);
   
   useEffect(() => {
+    // Clear any previous error messages
+    setErrorMessage(null);
+    
     if (isAuthenticated) {
       navigate('/dashboard');
     }
@@ -25,6 +30,9 @@ const Login = () => {
     const errorDescription = url.searchParams.get('error_description');
     
     if (error) {
+      setErrorMessage(errorDescription || "There was an error during authentication");
+      console.error("Auth error from URL:", error, errorDescription);
+      
       toast({
         title: "Authentication Error",
         description: errorDescription || "There was an error during authentication",
@@ -39,11 +47,14 @@ const Login = () => {
   // Handle login with selected provider
   const handleLogin = async (providerName: 'google' | 'linkedin_oidc') => {
     try {
+      setErrorMessage(null);
       setIsLoading(true);
       setProvider(providerName);
+      console.log(`Attempting to login with ${providerName}...`);
       await login(providerName);
     } catch (error) {
       console.error('Login error:', error);
+      setErrorMessage(error.message || "There was an error logging in. Please try again.");
       toast({
         title: "Login Failed",
         description: error.message || "There was an error logging in. Please try again.",
@@ -76,6 +87,13 @@ const Login = () => {
             </CardDescription>
           </CardHeader>
           <CardContent className="space-y-4">
+            {errorMessage && (
+              <Alert variant="destructive" className="mb-4">
+                <AlertCircle className="h-4 w-4" />
+                <AlertDescription>{errorMessage}</AlertDescription>
+              </Alert>
+            )}
+            
             <Button 
               className="w-full bg-[#4285F4] hover:bg-[#4285F4]/90 text-white"
               onClick={() => handleLogin('google')}
@@ -115,6 +133,12 @@ const Login = () => {
             </p>
           </CardFooter>
         </Card>
+        
+        <div className="mt-4 text-center">
+          <p className="text-sm text-muted-foreground">
+            Having trouble logging in? <a href="mailto:support@writlix.com" className="text-writlix-blue hover:underline">Contact Support</a>
+          </p>
+        </div>
       </div>
     </div>
   );

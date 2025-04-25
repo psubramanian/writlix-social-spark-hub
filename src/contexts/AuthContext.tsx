@@ -54,6 +54,7 @@ export const AuthProvider: React.FC<{children: React.ReactNode}> = ({ children }
     // Set up auth state listener first
     const { data: { subscription } } = supabase.auth.onAuthStateChange(
       (event, session) => {
+        console.log("Auth state changed:", event, session?.user?.email);
         setSession(session);
         setUser(processUserData(session));
         setIsLoading(false);
@@ -62,6 +63,7 @@ export const AuthProvider: React.FC<{children: React.ReactNode}> = ({ children }
 
     // Then check for existing session
     supabase.auth.getSession().then(({ data: { session } }) => {
+      console.log("Initial session check:", session?.user?.email);
       setSession(session);
       setUser(processUserData(session));
       setIsLoading(false);
@@ -72,33 +74,45 @@ export const AuthProvider: React.FC<{children: React.ReactNode}> = ({ children }
 
   const login = async (provider: 'google' | 'linkedin_oidc') => {
     try {
-      // Get the current URL origin for redirection
-      const redirectTo = `${window.location.origin}/dashboard`;
+      setIsLoading(true);
+      
+      // Get the current URL for redirection
+      const currentOrigin = window.location.origin;
+      const redirectTo = `${currentOrigin}/dashboard`;
+      
+      console.log(`Starting ${provider} login, will redirect to:`, redirectTo);
       
       const { data, error } = await supabase.auth.signInWithOAuth({
         provider,
         options: {
           redirectTo,
-          // Remove captcha parameter as it may be causing issues
           queryParams: {
-            // Only add specific provider parameters if needed
-            // For Google, you might need specific scopes
+            // For Google auth
             ...(provider === 'google' && {
               access_type: 'offline',
-              prompt: 'consent',
+              prompt: 'select_account',
             })
           }
         }
       });
 
-      if (error) throw error;
+      if (error) {
+        console.error(`${provider} login error:`, error);
+        throw error;
+      }
       
-      // Redirect to the OAuth provider's login page if URL is provided
-      if (data.url) window.location.href = data.url;
+      if (data?.url) {
+        console.log(`Redirecting to ${provider} auth URL:`, data.url);
+        window.location.href = data.url;
+      } else {
+        console.error(`No redirect URL returned from ${provider} auth`);
+        throw new Error(`Authentication with ${provider} failed. No redirect URL returned.`);
+      }
       
     } catch (error) {
       console.error('Login error:', error);
-      throw error; // Let the Login component handle the error display
+      setIsLoading(false);
+      throw error;
     }
   };
   
@@ -108,6 +122,7 @@ export const AuthProvider: React.FC<{children: React.ReactNode}> = ({ children }
       if (error) throw error;
       setUser(null);
       setSession(null);
+      console.log("User logged out successfully");
     } catch (error) {
       console.error('Logout error:', error);
       toast({

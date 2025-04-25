@@ -14,7 +14,14 @@ import Schedule from "./pages/Schedule";
 import Settings from "./pages/Settings";
 import NotFound from "./pages/NotFound";
 
-const queryClient = new QueryClient();
+const queryClient = new QueryClient({
+  defaultOptions: {
+    queries: {
+      retry: 1,
+      refetchOnWindowFocus: false,
+    },
+  },
+});
 
 // Protected route wrapper using the useAuth hook
 const ProtectedRoute = ({ children }: { children: React.ReactNode }) => {
@@ -22,10 +29,15 @@ const ProtectedRoute = ({ children }: { children: React.ReactNode }) => {
   
   // Show loading state while checking authentication
   if (isLoading) {
-    return <div className="flex items-center justify-center h-screen">Loading...</div>;
+    return (
+      <div className="flex items-center justify-center h-screen">
+        <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-writlix-blue"></div>
+      </div>
+    );
   }
   
   if (!isAuthenticated) {
+    console.log("User not authenticated, redirecting to login");
     return <Navigate to="/login" replace />;
   }
   
