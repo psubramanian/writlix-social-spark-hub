@@ -26,7 +26,7 @@ interface ScheduledPost {
     day_of_week?: number;
     day_of_month?: number;
     next_run_at: string;
-    timezone: string;
+    timezone?: string; // Make timezone optional since it might not exist in the database
   }[];
 }
 
@@ -61,14 +61,23 @@ export function useScheduledPosts() {
             time_of_day,
             day_of_week,
             day_of_month,
-            next_run_at,
-            timezone
+            next_run_at
           )
         `)
         .eq('content_ideas.status', 'Scheduled');
 
       if (postsError) throw postsError;
-      setPosts(postsData || []);
+      
+      // Map the data to the expected type
+      const formattedPosts: ScheduledPost[] = (postsData || []).map((post: any) => ({
+        ...post,
+        schedule_settings: post.schedule_settings.map((setting: any) => ({
+          ...setting,
+          timezone: 'UTC' // Add a default timezone if missing in DB
+        }))
+      }));
+      
+      setPosts(formattedPosts);
     } catch (error: any) {
       console.error('Error fetching posts:', error);
       toast({
@@ -102,7 +111,6 @@ export function useScheduledPosts() {
           day_of_week: settings.dayOfWeek,
           day_of_month: settings.dayOfMonth,
           next_run_at: nextRunAt.toISOString(),
-          timezone: settings.timezone,
         });
 
       if (settingsError) throw settingsError;
@@ -152,12 +160,7 @@ export function useScheduledPosts() {
     const [hours, minutes] = settings.timeOfDay.split(':').map(Number);
     let nextRun = new Date(now);
     
-    // Convert to the specified timezone
-    const timeZoneOffset = new Date().toLocaleString('en-US', { 
-      timeZone: settings.timezone, 
-      timeZoneName: 'short' 
-    }).split(' ').pop();
-    
+    // Set time
     nextRun.setHours(hours, minutes, 0, 0);
 
     if (nextRun <= now) {

@@ -17,12 +17,34 @@ interface SchedulePostFormProps {
   }) => void;
 }
 
+// Common timezones list
+const commonTimezones = [
+  'UTC',
+  'America/New_York',
+  'America/Chicago',
+  'America/Denver',
+  'America/Los_Angeles',
+  'Europe/London',
+  'Europe/Paris',
+  'Europe/Berlin',
+  'Asia/Tokyo',
+  'Asia/Shanghai',
+  'Australia/Sydney',
+  'Pacific/Auckland'
+];
+
 const SchedulePostForm: React.FC<SchedulePostFormProps> = ({ onSchedule }) => {
   const [frequency, setFrequency] = useState<'daily' | 'weekly' | 'monthly'>('daily');
   const [timeOfDay, setTimeOfDay] = useState('09:00');
   const [dayOfWeek, setDayOfWeek] = useState<number>(1);
   const [dayOfMonth, setDayOfMonth] = useState<number>(1);
-  const [timezone, setTimezone] = useState(() => Intl.DateTimeFormat().resolvedOptions().timeZone);
+  const [timezone, setTimezone] = useState(() => {
+    try {
+      return Intl.DateTimeFormat().resolvedOptions().timeZone;
+    } catch (e) {
+      return 'UTC';
+    }
+  });
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
@@ -50,7 +72,7 @@ const SchedulePostForm: React.FC<SchedulePostFormProps> = ({ onSchedule }) => {
                 <SelectValue placeholder="Select timezone" />
               </SelectTrigger>
               <SelectContent>
-                {Intl.supportedValuesOf('timeZone').map((tz) => (
+                {commonTimezones.map((tz) => (
                   <SelectItem key={tz} value={tz}>
                     {tz}
                   </SelectItem>
@@ -113,7 +135,7 @@ const SchedulePostForm: React.FC<SchedulePostFormProps> = ({ onSchedule }) => {
                   <SelectItem value="4">Thursday</SelectItem>
                   <SelectItem value="5">Friday</SelectItem>
                   <SelectItem value="6">Saturday</SelectItem>
-                  <SelectItem value="7">Sunday</SelectItem>
+                  <SelectItem value="0">Sunday</SelectItem>
                 </SelectContent>
               </Select>
             </div>
