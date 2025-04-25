@@ -3,6 +3,7 @@ import { useState, useEffect } from 'react';
 import { useAuth } from '../contexts/AuthContext';
 import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/components/ui/use-toast';
+import { startOfMonth, endOfMonth } from 'date-fns';
 
 interface DashboardStats {
   postsCreated: number;
@@ -11,7 +12,7 @@ interface DashboardStats {
   engagement: string;
 }
 
-export function useDashboardStats() {
+export function useDashboardStats(selectedMonth: Date) {
   const [stats, setStats] = useState<DashboardStats>({
     postsCreated: 0,
     postsScheduled: 0,
@@ -26,22 +27,31 @@ export function useDashboardStats() {
     try {
       if (!user) return;
 
+      const monthStart = startOfMonth(selectedMonth);
+      const monthEnd = endOfMonth(selectedMonth);
+
       const { data: createdPosts, error: createdError } = await supabase
         .from('content_ideas')
         .select('id', { count: 'exact' })
-        .eq('user_id', user.id);
+        .eq('user_id', user.id)
+        .gte('created_at', monthStart.toISOString())
+        .lte('created_at', monthEnd.toISOString());
 
       const { data: scheduledPosts, error: scheduledError } = await supabase
         .from('scheduled_posts')
         .select('id', { count: 'exact' })
         .eq('user_id', user.id)
-        .eq('status', 'pending');
+        .eq('status', 'pending')
+        .gte('created_at', monthStart.toISOString())
+        .lte('created_at', monthEnd.toISOString());
 
       const { data: publishedPosts, error: publishedError } = await supabase
         .from('content_ideas')
         .select('id', { count: 'exact' })
         .eq('user_id', user.id)
-        .eq('status', 'Published');
+        .eq('status', 'Published')
+        .gte('created_at', monthStart.toISOString())
+        .lte('created_at', monthEnd.toISOString());
 
       if (createdError || scheduledError || publishedError) {
         throw new Error('Error fetching dashboard stats');
@@ -67,7 +77,7 @@ export function useDashboardStats() {
 
   useEffect(() => {
     fetchStats();
-  }, [user]);
+  }, [user, selectedMonth]);
 
   return { stats, loading, refetch: fetchStats };
 }

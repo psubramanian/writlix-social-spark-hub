@@ -1,5 +1,5 @@
 
-import React from 'react';
+import React, { useState } from 'react';
 import { useAuth } from '../contexts/AuthContext';
 import Sidebar from '../components/Sidebar';
 import TopBar from '../components/TopBar';
@@ -7,10 +7,20 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { Button } from '@/components/ui/button';
 import { Link } from 'react-router-dom';
 import { useDashboardStats } from '@/hooks/useDashboardStats';
+import { Calendar } from '@/components/ui/calendar';
+import { format } from 'date-fns';
+import {
+  Popover,
+  PopoverContent,
+  PopoverTrigger,
+} from "@/components/ui/popover";
+import { cn } from '@/lib/utils';
+import { CalendarIcon } from 'lucide-react';
 
 const Dashboard = () => {
   const { user } = useAuth();
-  const { stats, loading } = useDashboardStats();
+  const [date, setDate] = useState<Date>(new Date());
+  const { stats, loading } = useDashboardStats(date);
   
   return (
     <div className="flex h-screen bg-writlix-lightgray">
@@ -20,9 +30,33 @@ const Dashboard = () => {
         <TopBar />
         
         <main className="flex-1 overflow-y-auto p-6">
-          <div className="mb-8">
-            <h1 className="text-2xl font-bold">Dashboard</h1>
-            <p className="text-muted-foreground">Overview of your content and performance</p>
+          <div className="flex justify-between items-center mb-8">
+            <div>
+              <h1 className="text-2xl font-bold">Dashboard</h1>
+              <p className="text-muted-foreground">Overview of your content and performance</p>
+            </div>
+            
+            <Popover>
+              <PopoverTrigger asChild>
+                <Button
+                  variant="outline"
+                  className={cn(
+                    "w-[240px] justify-start text-left font-normal"
+                  )}
+                >
+                  <CalendarIcon className="mr-2 h-4 w-4" />
+                  {format(date, "MMMM yyyy")}
+                </Button>
+              </PopoverTrigger>
+              <PopoverContent className="w-auto p-0" align="end">
+                <Calendar
+                  mode="single"
+                  selected={date}
+                  onSelect={(newDate) => newDate && setDate(newDate)}
+                  initialFocus
+                />
+              </PopoverContent>
+            </Popover>
           </div>
           
           {!user?.linkedInConnected && (
