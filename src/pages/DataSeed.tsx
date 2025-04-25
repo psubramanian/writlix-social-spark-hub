@@ -13,6 +13,7 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { Maximize2, Trash } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
+import { useNavigate } from 'react-router-dom';
 
 interface ContentItem {
   id: string;
@@ -30,6 +31,7 @@ const DataSeed = () => {
   const [selectedContent, setSelectedContent] = useState<ContentItem | null>(null);
   const [userId, setUserId] = useState<string | null>(null);
   const { toast } = useToast();
+  const navigate = useNavigate();
 
   // Get the current user's ID on component mount
   useEffect(() => {
@@ -38,17 +40,18 @@ const DataSeed = () => {
       if (user) {
         setUserId(user.id);
       } else {
-        // If no user is found, show an error message
+        // If no user is found, redirect to login page
         toast({
-          title: "Authentication Error",
-          description: "You must be logged in to generate content",
+          title: "Authentication Required",
+          description: "Please log in to access this page",
           variant: "destructive",
         });
+        navigate('/login');
       }
     };
 
     fetchUser();
-  }, [toast]);
+  }, [toast, navigate]);
 
   const handleGenerate = async () => {
     if (!seed.trim()) {
@@ -66,6 +69,7 @@ const DataSeed = () => {
         description: "You must be logged in to generate content",
         variant: "destructive",
       });
+      navigate('/login');
       return;
     }
     
@@ -89,7 +93,7 @@ const DataSeed = () => {
         status: 'Review' as const,
       }));
 
-      // Store content in the database
+      // Store content in the database - ensure user_id is properly formatted
       for (const item of newContentItems) {
         const { error: dbError } = await supabase
           .from('content_ideas')
@@ -97,23 +101,23 @@ const DataSeed = () => {
             title: item.title,
             content: item.content,
             status: item.status,
-            user_id: userId, // Add the user_id field
+            user_id: userId, // Make sure this matches the type expected by the database
           });
 
         if (dbError) {
           console.error('Database insertion error:', dbError);
-          throw new Error('Failed to save content to database');
+          throw new Error(`Failed to save content to database: ${dbError.message}`);
         }
       }
 
-      // Update local state with new content
+      // Update local state with new content - append to existing content
       setGeneratedContent(prevContent => [...prevContent, ...newContentItems]);
 
       toast({
         title: "Content Generated",
         description: `${quantity} new post ideas have been added and saved to the database.`,
       });
-    } catch (error) {
+    } catch (error: any) {
       console.error('Content generation error:', error);
       toast({
         title: "Generation Failed",
