@@ -1,11 +1,18 @@
 
 import React, { createContext, useContext, useState, useEffect } from "react";
 import { supabase } from "@/integrations/supabase/client";
-import { Session, User } from "@supabase/supabase-js";
+import { Session, User as SupabaseUser } from "@supabase/supabase-js";
 import { useToast } from "@/components/ui/use-toast";
 
+// Extended User type with our custom properties
+export interface ExtendedUser extends SupabaseUser {
+  name?: string;
+  avatar?: string;
+  linkedInConnected?: boolean;
+}
+
 interface AuthContextType {
-  user: User | null;
+  user: ExtendedUser | null;
   session: Session | null;
   isLoading: boolean;
   login: (provider: 'google' | 'linkedin_oidc') => Promise<void>;
@@ -16,17 +23,39 @@ interface AuthContextType {
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
 
 export const AuthProvider: React.FC<{children: React.ReactNode}> = ({ children }) => {
-  const [user, setUser] = useState<User | null>(null);
+  const [user, setUser] = useState<ExtendedUser | null>(null);
   const [session, setSession] = useState<Session | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const { toast } = useToast();
+
+  // Process user data and add our custom properties
+  const processUserData = (session: Session | null) => {
+    if (!session?.user) return null;
+    
+    const userData = session.user as ExtendedUser;
+    
+    // Extract properties from user metadata or set defaults
+    userData.name = userData.user_metadata?.full_name || 
+                    userData.user_metadata?.name || 
+                    'User';
+                    
+    userData.avatar = userData.user_metadata?.avatar_url || 
+                     userData.user_metadata?.picture || 
+                     null;
+                     
+    // Check if user connected with LinkedIn - this is just an example condition
+    userData.linkedInConnected = userData.app_metadata?.provider === 'linkedin_oidc' ||
+                                Boolean(userData.user_metadata?.linkedin_connected);
+                                
+    return userData;
+  };
 
   useEffect(() => {
     // Set up auth state listener
     const { data: { subscription } } = supabase.auth.onAuthStateChange(
       (event, session) => {
         setSession(session);
-        setUser(session?.user ?? null);
+        setUser(processUserData(session));
         setIsLoading(false);
       }
     );
@@ -34,7 +63,7 @@ export const AuthProvider: React.FC<{children: React.ReactNode}> = ({ children }
     // Check for existing session
     supabase.auth.getSession().then(({ data: { session } }) => {
       setSession(session);
-      setUser(session?.user ?? null);
+      setUser(processUserData(session));
       setIsLoading(false);
     });
 
