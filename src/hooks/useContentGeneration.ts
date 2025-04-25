@@ -1,3 +1,4 @@
+
 import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useToast } from '@/components/ui/use-toast';
@@ -9,7 +10,7 @@ interface ContentItem {
   title: string;
   preview: string;
   content: string;
-  status: 'Review' | 'Scheduled';
+  status: 'Review' | 'Scheduled' | 'Published';
   db_id?: number;
 }
 
@@ -19,7 +20,7 @@ export const useContentGeneration = () => {
   const [generatedContent, setGeneratedContent] = useState<ContentItem[]>([]);
   const { toast } = useToast();
   const navigate = useNavigate();
-  const { scheduleContentIdea } = useScheduledPosts();
+  const { scheduleContentIdea, fetchPosts } = useScheduledPosts();
 
   useEffect(() => {
     fetchAllContent();
@@ -61,7 +62,7 @@ export const useContentGeneration = () => {
         title: item.title,
         preview: item.content.substring(0, 100) + '...',
         content: item.content,
-        status: item.status as 'Review' | 'Scheduled',
+        status: item.status as 'Review' | 'Scheduled' | 'Published',
         db_id: item.id
       }));
 
@@ -291,8 +292,55 @@ export const useContentGeneration = () => {
       
       console.log('Found item to delete:', item);
       
+      // Don't allow deleting published content
+      if (item.status === 'Published') {
+        toast({
+          title: "Cannot Delete",
+          description: "Published content cannot be deleted",
+          variant: "destructive",
+        });
+        return;
+      }
+      
+      // First, if it's scheduled, we need to delete the scheduled post entry
+      if (item.status === 'Scheduled' && item.db_id) {
+        console.log('Removing scheduled post for content_id:', item.db_id);
+        const { data: scheduledPost, error: findError } = await supabase
+          .from('scheduled_posts')
+          .select('id')
+          .eq('content_id', item.db_id)
+          .maybeSingle();
+          
+        if (findError && findError.code !== 'PGRST116') {
+          console.error('Error finding scheduled post:', findError);
+        }
+        
+        if (scheduledPost) {
+          // Delete associated schedule settings
+          const { error: settingsError } = await supabase
+            .from('schedule_settings')
+            .delete()
+            .eq('post_id', scheduledPost.id);
+            
+          if (settingsError) {
+            console.error('Error deleting schedule settings:', settingsError);
+          }
+          
+          // Delete scheduled post
+          const { error: deleteScheduleError } = await supabase
+            .from('scheduled_posts')
+            .delete()
+            .eq('id', scheduledPost.id);
+            
+          if (deleteScheduleError) {
+            console.error('Error deleting scheduled post:', deleteScheduleError);
+          }
+        }
+      }
+      
+      // Now delete the content idea itself
       if (item.db_id) {
-        console.log('Deleting using db_id:', item.db_id);
+        console.log('Deleting content with db_id:', item.db_id);
         const { error: deleteError } = await supabase
           .from('content_ideas')
           .delete()
@@ -325,7 +373,11 @@ export const useContentGeneration = () => {
         }
       }
 
+      // Update the UI
       setGeneratedContent(prev => prev.filter(item => item.id !== id));
+      
+      // Refresh the scheduled posts list to reflect changes
+      fetchPosts();
       
       toast({
         title: "Topic Deleted",

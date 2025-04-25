@@ -11,7 +11,7 @@ interface ContentItem {
   title: string;
   preview: string;
   content: string;
-  status: 'Review' | 'Scheduled';
+  status: 'Review' | 'Scheduled' | 'Published';
 }
 
 interface ContentTableProps {
@@ -81,21 +81,30 @@ const ContentTable = ({
                     <TableCell>
                       <Button
                         variant="ghost"
-                        className={item.status === 'Scheduled' ? 'text-green-600' : 'text-yellow-600'}
-                        onClick={() => onStatusToggle(item.id)}
+                        className={
+                          item.status === 'Published' 
+                            ? 'text-blue-600' 
+                            : item.status === 'Scheduled' 
+                              ? 'text-green-600' 
+                              : 'text-yellow-600'
+                        }
+                        onClick={() => item.status !== 'Published' && onStatusToggle(item.id)}
+                        disabled={item.status === 'Published'}
                       >
                         {item.status}
                       </Button>
                     </TableCell>
                     <TableCell>
-                      <Button
-                        variant="ghost"
-                        size="icon"
-                        className="hover:text-red-600"
-                        onClick={() => onDelete(item.id)}
-                      >
-                        <Trash className="h-4 w-4" />
-                      </Button>
+                      {item.status !== 'Published' && (
+                        <Button
+                          variant="ghost"
+                          size="icon"
+                          className="hover:text-red-600"
+                          onClick={() => onDelete(item.id)}
+                        >
+                          <Trash className="h-4 w-4" />
+                        </Button>
+                      )}
                     </TableCell>
                   </TableRow>
                 ))}

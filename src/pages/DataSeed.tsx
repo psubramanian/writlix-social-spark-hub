@@ -12,7 +12,7 @@ interface ContentItem {
   title: string;
   preview: string;
   content: string;
-  status: 'Review' | 'Scheduled';
+  status: 'Review' | 'Scheduled' | 'Published';
 }
 
 const DataSeed = () => {
