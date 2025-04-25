@@ -1,3 +1,4 @@
+
 import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useToast } from '@/components/ui/use-toast';
@@ -22,6 +23,7 @@ export const useContentGeneration = () => {
     const { data: { user }, error: authError } = await supabase.auth.getUser();
     
     if (authError || !user) {
+      console.error("Authentication error:", authError);
       toast({
         title: "Authentication Error",
         description: "You must be logged in to generate content",
@@ -97,10 +99,11 @@ export const useContentGeneration = () => {
     const newStatus = item.status === 'Review' ? 'Scheduled' : 'Review';
 
     try {
+      // Update in the database - We need to use the string ID here
       const { error: updateError } = await supabase
         .from('content_ideas')
         .update({ status: newStatus })
-        .eq('id', id);
+        .eq('id', id); // This expects a string, not a number
 
       if (updateError) throw updateError;
 
@@ -126,10 +129,11 @@ export const useContentGeneration = () => {
 
   const updateContent = async (id: string, content: string) => {
     try {
+      // Update in the database - We need to use the string ID here
       const { error: updateError } = await supabase
         .from('content_ideas')
         .update({ content })
-        .eq('id', id);
+        .eq('id', id); // This expects a string, not a number
 
       if (updateError) throw updateError;
 
