@@ -7,6 +7,13 @@ import { Loader2 } from "lucide-react";
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '../contexts/AuthContext';
 
+// Define types for LinkedIn profile data to avoid TypeScript errors
+interface LinkedInProfileData {
+  localizedFirstName?: string;
+  localizedLastName?: string;
+  [key: string]: any;
+}
+
 const LinkedInOAuth = () => {
   const [isConnected, setIsConnected] = useState(false);
   const [loading, setLoading] = useState(true);
@@ -36,8 +43,9 @@ const LinkedInOAuth = () => {
           setIsConnected(true);
           
           if (data.linkedin_profile_data) {
-            const profileData = data.linkedin_profile_data;
-            if (profileData.localizedFirstName) {
+            // Properly type and access the linkedin_profile_data
+            const profileData = data.linkedin_profile_data as LinkedInProfileData;
+            if (profileData && typeof profileData === 'object' && profileData.localizedFirstName) {
               setProfileName(`${profileData.localizedFirstName} ${profileData.localizedLastName || ''}`);
             }
           }
