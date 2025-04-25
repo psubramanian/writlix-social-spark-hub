@@ -52,7 +52,7 @@ const Login = () => {
       setProvider(providerName);
       console.log(`Attempting to login with ${providerName}...`);
       await login(providerName);
-    } catch (error) {
+    } catch (error: any) {
       console.error('Login error:', error);
       setErrorMessage(error.message || "There was an error logging in. Please try again.");
       toast({

@@ -109,7 +109,7 @@ export const AuthProvider: React.FC<{children: React.ReactNode}> = ({ children }
         throw new Error(`Authentication with ${provider} failed. No redirect URL returned.`);
       }
       
-    } catch (error) {
+    } catch (error: any) {
       console.error('Login error:', error);
       setIsLoading(false);
       throw error;
@@ -123,7 +123,7 @@ export const AuthProvider: React.FC<{children: React.ReactNode}> = ({ children }
       setUser(null);
       setSession(null);
       console.log("User logged out successfully");
-    } catch (error) {
+    } catch (error: any) {
       console.error('Logout error:', error);
       toast({
         title: "Logout Failed",

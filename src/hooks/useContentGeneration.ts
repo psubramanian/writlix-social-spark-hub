@@ -151,6 +151,20 @@ export const useContentGeneration = () => {
     const newStatus = item.status === 'Review' ? 'Scheduled' : 'Review';
 
     try {
+      // Get the current user first
+      const { data: { user }, error: authError } = await supabase.auth.getUser();
+      
+      if (authError || !user) {
+        console.error("Authentication error:", authError);
+        toast({
+          title: "Authentication Error",
+          description: "You must be logged in to update content status",
+          variant: "destructive",
+        });
+        navigate('/login');
+        return;
+      }
+
       const { data: dbItem, error: fetchError } = await supabase
         .from('content_ideas')
         .select('id, title')
@@ -191,6 +205,20 @@ export const useContentGeneration = () => {
 
   const updateContent = async (id: string, content: string) => {
     try {
+      // Get the current user first
+      const { data: { user }, error: authError } = await supabase.auth.getUser();
+      
+      if (authError || !user) {
+        console.error("Authentication error:", authError);
+        toast({
+          title: "Authentication Error",
+          description: "You must be logged in to update content",
+          variant: "destructive",
+        });
+        navigate('/login');
+        return;
+      }
+      
       const item = generatedContent.find(content => content.id === id);
       if (!item) return;
 
@@ -232,12 +260,62 @@ export const useContentGeneration = () => {
     }
   };
 
-  const deleteContent = (id: string) => {
-    setGeneratedContent(prev => prev.filter(item => item.id !== id));
-    toast({
-      title: "Topic Deleted",
-      description: "The selected topic has been removed.",
-    });
+  const deleteContent = async (id: string) => {
+    try {
+      // Get the current user first
+      const { data: { user }, error: authError } = await supabase.auth.getUser();
+      
+      if (authError || !user) {
+        console.error("Authentication error:", authError);
+        toast({
+          title: "Authentication Error",
+          description: "You must be logged in to delete content",
+          variant: "destructive",
+        });
+        navigate('/login');
+        return;
+      }
+      
+      const item = generatedContent.find(content => content.id === id);
+      if (!item) return;
+      
+      const { data: dbItem, error: fetchError } = await supabase
+        .from('content_ideas')
+        .select('id')
+        .eq('title', item.title)
+        .single();
+        
+      if (fetchError) {
+        console.error('Error fetching item from database:', fetchError);
+        // If we can't find it in DB, just remove it from UI
+        setGeneratedContent(prev => prev.filter(item => item.id !== id));
+        return;
+      }
+      
+      const { error: deleteError } = await supabase
+        .from('content_ideas')
+        .delete()
+        .eq('id', dbItem.id);
+        
+      if (deleteError) {
+        console.error('Error deleting from database:', deleteError);
+        throw deleteError;
+      }
+
+      setGeneratedContent(prev => prev.filter(item => item.id !== id));
+      
+      toast({
+        title: "Topic Deleted",
+        description: "The selected topic has been removed.",
+      });
+    } catch (error: any) {
+      console.error('Delete error:', error);
+      toast({
+        title: "Delete Failed",
+        description: error.message || "Failed to delete content",
+        variant: "destructive",
+      });
+    }
   };
 
   const importFromCsv = (data: any[]) => {
