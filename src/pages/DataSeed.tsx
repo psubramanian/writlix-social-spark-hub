@@ -1,3 +1,4 @@
+
 import React, { useState } from 'react';
 import Sidebar from '../components/Sidebar';
 import TopBar from '../components/TopBar';
@@ -42,29 +43,45 @@ const DataSeed = () => {
     setGenerating(true);
     
     try {
-      const { data, error } = await supabase.functions.invoke('generate-content', {
+      const { data: generationData, error: generationError } = await supabase.functions.invoke('generate-content', {
         body: {
           topic: seed,
           quantity,
         },
       });
 
-      if (error) throw new Error(error.message || 'Failed to generate content');
+      if (generationError) throw new Error(generationError.message || 'Failed to generate content');
 
-      setGeneratedContent(prevContent => [
-        ...prevContent,
-        ...data.map((item: any, index: number) => ({
-          id: `content-${Date.now()}-${index}`,
-          title: item.title,
-          preview: item.preview,
-          content: item.content,
-          status: 'Review' as const,
-        }))
-      ]);
+      const newContentItems = generationData.map((item: any, index: number) => ({
+        id: `content-${Date.now()}-${index}`,
+        title: item.title,
+        preview: item.preview,
+        content: item.content,
+        status: 'Review' as const,
+      }));
+
+      // Store content in the database
+      for (const item of newContentItems) {
+        const { error: dbError } = await supabase
+          .from('content_ideas')
+          .insert({
+            title: item.title,
+            content: item.content,
+            status: item.status,
+          });
+
+        if (dbError) {
+          console.error('Database insertion error:', dbError);
+          throw new Error('Failed to save content to database');
+        }
+      }
+
+      // Update local state with new content
+      setGeneratedContent(prevContent => [...prevContent, ...newContentItems]);
 
       toast({
         title: "Content Generated",
-        description: `${quantity} new post ideas have been added.`,
+        description: `${quantity} new post ideas have been added and saved to the database.`,
       });
     } catch (error) {
       console.error('Content generation error:', error);
