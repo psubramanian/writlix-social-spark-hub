@@ -19,17 +19,12 @@ const Schedule = () => {
     const settings = post.schedule_settings[0];
     const nextRun = new Date(settings.next_run_at);
     const time = settings.time_of_day;
+    const timezone = settings.timezone || 'UTC';
     
-    switch (settings.frequency) {
-      case 'daily':
-        return `Daily at ${time}`;
-      case 'weekly':
-        return `Weekly on ${format(nextRun, 'EEEE')} at ${time}`;
-      case 'monthly':
-        return `Monthly on day ${settings.day_of_month} at ${time}`;
-      default:
-        return 'Schedule not set';
-    }
+    const formattedDate = format(nextRun, 'PPP');
+    const formattedTime = format(nextRun, 'p');
+    
+    return `${formattedDate} at ${formattedTime} (${timezone})`;
   };
 
   const handlePostNow = async (postId: string) => {

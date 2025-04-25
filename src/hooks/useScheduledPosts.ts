@@ -9,6 +9,7 @@ interface ScheduleSettings {
   timeOfDay: string;
   dayOfWeek?: number;
   dayOfMonth?: number;
+  timezone: string;
 }
 
 interface ScheduledPost {
@@ -25,6 +26,7 @@ interface ScheduledPost {
     day_of_week?: number;
     day_of_month?: number;
     next_run_at: string;
+    timezone: string;
   }[];
 }
 
@@ -59,7 +61,8 @@ export function useScheduledPosts() {
             time_of_day,
             day_of_week,
             day_of_month,
-            next_run_at
+            next_run_at,
+            timezone
           )
         `)
         .eq('content_ideas.status', 'Scheduled');
@@ -78,7 +81,7 @@ export function useScheduledPosts() {
     }
   };
 
-  const createScheduledPost = async (contentId: number, settings: ScheduleSettings) => {
+  const createScheduledPost = async (settings: ScheduleSettings) => {
     try {
       const { data: { user }, error: authError } = await supabase.auth.getUser();
       
@@ -88,54 +91,32 @@ export function useScheduledPosts() {
         return;
       }
 
-      // First, create the scheduled post
-      const { data: post, error: postError } = await supabase
-        .from('scheduled_posts')
-        .insert({
-          content_id: contentId,
-          user_id: user.id,
-        })
-        .select()
-        .single();
-
-      if (postError) throw postError;
-
-      // Calculate next run time
       const nextRunAt = calculateNextRunTime(settings);
-      const nextRunAtString = nextRunAt.toISOString();
 
       // Create the schedule settings
       const { error: settingsError } = await supabase
         .from('schedule_settings')
         .insert({
-          post_id: post.id,
           frequency: settings.frequency,
           time_of_day: settings.timeOfDay,
           day_of_week: settings.dayOfWeek,
           day_of_month: settings.dayOfMonth,
-          next_run_at: nextRunAtString,
+          next_run_at: nextRunAt.toISOString(),
+          timezone: settings.timezone,
         });
 
       if (settingsError) throw settingsError;
 
-      // Update content status to Scheduled
-      const { error: statusError } = await supabase
-        .from('content_ideas')
-        .update({ status: 'Scheduled' })
-        .eq('id', contentId);
-
-      if (statusError) throw statusError;
-
       await fetchPosts();
       
       toast({
-        title: "Post Scheduled",
-        description: "Your post has been scheduled successfully.",
+        title: "Schedule Updated",
+        description: "Your schedule has been updated successfully.",
       });
     } catch (error: any) {
-      console.error('Error scheduling post:', error);
+      console.error('Error updating schedule:', error);
       toast({
-        title: "Failed to schedule post",
+        title: "Failed to update schedule",
         description: error.message,
         variant: "destructive",
       });
@@ -170,6 +151,12 @@ export function useScheduledPosts() {
     const now = new Date();
     const [hours, minutes] = settings.timeOfDay.split(':').map(Number);
     let nextRun = new Date(now);
+    
+    // Convert to the specified timezone
+    const timeZoneOffset = new Date().toLocaleString('en-US', { 
+      timeZone: settings.timezone, 
+      timeZoneName: 'short' 
+    }).split(' ').pop();
     
     nextRun.setHours(hours, minutes, 0, 0);
 
