@@ -98,13 +98,18 @@ const LinkedInOAuth = () => {
             throw new Error('User not authenticated');
           }
           
+          // Get the exact redirect URI that was used in the authorization request
+          // This ensures it matches what LinkedIn expects
+          const redirectUri = window.location.origin + window.location.pathname;
+          console.log('Redirect URI for token exchange:', redirectUri);
+          
           // Exchange the code for an access token
           const { data, error } = await supabase.functions.invoke('linkedin-oauth', {
             body: { 
               code,
               state,
               user_id: user.id,
-              redirect_uri: window.location.origin + window.location.pathname
+              redirect_uri: redirectUri
             }
           });
           
@@ -172,6 +177,7 @@ const LinkedInOAuth = () => {
       
       // Get the redirect URI (current page)
       const redirectUri = encodeURIComponent(window.location.origin + window.location.pathname);
+      console.log('Using redirect URI:', window.location.origin + window.location.pathname);
       
       // Redirect to LinkedIn authorization page
       const linkedInAuthUrl = `https://www.linkedin.com/oauth/v2/authorization?response_type=code&client_id=${credentials.client_id}&redirect_uri=${redirectUri}&state=${state}&scope=r_liteprofile%20r_emailaddress%20w_member_social`;

@@ -39,6 +39,8 @@ serve(async (req) => {
       throw new Error('LinkedIn credentials not found. Please add your LinkedIn API credentials in Settings.');
     }
 
+    console.log('Using redirect_uri:', redirect_uri);
+    
     // Exchange the authorization code for an access token
     const tokenResponse = await fetch('https://www.linkedin.com/oauth/v2/accessToken', {
       method: 'POST',
