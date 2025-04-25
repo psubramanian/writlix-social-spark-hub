@@ -5,6 +5,7 @@ import TopBar from '../components/TopBar';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import LinkedInConnect from '../components/LinkedInConnect';
+import LinkedInCredentialsForm from '../components/LinkedInCredentialsForm';
 
 const Settings = () => {
   return (
@@ -27,7 +28,8 @@ const Settings = () => {
               <TabsTrigger value="notifications">Notifications</TabsTrigger>
             </TabsList>
             
-            <TabsContent value="connections" className="mt-0">
+            <TabsContent value="connections" className="mt-0 space-y-6">
+              <LinkedInCredentialsForm />
               <Card>
                 <CardHeader>
                   <CardTitle>LinkedIn Connection</CardTitle>
