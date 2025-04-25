@@ -72,10 +72,13 @@ export const AuthProvider: React.FC<{children: React.ReactNode}> = ({ children }
 
   const login = async (provider: 'google' | 'linkedin_oidc') => {
     try {
+      // Get the current URL origin for redirection
+      const redirectUrl = window.location.origin + '/dashboard';
+      
       const { error } = await supabase.auth.signInWithOAuth({
         provider,
         options: {
-          redirectTo: window.location.origin + '/dashboard'
+          redirectTo: redirectUrl
         }
       });
 
