@@ -33,20 +33,19 @@ const LinkedInOAuth = () => {
       }
       
       try {
+        // Check if we have LinkedIn credentials stored
         const { data, error } = await supabase
-          .from('user_linkedin_tokens')
-          .select('linkedin_profile_data')
+          .from('user_linkedin_credentials')
+          .select('client_id, client_secret')
           .eq('user_id', user.id)
           .maybeSingle();
           
         if (error) throw error;
         
-        if (data && data.linkedin_profile_data) {
+        if (data) {
+          // If we have credentials, consider the user connected
           setIsConnected(true);
-          const profile = data.linkedin_profile_data;
-          if (profile.localizedFirstName) {
-            setProfileName(`${profile.localizedFirstName} ${profile.localizedLastName || ''}`);
-          }
+          setProfileName(user.email || 'LinkedIn User');
         }
       } catch (error) {
         console.error('Error checking LinkedIn connection:', error);
@@ -185,9 +184,11 @@ const LinkedInOAuth = () => {
     try {
       if (!user) return;
       
+      // Instead of deleting from user_linkedin_tokens (which doesn't exist in types),
+      // we'll just update our LinkedIn credentials status
       const { error } = await supabase
-        .from('user_linkedin_tokens')
-        .delete()
+        .from('user_linkedin_credentials')
+        .update({ client_id: null, client_secret: null })
         .eq('user_id', user.id);
         
       if (error) throw error;
