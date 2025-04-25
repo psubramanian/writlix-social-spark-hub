@@ -40,10 +40,12 @@ serve(async (req) => {
             role: 'system',
             content: `You are a professional LinkedIn content creator. Generate engaging and professional LinkedIn posts about the given topic. Each post should have a title, a short preview, and a full detailed content. 
             
-            Format the response as a strict JSON array with each object having these fields:
+            Format your response as a JSON array with each object having these exact fields:
             - title: A catchy, professional title
-            - preview: A 2-3 sentence summary that can be displayed in a list view
-            - content: A full, detailed post with multiple paragraphs that provides deep insights`
+            - preview: A 2-3 sentence summary 
+            - content: A full, detailed post with multiple paragraphs
+            
+            Return ONLY the JSON array with no markdown formatting, code blocks, or additional text.`
           },
           {
             role: 'user',
@@ -66,17 +68,28 @@ serve(async (req) => {
     }
     
     const content = data.choices[0].message.content;
-    console.log('Parsing content from API response');
+    console.log('Content received:', content.substring(0, 100) + '...');
     
     try {
-      const generatedContent = JSON.parse(content);
+      // Clean up the content by removing any markdown code block indicators
+      let cleanContent = content;
+      
+      // Remove markdown code block markers if present
+      cleanContent = cleanContent.replace(/```json\s*/g, '');
+      cleanContent = cleanContent.replace(/```\s*$/g, '');
+      
+      // Trim any whitespace
+      cleanContent = cleanContent.trim();
+      
+      console.log('Parsing cleaned JSON content');
+      const generatedContent = JSON.parse(cleanContent);
       console.log(`Successfully generated ${generatedContent.length} content items`);
       
       return new Response(JSON.stringify(generatedContent), {
         headers: { ...corsHeaders, 'Content-Type': 'application/json' },
       });
     } catch (parseError) {
-      console.error('Failed to parse JSON content:', parseError, 'Content:', content);
+      console.error('Failed to parse JSON content:', parseError, 'Content sample:', content.substring(0, 200));
       return new Response(
         JSON.stringify({ 
           error: 'Failed to parse content from AI service',
