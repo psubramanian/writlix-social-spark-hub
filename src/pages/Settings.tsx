@@ -4,7 +4,7 @@ import Sidebar from '../components/Sidebar';
 import TopBar from '../components/TopBar';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import LinkedInConnect from '../components/LinkedInConnect';
+import LinkedInOAuth from '../components/LinkedInOAuth';
 import LinkedInCredentialsForm from '../components/LinkedInCredentialsForm';
 
 const Settings = () => {
@@ -36,7 +36,7 @@ const Settings = () => {
                   <CardDescription>Connect your LinkedIn account to enable post scheduling</CardDescription>
                 </CardHeader>
                 <CardContent>
-                  <LinkedInConnect />
+                  <LinkedInOAuth />
                 </CardContent>
               </Card>
             </TabsContent>
