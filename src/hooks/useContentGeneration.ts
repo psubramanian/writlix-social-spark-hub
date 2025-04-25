@@ -99,11 +99,11 @@ export const useContentGeneration = () => {
     const newStatus = item.status === 'Review' ? 'Scheduled' : 'Review';
 
     try {
-      // Update in the database - We need to use the string ID here
+      // Fix: Use string match for the id in the eq clause
       const { error: updateError } = await supabase
         .from('content_ideas')
         .update({ status: newStatus })
-        .eq('id', id); // This expects a string, not a number
+        .eq('id', id); // Use string comparison
 
       if (updateError) throw updateError;
 
@@ -129,11 +129,11 @@ export const useContentGeneration = () => {
 
   const updateContent = async (id: string, content: string) => {
     try {
-      // Update in the database - We need to use the string ID here
+      // Fix: Use string match for the id in the eq clause
       const { error: updateError } = await supabase
         .from('content_ideas')
         .update({ content })
-        .eq('id', id); // This expects a string, not a number
+        .eq('id', id); // Use string comparison
 
       if (updateError) throw updateError;
 
