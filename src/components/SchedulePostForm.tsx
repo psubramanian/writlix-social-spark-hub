@@ -38,13 +38,7 @@ const SchedulePostForm: React.FC<SchedulePostFormProps> = ({ onSchedule }) => {
   const [timeOfDay, setTimeOfDay] = useState('09:00');
   const [dayOfWeek, setDayOfWeek] = useState<number>(1);
   const [dayOfMonth, setDayOfMonth] = useState<number>(1);
-  const [timezone, setTimezone] = useState(() => {
-    try {
-      return Intl.DateTimeFormat().resolvedOptions().timeZone;
-    } catch (e) {
-      return 'UTC';
-    }
-  });
+  const [timezone, setTimezone] = useState('UTC');
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();

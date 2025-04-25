@@ -69,15 +69,15 @@ export function useScheduledPosts() {
       if (postsError) throw postsError;
       
       // Map the data to the expected type
-      const formattedPosts: ScheduledPost[] = (postsData || []).map((post: any) => ({
+      const formattedPosts = (postsData || []).map((post: any) => ({
         ...post,
         schedule_settings: post.schedule_settings.map((setting: any) => ({
           ...setting,
-          timezone: 'UTC' // Add a default timezone if missing in DB
+          timezone: setting.timezone || 'UTC' // Add a default timezone if missing in DB
         }))
       }));
       
-      setPosts(formattedPosts);
+      setPosts(formattedPosts as ScheduledPost[]);
     } catch (error: any) {
       console.error('Error fetching posts:', error);
       toast({
@@ -111,6 +111,7 @@ export function useScheduledPosts() {
           day_of_week: settings.dayOfWeek,
           day_of_month: settings.dayOfMonth,
           next_run_at: nextRunAt.toISOString(),
+          // We don't insert timezone as it doesn't exist in the database
         });
 
       if (settingsError) throw settingsError;
