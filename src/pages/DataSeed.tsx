@@ -1,5 +1,5 @@
 
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import Sidebar from '../components/Sidebar';
 import TopBar from '../components/TopBar';
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from '@/components/ui/card';
@@ -28,13 +28,42 @@ const DataSeed = () => {
   const [generating, setGenerating] = useState(false);
   const [generatedContent, setGeneratedContent] = useState<ContentItem[]>([]);
   const [selectedContent, setSelectedContent] = useState<ContentItem | null>(null);
+  const [userId, setUserId] = useState<string | null>(null);
   const { toast } = useToast();
+
+  // Get the current user's ID on component mount
+  useEffect(() => {
+    const fetchUser = async () => {
+      const { data: { user } } = await supabase.auth.getUser();
+      if (user) {
+        setUserId(user.id);
+      } else {
+        // If no user is found, show an error message
+        toast({
+          title: "Authentication Error",
+          description: "You must be logged in to generate content",
+          variant: "destructive",
+        });
+      }
+    };
+
+    fetchUser();
+  }, [toast]);
 
   const handleGenerate = async () => {
     if (!seed.trim()) {
       toast({
         title: "Error",
         description: "Please enter a topic seed",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    if (!userId) {
+      toast({
+        title: "Authentication Error",
+        description: "You must be logged in to generate content",
         variant: "destructive",
       });
       return;
@@ -68,6 +97,7 @@ const DataSeed = () => {
             title: item.title,
             content: item.content,
             status: item.status,
+            user_id: userId, // Add the user_id field
           });
 
         if (dbError) {
@@ -180,7 +210,7 @@ const DataSeed = () => {
                 <Button 
                   onClick={handleGenerate} 
                   className="w-full"
-                  disabled={generating || !seed.trim()}
+                  disabled={generating || !seed.trim() || !userId}
                 >
                   {generating ? 'Generating...' : 'Generate Ideas'}
                 </Button>
