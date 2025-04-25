@@ -1,4 +1,3 @@
-
 import React from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
@@ -24,10 +23,9 @@ const PublishedContent = () => {
   const { data: publishedPosts, isLoading } = useQuery({
     queryKey: ['published-posts'],
     queryFn: async () => {
-      // Using a more generic approach to avoid TypeScript errors with tables not in the type definitions
-      const response = await fetch(`${supabase.supabaseUrl}/rest/v1/published_content?order=published_at.desc`, {
+      const response = await fetch(`${import.meta.env.VITE_SUPABASE_URL}/rest/v1/published_content?order=published_at.desc`, {
         headers: {
-          'apikey': supabase.supabaseKey,
+          'apikey': import.meta.env.VITE_SUPABASE_ANON_KEY,
           'Content-Type': 'application/json'
         }
       });
