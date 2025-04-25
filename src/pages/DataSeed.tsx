@@ -10,11 +10,13 @@ import { Textarea } from '@/components/ui/textarea';
 import { useToast } from '@/components/ui/use-toast';
 import CSVImport from '../components/CSVImport';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
-import { Trash } from 'lucide-react';
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
+import { Maximize2, Trash } from 'lucide-react';
 
 interface ContentItem {
   id: string;
   title: string;
+  content: string;
   status: 'Review' | 'Scheduled';
 }
 
@@ -23,9 +25,10 @@ const DataSeed = () => {
   const [quantity, setQuantity] = useState(5);
   const [generating, setGenerating] = useState(false);
   const [generatedContent, setGeneratedContent] = useState<ContentItem[]>([]);
+  const [selectedContent, setSelectedContent] = useState<ContentItem | null>(null);
   const { toast } = useToast();
-  
-  const handleGenerate = () => {
+
+  const handleGenerate = async () => {
     if (!seed.trim()) {
       toast({
         title: "Error",
@@ -36,23 +39,44 @@ const DataSeed = () => {
     }
     
     setGenerating(true);
-    setTimeout(() => {
-      const mockResults = Array.from({ length: quantity }).map((_, index) => ({
+    
+    try {
+      const response = await fetch('/api/generate-content', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          topic: seed,
+          quantity,
+        }),
+      });
+
+      if (!response.ok) throw new Error('Failed to generate content');
+
+      const data = await response.json();
+      setGeneratedContent(data.map((item: any, index: number) => ({
         id: `content-${Date.now()}-${index}`,
-        title: getMockTitle(seed, index),
+        title: item.title,
+        content: item.content,
         status: 'Review' as const,
-      }));
-      
-      setGeneratedContent(mockResults);
-      setGenerating(false);
-      
+      })));
+
       toast({
         title: "Content Generated",
         description: `${quantity} post ideas have been generated.`,
       });
-    }, 1500);
+    } catch (error) {
+      toast({
+        title: "Generation Failed",
+        description: error.message,
+        variant: "destructive",
+      });
+    } finally {
+      setGenerating(false);
+    }
   };
-  
+
   const getMockTitle = (seed: string, index: number) => {
     const titles = [
       `10 Ways ${seed} Can Transform Your Business in 2025`,
@@ -74,7 +98,7 @@ const DataSeed = () => {
     
     return titles[index % titles.length];
   };
-  
+
   const toggleStatus = (id: string) => {
     setGeneratedContent(prev =>
       prev.map(item =>
@@ -84,7 +108,7 @@ const DataSeed = () => {
       )
     );
   };
-  
+
   const handleDelete = (id: string) => {
     setGeneratedContent(prev => prev.filter(item => item.id !== id));
     toast({
@@ -92,12 +116,13 @@ const DataSeed = () => {
       description: "The selected topic has been removed.",
     });
   };
-  
+
   const handleCsvData = (data: any[]) => {
     if (data && data.length > 0) {
       const contentFromCsv = data.map((row, index) => ({
         id: `csv-${Date.now()}-${index}`,
         title: row.title || row[0] || `Imported Topic ${index + 1}`,
+        content: row.content || '',
         status: 'Review' as const,
       }));
       
@@ -177,7 +202,8 @@ const DataSeed = () => {
                   <Table>
                     <TableHeader>
                       <TableRow>
-                        <TableHead>Topic</TableHead>
+                        <TableHead className="w-[50%]">Topic</TableHead>
+                        <TableHead className="w-[30%]">Content Preview</TableHead>
                         <TableHead>Status</TableHead>
                         <TableHead className="w-[100px]">Actions</TableHead>
                       </TableRow>
@@ -186,6 +212,17 @@ const DataSeed = () => {
                       {generatedContent.map((item) => (
                         <TableRow key={item.id}>
                           <TableCell className="font-medium">{item.title}</TableCell>
+                          <TableCell className="relative">
+                            <div className="line-clamp-2">{item.content}</div>
+                            <Button
+                              variant="ghost"
+                              size="icon"
+                              className="absolute right-2 top-1/2 -translate-y-1/2"
+                              onClick={() => setSelectedContent(item)}
+                            >
+                              <Maximize2 className="h-4 w-4" />
+                            </Button>
+                          </TableCell>
                           <TableCell>
                             <Button
                               variant="ghost"
@@ -224,6 +261,17 @@ const DataSeed = () => {
           </div>
         </main>
       </div>
+
+      <Dialog open={!!selectedContent} onOpenChange={() => setSelectedContent(null)}>
+        {selectedContent && (
+          <DialogContent className="max-w-2xl">
+            <DialogHeader>
+              <DialogTitle>{selectedContent.title}</DialogTitle>
+            </DialogHeader>
+            <div className="mt-4 whitespace-pre-wrap">{selectedContent.content}</div>
+          </DialogContent>
+        )}
+      </Dialog>
     </div>
   );
 };
