@@ -19,9 +19,10 @@ export const useContentGeneration = () => {
   const navigate = useNavigate();
 
   const generateContent = async (seed: string, quantity: number) => {
-    const { data: { user } } = await supabase.auth.getUser();
+    // Check if user is authenticated
+    const { data: { user }, error: authError } = await supabase.auth.getUser();
     
-    if (!user) {
+    if (authError || !user) {
       toast({
         title: "Authentication Error",
         description: "You must be logged in to generate content",
@@ -34,6 +35,7 @@ export const useContentGeneration = () => {
     setGenerating(true);
     
     try {
+      // Call the edge function to generate content
       const { data: generationData, error: generationError } = await supabase.functions.invoke('generate-content', {
         body: {
           topic: seed,
@@ -43,6 +45,7 @@ export const useContentGeneration = () => {
 
       if (generationError) throw new Error(generationError.message || 'Failed to generate content');
 
+      // Process the generated content
       const newContentItems = generationData.map((item: any, index: number) => ({
         id: `content-${Date.now()}-${index}`,
         title: item.title,
@@ -51,6 +54,7 @@ export const useContentGeneration = () => {
         status: 'Review' as const,
       }));
 
+      // Save each content item to the database
       for (const item of newContentItems) {
         const { error: dbError } = await supabase
           .from('content_ideas')
@@ -58,7 +62,8 @@ export const useContentGeneration = () => {
             title: item.title,
             content: item.content,
             status: item.status,
-            user_id: user.id,
+            // Store user_id as a string to match the RLS policy
+            user_id: user.id.toString(),
           });
 
         if (dbError) {
@@ -67,7 +72,9 @@ export const useContentGeneration = () => {
         }
       }
 
+      // Update the local state with new content
       setGeneratedContent(prevContent => [...prevContent, ...newContentItems]);
+      
       toast({
         title: "Content Generated",
         description: `${quantity} new post ideas have been added and saved to the database.`,
