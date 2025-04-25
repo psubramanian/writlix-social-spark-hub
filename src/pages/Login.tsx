@@ -14,6 +14,19 @@ const Login = () => {
       navigate('/dashboard');
     }
   }, [isAuthenticated, navigate]);
+
+  // Initialize reCAPTCHA
+  useEffect(() => {
+    const script = document.createElement('script');
+    script.src = 'https://www.google.com/recaptcha/api.js';
+    script.async = true;
+    script.defer = true;
+    document.head.appendChild(script);
+
+    return () => {
+      document.head.removeChild(script);
+    };
+  }, []);
   
   return (
     <div className="min-h-screen flex items-center justify-center bg-writlix-lightblue bg-opacity-30">
@@ -36,6 +49,8 @@ const Login = () => {
             </CardDescription>
           </CardHeader>
           <CardContent className="space-y-4">
+            <div className="g-recaptcha mb-4" data-sitekey="6LeIxAcTAAAAAJcZVRqyHh71UMIEGNQ_MXjiZKhI"></div>
+            
             <Button 
               className="w-full bg-[#4285F4] hover:bg-[#4285F4]/90 text-white"
               onClick={() => login('google')}

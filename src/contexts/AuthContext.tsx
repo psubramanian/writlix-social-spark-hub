@@ -1,4 +1,3 @@
-
 import React, { createContext, useContext, useState, useEffect } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { Session, User as SupabaseUser } from "@supabase/supabase-js";
@@ -75,14 +74,19 @@ export const AuthProvider: React.FC<{children: React.ReactNode}> = ({ children }
       // Get the current URL origin for redirection
       const redirectUrl = window.location.origin + '/dashboard';
       
-      const { error } = await supabase.auth.signInWithOAuth({
+      const { data: { url }, error } = await supabase.auth.signInWithOAuth({
         provider,
         options: {
-          redirectTo: redirectUrl
+          redirectTo: `${window.location.origin}/dashboard`,
+          captchaToken: true // Enable CAPTCHA verification
         }
       });
 
       if (error) throw error;
+      
+      // Redirect to the OAuth provider's login page
+      if (url) window.location.href = url;
+      
     } catch (error) {
       console.error('Login error:', error);
       toast({
