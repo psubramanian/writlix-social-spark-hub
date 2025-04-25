@@ -50,23 +50,30 @@ const LinkedInCredentialsForm = () => {
         client_secret: clientSecret,
       };
 
-      const operation = hasCredentials ? 'update' : 'insert';
+      let error;
       
-      let query = supabase.from('user_linkedin_credentials');
-      
-      if (operation === 'update') {
-        query = query.update(credentials).eq('user_id', user?.id);
+      if (hasCredentials) {
+        // For update operation
+        const { error: updateError } = await supabase
+          .from('user_linkedin_credentials')
+          .update(credentials)
+          .eq('user_id', user?.id);
+        
+        error = updateError;
       } else {
-        query = query.insert(credentials);
+        // For insert operation
+        const { error: insertError } = await supabase
+          .from('user_linkedin_credentials')
+          .insert(credentials);
+        
+        error = insertError;
       }
-
-      const { error } = await query;
       
       if (error) throw error;
 
       toast({
         title: "Success",
-        description: `LinkedIn credentials ${operation}d successfully.`,
+        description: `LinkedIn credentials ${hasCredentials ? 'updated' : 'saved'} successfully.`,
       });
       
       setHasCredentials(true);
