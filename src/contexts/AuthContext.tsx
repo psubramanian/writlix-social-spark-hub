@@ -1,18 +1,14 @@
 
 import React, { createContext, useContext, useState, useEffect } from "react";
-
-interface User {
-  id: string;
-  name: string;
-  email: string;
-  avatar?: string;
-  linkedInConnected: boolean;
-}
+import { supabase } from "@/integrations/supabase/client";
+import { Session, User } from "@supabase/supabase-js";
+import { useToast } from "@/components/ui/use-toast";
 
 interface AuthContextType {
   user: User | null;
+  session: Session | null;
   isLoading: boolean;
-  login: (provider: 'google' | 'linkedin') => Promise<void>;
+  login: (provider: 'google' | 'linkedin_oidc') => Promise<void>;
   logout: () => Promise<void>;
   isAuthenticated: boolean;
 }
@@ -21,59 +17,73 @@ const AuthContext = createContext<AuthContextType | undefined>(undefined);
 
 export const AuthProvider: React.FC<{children: React.ReactNode}> = ({ children }) => {
   const [user, setUser] = useState<User | null>(null);
+  const [session, setSession] = useState<Session | null>(null);
   const [isLoading, setIsLoading] = useState(true);
+  const { toast } = useToast();
 
   useEffect(() => {
-    // Check if user is stored in localStorage
-    const storedUser = localStorage.getItem('writlix-user');
-    if (storedUser) {
-      setUser(JSON.parse(storedUser));
-    }
-    setIsLoading(false);
+    // Set up auth state listener
+    const { data: { subscription } } = supabase.auth.onAuthStateChange(
+      (event, session) => {
+        setSession(session);
+        setUser(session?.user ?? null);
+        setIsLoading(false);
+      }
+    );
+
+    // Check for existing session
+    supabase.auth.getSession().then(({ data: { session } }) => {
+      setSession(session);
+      setUser(session?.user ?? null);
+      setIsLoading(false);
+    });
+
+    return () => subscription.unsubscribe();
   }, []);
 
-  const login = async (provider: 'google' | 'linkedin') => {
-    setIsLoading(true);
+  const login = async (provider: 'google' | 'linkedin_oidc') => {
     try {
-      // This is a mock login for demo purposes
-      // In a real app, you would implement OAuth with the provider
-      const mockUser = {
-        id: `user-${Math.random().toString(36).substr(2, 9)}`,
-        name: provider === 'google' ? 'Jane Doe' : 'John Smith',
-        email: provider === 'google' ? 'jane@example.com' : 'john@example.com',
-        avatar: `https://i.pravatar.cc/150?u=${Math.random()}`,
-        linkedInConnected: provider === 'linkedin',
-      };
-      
-      setUser(mockUser);
-      localStorage.setItem('writlix-user', JSON.stringify(mockUser));
-      
-      console.log(`Logged in with ${provider}`);
+      const { error } = await supabase.auth.signInWithOAuth({
+        provider,
+        options: {
+          redirectTo: window.location.origin + '/dashboard'
+        }
+      });
+
+      if (error) throw error;
     } catch (error) {
       console.error('Login error:', error);
-    } finally {
-      setIsLoading(false);
+      toast({
+        title: "Login Failed",
+        description: error.message,
+        variant: "destructive",
+      });
     }
   };
   
   const logout = async () => {
-    setIsLoading(true);
     try {
+      const { error } = await supabase.auth.signOut();
+      if (error) throw error;
       setUser(null);
-      localStorage.removeItem('writlix-user');
+      setSession(null);
     } catch (error) {
       console.error('Logout error:', error);
-    } finally {
-      setIsLoading(false);
+      toast({
+        title: "Logout Failed",
+        description: error.message,
+        variant: "destructive",
+      });
     }
   };
 
   const value = {
     user,
+    session,
     isLoading,
     login,
     logout,
-    isAuthenticated: !!user,
+    isAuthenticated: !!session,
   };
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;
