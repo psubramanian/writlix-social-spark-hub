@@ -23,6 +23,7 @@ const DataSeed = () => {
     toggleStatus,
     deleteContent,
     importFromCsv,
+    updateContent,
   } = useContentGeneration();
   
   const [selectedContent, setSelectedContent] = useState<ContentItem | null>(null);
@@ -61,6 +62,7 @@ const DataSeed = () => {
       <ContentDialog 
         content={selectedContent}
         onClose={() => setSelectedContent(null)}
+        onUpdate={updateContent}
       />
     </div>
   );

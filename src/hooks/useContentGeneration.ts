@@ -1,4 +1,3 @@
-
 import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useToast } from '@/components/ui/use-toast';
@@ -91,14 +90,67 @@ export const useContentGeneration = () => {
     }
   };
 
-  const toggleStatus = (id: string) => {
-    setGeneratedContent(prev =>
-      prev.map(item =>
-        item.id === id
-          ? { ...item, status: item.status === 'Review' ? 'Scheduled' : 'Review' }
-          : item
-      )
-    );
+  const toggleStatus = async (id: string) => {
+    const item = generatedContent.find(content => content.id === id);
+    if (!item) return;
+
+    const newStatus = item.status === 'Review' ? 'Scheduled' : 'Review';
+
+    try {
+      const { error: updateError } = await supabase
+        .from('content_ideas')
+        .update({ status: newStatus })
+        .eq('id', id);
+
+      if (updateError) throw updateError;
+
+      setGeneratedContent(prev =>
+        prev.map(content =>
+          content.id === id ? { ...content, status: newStatus } : content
+        )
+      );
+
+      toast({
+        title: "Status Updated",
+        description: `Content status changed to ${newStatus}`,
+      });
+    } catch (error: any) {
+      console.error('Status update error:', error);
+      toast({
+        title: "Update Failed",
+        description: error.message || "Failed to update status",
+        variant: "destructive",
+      });
+    }
+  };
+
+  const updateContent = async (id: string, content: string) => {
+    try {
+      const { error: updateError } = await supabase
+        .from('content_ideas')
+        .update({ content })
+        .eq('id', id);
+
+      if (updateError) throw updateError;
+
+      setGeneratedContent(prev =>
+        prev.map(item =>
+          item.id === id ? { ...item, content } : item
+        )
+      );
+
+      toast({
+        title: "Content Updated",
+        description: "Your changes have been saved",
+      });
+    } catch (error: any) {
+      console.error('Content update error:', error);
+      toast({
+        title: "Update Failed",
+        description: error.message || "Failed to update content",
+        variant: "destructive",
+      });
+    }
   };
 
   const deleteContent = (id: string) => {
@@ -132,5 +184,6 @@ export const useContentGeneration = () => {
     toggleStatus,
     deleteContent,
     importFromCsv,
+    updateContent,
   };
 };
