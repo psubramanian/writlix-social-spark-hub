@@ -3,6 +3,8 @@
 export const DEFAULT_SCHEDULE_SETTINGS = {
   frequency: 'daily' as const,
   timeOfDay: '09:00',
+  dayOfWeek: undefined as number | undefined,
+  dayOfMonth: undefined as number | undefined,
   timezone: 'Asia/Kolkata', // India timezone
 };
 

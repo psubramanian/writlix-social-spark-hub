@@ -66,29 +66,26 @@ export function useScheduledPosts() {
           timezone: data.timezone || 'Asia/Kolkata'
         } as ScheduleSettings;
       } else {
-        const defaultSettings = {
-          ...DEFAULT_SCHEDULE_SETTINGS,
-          dayOfWeek: undefined,
-          dayOfMonth: undefined
-        };
-        const nextRunAt = calculateNextRunTime(defaultSettings);
+        const nextRunAt = calculateNextRunTime(DEFAULT_SCHEDULE_SETTINGS);
         
         const { data: newSettings, error: insertError } = await supabase
           .from('schedule_settings')
           .insert({
             user_id: user.id,
             post_id: null,
-            frequency: defaultSettings.frequency,
-            time_of_day: defaultSettings.timeOfDay,
+            frequency: DEFAULT_SCHEDULE_SETTINGS.frequency,
+            time_of_day: DEFAULT_SCHEDULE_SETTINGS.timeOfDay,
+            day_of_week: DEFAULT_SCHEDULE_SETTINGS.dayOfWeek,
+            day_of_month: DEFAULT_SCHEDULE_SETTINGS.dayOfMonth,
             next_run_at: nextRunAt.toISOString(),
-            timezone: defaultSettings.timezone
+            timezone: DEFAULT_SCHEDULE_SETTINGS.timezone
           })
           .select()
           .single();
           
         if (insertError) throw insertError;
         
-        return defaultSettings;
+        return DEFAULT_SCHEDULE_SETTINGS;
       }
     } catch (error) {
       console.error("Error fetching user settings:", error);
@@ -329,15 +326,7 @@ export function useScheduledPosts() {
 
       if (postError) throw postError;
 
-      const scheduleConfig = {
-        frequency: settings.frequency,
-        timeOfDay: settings.timeOfDay,
-        dayOfWeek: settings.dayOfWeek,
-        dayOfMonth: settings.dayOfMonth,
-        timezone: settings.timezone
-      };
-
-      const nextRunAt = calculateNextRunTime(scheduleConfig);
+      const nextRunAt = calculateNextRunTime(settings);
 
       const { error: settingsError } = await supabase
         .from('schedule_settings')
