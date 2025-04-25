@@ -6,18 +6,12 @@ import TopBar from '../components/TopBar';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Link } from 'react-router-dom';
+import { useDashboardStats } from '@/hooks/useDashboardStats';
 
 const Dashboard = () => {
   const { user } = useAuth();
+  const { stats, loading } = useDashboardStats();
   
-  // Mock data for the dashboard
-  const stats = {
-    postsCreated: 12,
-    postsScheduled: 8,
-    postsPublished: 5,
-    engagement: '24%',
-  };
-
   return (
     <div className="flex h-screen bg-writlix-lightgray">
       <Sidebar />
@@ -53,7 +47,9 @@ const Dashboard = () => {
                 </CardTitle>
               </CardHeader>
               <CardContent>
-                <div className="text-3xl font-bold">{stats.postsCreated}</div>
+                <div className="text-3xl font-bold">
+                  {loading ? '...' : stats.postsCreated}
+                </div>
               </CardContent>
             </Card>
             
@@ -64,7 +60,9 @@ const Dashboard = () => {
                 </CardTitle>
               </CardHeader>
               <CardContent>
-                <div className="text-3xl font-bold">{stats.postsScheduled}</div>
+                <div className="text-3xl font-bold">
+                  {loading ? '...' : stats.postsScheduled}
+                </div>
               </CardContent>
             </Card>
             
@@ -75,7 +73,9 @@ const Dashboard = () => {
                 </CardTitle>
               </CardHeader>
               <CardContent>
-                <div className="text-3xl font-bold">{stats.postsPublished}</div>
+                <div className="text-3xl font-bold">
+                  {loading ? '...' : stats.postsPublished}
+                </div>
               </CardContent>
             </Card>
             
