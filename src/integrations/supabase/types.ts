@@ -150,26 +150,41 @@ export type Database = {
       }
       user_linkedin_credentials: {
         Row: {
+          access_token: string | null
           client_id: string
           client_secret: string
           created_at: string | null
+          expires_at: string | null
           id: string
+          linkedin_profile_data: Json | null
+          linkedin_profile_id: string | null
+          refresh_token: string | null
           updated_at: string | null
           user_id: string
         }
         Insert: {
+          access_token?: string | null
           client_id: string
           client_secret: string
           created_at?: string | null
+          expires_at?: string | null
           id?: string
+          linkedin_profile_data?: Json | null
+          linkedin_profile_id?: string | null
+          refresh_token?: string | null
           updated_at?: string | null
           user_id: string
         }
         Update: {
+          access_token?: string | null
           client_id?: string
           client_secret?: string
           created_at?: string | null
+          expires_at?: string | null
           id?: string
+          linkedin_profile_data?: Json | null
+          linkedin_profile_id?: string | null
+          refresh_token?: string | null
           updated_at?: string | null
           user_id?: string
         }

@@ -7,16 +7,6 @@ import { Loader2 } from "lucide-react";
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '../contexts/AuthContext';
 
-// This generates a random string for the state parameter
-const generateRandomString = (length = 20) => {
-  const charset = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789';
-  let result = '';
-  for (let i = 0; i < length; i++) {
-    result += charset.charAt(Math.floor(Math.random() * charset.length));
-  }
-  return result;
-};
-
 const LinkedInOAuth = () => {
   const [isConnected, setIsConnected] = useState(false);
   const [loading, setLoading] = useState(true);
@@ -42,31 +32,30 @@ const LinkedInOAuth = () => {
           
         if (error) throw error;
         
-        if (data && data.access_token) {
-          // If we have credentials with an access token, consider the user connected
+        if (data?.access_token) {
           setIsConnected(true);
           
-          // Try to get profile name from stored data
           if (data.linkedin_profile_data) {
             const profileData = data.linkedin_profile_data;
             if (profileData.localizedFirstName) {
               setProfileName(`${profileData.localizedFirstName} ${profileData.localizedLastName || ''}`);
-            } else {
-              setProfileName(user.email || 'LinkedIn User');
             }
-          } else {
-            setProfileName(user.email || 'LinkedIn User');
           }
         }
       } catch (error) {
         console.error('Error checking LinkedIn connection:', error);
+        toast({
+          title: "Error",
+          description: "Failed to check LinkedIn connection status",
+          variant: "destructive",
+        });
       } finally {
         setLoading(false);
       }
     };
     
     checkConnection();
-  }, [user]);
+  }, [user, toast]);
   
   useEffect(() => {
     // Handle the OAuth callback
@@ -79,7 +68,6 @@ const LinkedInOAuth = () => {
       
       // Clean up URL after processing
       if (code || error) {
-        // Remove query parameters without reloading the page
         window.history.replaceState({}, document.title, window.location.pathname);
       }
       
@@ -125,7 +113,7 @@ const LinkedInOAuth = () => {
           } else {
             throw new Error(data.error || 'Failed to connect LinkedIn account');
           }
-        } catch (error) {
+        } catch (error: any) {
           console.error('LinkedIn OAuth error:', error);
           toast({
             title: "LinkedIn Connection Failed",
@@ -181,7 +169,7 @@ const LinkedInOAuth = () => {
       const linkedInAuthUrl = `https://www.linkedin.com/oauth/v2/authorization?response_type=code&client_id=${credentials.client_id}&redirect_uri=${redirectUri}&state=${state}&scope=r_liteprofile%20r_emailaddress%20w_member_social`;
       
       window.location.href = linkedInAuthUrl;
-    } catch (error) {
+    } catch (error: any) {
       console.error('Error initiating LinkedIn connection:', error);
       toast({
         title: "Connection Error",
@@ -216,7 +204,7 @@ const LinkedInOAuth = () => {
         title: "LinkedIn Disconnected",
         description: "Your LinkedIn account has been disconnected",
       });
-    } catch (error) {
+    } catch (error: any) {
       console.error('Error disconnecting LinkedIn account:', error);
       toast({
         title: "Error",
@@ -224,6 +212,16 @@ const LinkedInOAuth = () => {
         variant: "destructive",
       });
     }
+  };
+
+  // Generate a random string for the state parameter
+  const generateRandomString = (length = 20) => {
+    const charset = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789';
+    let result = '';
+    for (let i = 0; i < length; i++) {
+      result += charset.charAt(Math.floor(Math.random() * charset.length));
+    }
+    return result;
   };
 
   if (loading) {
@@ -271,27 +269,6 @@ const LinkedInOAuth = () => {
             >
               Disconnect
             </Button>
-          </div>
-          
-          <div className="border-t pt-6 mt-6">
-            <h3 className="font-medium mb-4">LinkedIn Settings</h3>
-            
-            <div className="space-y-4">
-              <div>
-                <label className="block text-sm font-medium mb-1">Post Visibility</label>
-                <select className="w-full rounded-md border border-input bg-background px-3 py-2">
-                  <option>Public - Anyone on LinkedIn</option>
-                  <option>Connections only</option>
-                </select>
-              </div>
-              
-              <div>
-                <label className="flex items-center gap-2">
-                  <input type="checkbox" className="h-4 w-4" defaultChecked />
-                  <span>Enable post hashtags</span>
-                </label>
-              </div>
-            </div>
           </div>
         </>
       ) : (
