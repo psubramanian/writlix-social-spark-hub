@@ -10,6 +10,7 @@ interface ContentItem {
   preview: string;
   content: string;
   status: 'Review' | 'Scheduled';
+  db_id?: number;
 }
 
 export const useContentGeneration = () => {
@@ -56,11 +57,12 @@ export const useContentGeneration = () => {
       }
 
       const contentItems: ContentItem[] = data.map((item: any) => ({
-        id: `content-${Date.now()}-${item.id}`,
+        id: `content-${Date.now()}-${Math.random().toString(36).substring(2, 9)}`,
         title: item.title,
         preview: item.content.substring(0, 100) + '...',
         content: item.content,
         status: item.status as 'Review' | 'Scheduled',
+        db_id: item.id
       }));
 
       setGeneratedContent(contentItems);
@@ -266,6 +268,7 @@ export const useContentGeneration = () => {
   };
 
   const deleteContent = async (id: string) => {
+    console.log('Deleting content with ID:', id);
     try {
       const { data: { user }, error: authError } = await supabase.auth.getUser();
       
@@ -281,28 +284,45 @@ export const useContentGeneration = () => {
       }
       
       const item = generatedContent.find(content => content.id === id);
-      if (!item) return;
-      
-      const { data: dbItem, error: fetchError } = await supabase
-        .from('content_ideas')
-        .select('id')
-        .eq('title', item.title)
-        .single();
-        
-      if (fetchError) {
-        console.error('Error fetching item from database:', fetchError);
-        setGeneratedContent(prev => prev.filter(item => item.id !== id));
+      if (!item) {
+        console.error('Item not found in local state:', id);
         return;
       }
       
-      const { error: deleteError } = await supabase
-        .from('content_ideas')
-        .delete()
-        .eq('id', dbItem.id);
-        
-      if (deleteError) {
-        console.error('Error deleting from database:', deleteError);
-        throw deleteError;
+      console.log('Found item to delete:', item);
+      
+      if (item.db_id) {
+        console.log('Deleting using db_id:', item.db_id);
+        const { error: deleteError } = await supabase
+          .from('content_ideas')
+          .delete()
+          .eq('id', item.db_id);
+          
+        if (deleteError) {
+          console.error('Error deleting from database:', deleteError);
+          throw deleteError;
+        }
+      } else {
+        console.log('Fallback: Deleting using title:', item.title);
+        const { data: dbItem, error: fetchError } = await supabase
+          .from('content_ideas')
+          .select('id')
+          .eq('title', item.title)
+          .single();
+          
+        if (fetchError) {
+          console.error('Error fetching item from database:', fetchError);
+        } else {
+          const { error: deleteError } = await supabase
+            .from('content_ideas')
+            .delete()
+            .eq('id', dbItem.id);
+            
+          if (deleteError) {
+            console.error('Error deleting from database:', deleteError);
+            throw deleteError;
+          }
+        }
       }
 
       setGeneratedContent(prev => prev.filter(item => item.id !== id));
