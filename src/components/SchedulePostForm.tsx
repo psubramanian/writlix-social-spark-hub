@@ -1,5 +1,5 @@
 
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { Card, CardContent, CardFooter, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Label } from '@/components/ui/label';
@@ -7,14 +7,17 @@ import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Clock } from 'lucide-react';
 
+interface ScheduleSettings {
+  frequency: 'daily' | 'weekly' | 'monthly';
+  timeOfDay: string;
+  dayOfWeek?: number;
+  dayOfMonth?: number;
+  timezone: string;
+}
+
 interface SchedulePostFormProps {
-  onSchedule: (settings: {
-    frequency: 'daily' | 'weekly' | 'monthly';
-    timeOfDay: string;
-    dayOfWeek?: number;
-    dayOfMonth?: number;
-    timezone: string;
-  }) => void;
+  onSchedule: (settings: ScheduleSettings) => void;
+  initialValues?: ScheduleSettings;
 }
 
 // Common timezones list
@@ -27,18 +30,29 @@ const commonTimezones = [
   'Europe/London',
   'Europe/Paris',
   'Europe/Berlin',
+  'Asia/Kolkata',
   'Asia/Tokyo',
   'Asia/Shanghai',
   'Australia/Sydney',
   'Pacific/Auckland'
 ];
 
-const SchedulePostForm: React.FC<SchedulePostFormProps> = ({ onSchedule }) => {
+const SchedulePostForm: React.FC<SchedulePostFormProps> = ({ onSchedule, initialValues }) => {
   const [frequency, setFrequency] = useState<'daily' | 'weekly' | 'monthly'>('daily');
   const [timeOfDay, setTimeOfDay] = useState('09:00');
   const [dayOfWeek, setDayOfWeek] = useState<number>(1);
   const [dayOfMonth, setDayOfMonth] = useState<number>(1);
-  const [timezone, setTimezone] = useState('UTC');
+  const [timezone, setTimezone] = useState('Asia/Kolkata');
+
+  useEffect(() => {
+    if (initialValues) {
+      setFrequency(initialValues.frequency);
+      setTimeOfDay(initialValues.timeOfDay);
+      if (initialValues.dayOfWeek !== undefined) setDayOfWeek(initialValues.dayOfWeek);
+      if (initialValues.dayOfMonth !== undefined) setDayOfMonth(initialValues.dayOfMonth);
+      setTimezone(initialValues.timezone || 'Asia/Kolkata');
+    }
+  }, [initialValues]);
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
@@ -55,7 +69,7 @@ const SchedulePostForm: React.FC<SchedulePostFormProps> = ({ onSchedule }) => {
   return (
     <Card>
       <CardHeader>
-        <CardTitle>Schedule New Post</CardTitle>
+        <CardTitle>Update Schedule</CardTitle>
       </CardHeader>
       <CardContent>
         <form onSubmit={handleSubmit} className="space-y-6">
@@ -157,7 +171,7 @@ const SchedulePostForm: React.FC<SchedulePostFormProps> = ({ onSchedule }) => {
           )}
 
           <Button type="submit" className="w-full">
-            Schedule Post
+            Update Schedule
           </Button>
         </form>
       </CardContent>

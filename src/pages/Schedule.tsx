@@ -3,15 +3,16 @@ import React from 'react';
 import Sidebar from '../components/Sidebar';
 import TopBar from '../components/TopBar';
 import { format } from 'date-fns';
-import { Calendar, Send } from 'lucide-react';
+import { Calendar, Send, Clock } from 'lucide-react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import SchedulePostForm from '../components/SchedulePostForm';
 import { useScheduledPosts } from '../hooks/useScheduledPosts';
+import { Badge } from '@/components/ui/badge';
 
 const Schedule = () => {
-  const { posts, loading, createScheduledPost, postToLinkedIn } = useScheduledPosts();
+  const { posts, loading, createScheduledPost, postToLinkedIn, userSettings } = useScheduledPosts();
 
   const formatScheduleTime = (post: any) => {
     if (!post.schedule_settings?.[0]) return 'Not scheduled';
@@ -29,6 +30,19 @@ const Schedule = () => {
 
   const handlePostNow = async (postId: string) => {
     await postToLinkedIn(postId);
+  };
+
+  const getFrequencyDisplay = (frequency: string) => {
+    switch (frequency) {
+      case 'daily': return 'Daily';
+      case 'weekly': return userSettings.dayOfWeek !== undefined ? 
+        `Weekly on ${['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'][userSettings.dayOfWeek]}` : 
+        'Weekly';
+      case 'monthly': return userSettings.dayOfMonth !== undefined ? 
+        `Monthly on day ${userSettings.dayOfMonth}` :
+        'Monthly';
+      default: return frequency;
+    }
   };
 
   return (
@@ -59,7 +73,47 @@ const Schedule = () => {
             <TabsContent value="scheduled" className="mt-0">
               <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
                 <div className="lg:col-span-1">
-                  <SchedulePostForm onSchedule={createScheduledPost} />
+                  <Card className="mb-6">
+                    <CardHeader>
+                      <CardTitle className="flex items-center">
+                        <Clock className="h-5 w-5 mr-2" />
+                        Current Schedule
+                      </CardTitle>
+                      <CardDescription>
+                        Your default posting schedule
+                      </CardDescription>
+                    </CardHeader>
+                    <CardContent>
+                      {userSettings ? (
+                        <div className="space-y-2">
+                          <div className="flex items-center justify-between">
+                            <span className="font-medium">Frequency:</span>
+                            <Badge variant="outline">{getFrequencyDisplay(userSettings.frequency)}</Badge>
+                          </div>
+                          <div className="flex items-center justify-between">
+                            <span className="font-medium">Time:</span>
+                            <Badge variant="outline">{userSettings.timeOfDay}</Badge>
+                          </div>
+                          <div className="flex items-center justify-between">
+                            <span className="font-medium">Timezone:</span>
+                            <Badge variant="outline">{userSettings.timezone}</Badge>
+                          </div>
+                        </div>
+                      ) : (
+                        <div className="text-center py-2">Loading your schedule...</div>
+                      )}
+                      <div className="mt-4">
+                        <p className="text-sm text-muted-foreground">
+                          Change your schedule below to update all scheduled posts.
+                        </p>
+                      </div>
+                    </CardContent>
+                  </Card>
+                  
+                  <SchedulePostForm 
+                    onSchedule={createScheduledPost} 
+                    initialValues={userSettings}
+                  />
                 </div>
                 
                 <Card className="lg:col-span-1">

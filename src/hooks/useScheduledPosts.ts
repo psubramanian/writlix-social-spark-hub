@@ -1,7 +1,9 @@
+
 import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useToast } from '@/components/ui/use-toast';
 import { supabase } from '@/integrations/supabase/client';
+import { DEFAULT_SCHEDULE_SETTINGS, calculateNextRunTime } from '@/utils/scheduleUtils';
 
 interface ScheduleSettings {
   frequency: 'daily' | 'weekly' | 'monthly';
@@ -32,8 +34,64 @@ interface ScheduledPost {
 export function useScheduledPosts() {
   const [posts, setPosts] = useState<ScheduledPost[]>([]);
   const [loading, setLoading] = useState(true);
+  const [userSettings, setUserSettings] = useState<ScheduleSettings>(DEFAULT_SCHEDULE_SETTINGS);
   const { toast } = useToast();
   const navigate = useNavigate();
+
+  const fetchUserSettings = async () => {
+    try {
+      const { data: { user }, error: authError } = await supabase.auth.getUser();
+      
+      if (authError || !user) {
+        console.error("Authentication error:", authError);
+        navigate('/login');
+        return null;
+      }
+
+      const { data, error } = await supabase
+        .from('schedule_settings')
+        .select('*')
+        .eq('user_id', user.id)
+        .is('post_id', null)
+        .maybeSingle();
+
+      if (error) throw error;
+
+      if (data) {
+        return {
+          frequency: data.frequency,
+          timeOfDay: data.time_of_day,
+          dayOfWeek: data.day_of_week,
+          dayOfMonth: data.day_of_month,
+          timezone: data.timezone || 'Asia/Kolkata'
+        } as ScheduleSettings;
+      } else {
+        // Create default settings if none exist
+        const defaultSettings = DEFAULT_SCHEDULE_SETTINGS;
+        const nextRunAt = calculateNextRunTime(defaultSettings);
+        
+        const { data: newSettings, error: insertError } = await supabase
+          .from('schedule_settings')
+          .insert({
+            user_id: user.id,
+            post_id: null, // Null post_id indicates these are user default settings
+            frequency: defaultSettings.frequency,
+            time_of_day: defaultSettings.timeOfDay,
+            next_run_at: nextRunAt.toISOString(),
+            timezone: defaultSettings.timezone
+          })
+          .select()
+          .single();
+          
+        if (insertError) throw insertError;
+        
+        return defaultSettings;
+      }
+    } catch (error) {
+      console.error("Error fetching user settings:", error);
+      return DEFAULT_SCHEDULE_SETTINGS;
+    }
+  };
 
   const fetchPosts = async () => {
     try {
@@ -60,7 +118,8 @@ export function useScheduledPosts() {
             time_of_day,
             day_of_week,
             day_of_month,
-            next_run_at
+            next_run_at,
+            timezone
           )
         `)
         .eq('user_id', user.id);
@@ -98,48 +157,131 @@ export function useScheduledPosts() {
         return;
       }
 
-      const nextRunAt = calculateNextRunTime(settings);
+      // First save the user settings (overwrite existing ones if any)
+      await saveUserSettings(settings);
 
-      // First create the scheduled post
-      const { data: postData, error: postError } = await supabase
-        .from('scheduled_posts')
-        .insert({
-          user_id: user.id,
-          status: 'pending'
-        })
-        .select()
-        .single();
-
-      if (postError) throw postError;
-
-      // Then create the schedule settings
-      const { error: settingsError } = await supabase
-        .from('schedule_settings')
-        .insert({
-          post_id: postData.id,
-          frequency: settings.frequency,
-          time_of_day: settings.timeOfDay,
-          day_of_week: settings.dayOfWeek,
-          day_of_month: settings.dayOfMonth,
-          next_run_at: nextRunAt.toISOString()
-        });
-
-      if (settingsError) throw settingsError;
-
-      await fetchPosts();
+      // Then update all scheduled posts with new timings
+      await updateAllScheduledPosts(settings);
       
       toast({
-        title: "Schedule Created",
-        description: "Your schedule has been created successfully.",
+        title: "Schedule Updated",
+        description: "Your schedule has been updated and all scheduled posts have been adjusted.",
       });
     } catch (error: any) {
-      console.error('Error creating schedule:', error);
+      console.error('Error creating/updating schedule:', error);
       toast({
-        title: "Failed to create schedule",
+        title: "Failed to update schedule",
         description: error.message,
         variant: "destructive",
       });
     }
+  };
+
+  const saveUserSettings = async (settings: ScheduleSettings) => {
+    const { data: { user }, error: authError } = await supabase.auth.getUser();
+      
+    if (authError || !user) {
+      console.error("Authentication error:", authError);
+      throw new Error("Authentication required");
+    }
+
+    const nextRunAt = calculateNextRunTime(settings);
+
+    // Check if settings already exist for this user
+    const { data, error } = await supabase
+      .from('schedule_settings')
+      .select('id')
+      .eq('user_id', user.id)
+      .is('post_id', null)
+      .maybeSingle();
+
+    if (error) throw error;
+
+    if (data) {
+      // Update existing settings
+      const { error: updateError } = await supabase
+        .from('schedule_settings')
+        .update({
+          frequency: settings.frequency,
+          time_of_day: settings.timeOfDay,
+          day_of_week: settings.dayOfWeek,
+          day_of_month: settings.dayOfMonth,
+          next_run_at: nextRunAt.toISOString(),
+          timezone: settings.timezone
+        })
+        .eq('id', data.id);
+
+      if (updateError) throw updateError;
+    } else {
+      // Insert new settings
+      const { error: insertError } = await supabase
+        .from('schedule_settings')
+        .insert({
+          user_id: user.id,
+          post_id: null, // null indicates these are user defaults
+          frequency: settings.frequency,
+          time_of_day: settings.timeOfDay,
+          day_of_week: settings.dayOfWeek,
+          day_of_month: settings.dayOfMonth,
+          next_run_at: nextRunAt.toISOString(),
+          timezone: settings.timezone
+        });
+
+      if (insertError) throw insertError;
+    }
+
+    // Update local state
+    setUserSettings(settings);
+  };
+
+  const updateAllScheduledPosts = async (settings: ScheduleSettings) => {
+    const { data: { user }, error: authError } = await supabase.auth.getUser();
+      
+    if (authError || !user) {
+      console.error("Authentication error:", authError);
+      throw new Error("Authentication required");
+    }
+
+    // Get all scheduled posts for this user
+    const { data: postsData, error: postsError } = await supabase
+      .from('scheduled_posts')
+      .select('id, schedule_settings(id)')
+      .eq('user_id', user.id);
+
+    if (postsError) throw postsError;
+
+    // No posts to update
+    if (!postsData || postsData.length === 0) {
+      return;
+    }
+
+    // For each post, update its schedule settings
+    for (const post of postsData) {
+      if (post.schedule_settings && post.schedule_settings.length > 0) {
+        for (const setting of post.schedule_settings) {
+          const nextRunAt = calculateNextRunTime(settings);
+          
+          const { error: updateError } = await supabase
+            .from('schedule_settings')
+            .update({
+              frequency: settings.frequency,
+              time_of_day: settings.timeOfDay,
+              day_of_week: settings.dayOfWeek,
+              day_of_month: settings.dayOfMonth,
+              next_run_at: nextRunAt.toISOString(),
+              timezone: settings.timezone
+            })
+            .eq('id', setting.id);
+
+          if (updateError) {
+            console.error('Error updating setting:', updateError);
+          }
+        }
+      }
+    }
+
+    // Refresh the posts list
+    await fetchPosts();
   };
 
   const postToLinkedIn = async (postId: string) => {
@@ -166,46 +308,78 @@ export function useScheduledPosts() {
     }
   };
 
-  const calculateNextRunTime = (settings: ScheduleSettings): Date => {
-    const now = new Date();
-    const [hours, minutes] = settings.timeOfDay.split(':').map(Number);
-    let nextRun = new Date(now);
-    
-    // Set time
-    nextRun.setHours(hours, minutes, 0, 0);
-
-    if (nextRun <= now) {
-      nextRun.setDate(nextRun.getDate() + 1);
-    }
-
-    switch (settings.frequency) {
-      case 'daily':
-        // Already handled above
-        break;
+  const scheduleContentIdea = async (contentId: number) => {
+    try {
+      const { data: { user }, error: authError } = await supabase.auth.getUser();
       
-      case 'weekly':
-        if (settings.dayOfWeek !== undefined) {
-          const currentDay = nextRun.getDay();
-          const daysUntilTarget = (settings.dayOfWeek - currentDay + 7) % 7;
-          nextRun.setDate(nextRun.getDate() + daysUntilTarget);
-        }
-        break;
-      
-      case 'monthly':
-        if (settings.dayOfMonth !== undefined) {
-          nextRun.setDate(settings.dayOfMonth);
-          if (nextRun <= now) {
-            nextRun.setMonth(nextRun.getMonth() + 1);
-          }
-        }
-        break;
-    }
+      if (authError || !user) {
+        console.error("Authentication error:", authError);
+        navigate('/login');
+        return;
+      }
 
-    return nextRun;
+      // Get the current user settings
+      const settings = await fetchUserSettings();
+      if (!settings) {
+        throw new Error("Could not retrieve user schedule settings");
+      }
+
+      // Create a scheduled post for this content
+      const { data: postData, error: postError } = await supabase
+        .from('scheduled_posts')
+        .insert({
+          user_id: user.id,
+          content_id: contentId,
+          status: 'pending'
+        })
+        .select()
+        .single();
+
+      if (postError) throw postError;
+
+      // Calculate next run time based on user settings
+      const nextRunAt = calculateNextRunTime(settings);
+
+      // Create schedule settings for this post
+      const { error: settingsError } = await supabase
+        .from('schedule_settings')
+        .insert({
+          post_id: postData.id,
+          user_id: user.id,
+          frequency: settings.frequency,
+          time_of_day: settings.timeOfDay,
+          day_of_week: settings.dayOfWeek,
+          day_of_month: settings.dayOfMonth,
+          next_run_at: nextRunAt.toISOString(),
+          timezone: settings.timezone
+        });
+
+      if (settingsError) throw settingsError;
+
+      await fetchPosts();
+      
+      return true;
+    } catch (error: any) {
+      console.error('Error scheduling content:', error);
+      toast({
+        title: "Failed to schedule content",
+        description: error.message,
+        variant: "destructive",
+      });
+      return false;
+    }
   };
 
   useEffect(() => {
-    fetchPosts();
+    const initialize = async () => {
+      const settings = await fetchUserSettings();
+      if (settings) {
+        setUserSettings(settings);
+      }
+      await fetchPosts();
+    };
+    
+    initialize();
   }, []);
 
   return {
@@ -214,5 +388,7 @@ export function useScheduledPosts() {
     createScheduledPost,
     postToLinkedIn,
     fetchPosts,
+    scheduleContentIdea,
+    userSettings
   };
 }

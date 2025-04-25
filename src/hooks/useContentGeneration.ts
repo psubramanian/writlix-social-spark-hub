@@ -1,8 +1,8 @@
-
 import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useToast } from '@/components/ui/use-toast';
 import { supabase } from '@/integrations/supabase/client';
+import { useScheduledPosts } from './useScheduledPosts';
 
 interface ContentItem {
   id: string;
@@ -18,6 +18,7 @@ export const useContentGeneration = () => {
   const [generatedContent, setGeneratedContent] = useState<ContentItem[]>([]);
   const { toast } = useToast();
   const navigate = useNavigate();
+  const { scheduleContentIdea } = useScheduledPosts();
 
   useEffect(() => {
     fetchAllContent();
@@ -79,7 +80,6 @@ export const useContentGeneration = () => {
     setGenerating(true);
     
     try {
-      // Get the current user first
       const { data: { user }, error: authError } = await supabase.auth.getUser();
       
       if (authError || !user) {
@@ -151,7 +151,6 @@ export const useContentGeneration = () => {
     const newStatus = item.status === 'Review' ? 'Scheduled' : 'Review';
 
     try {
-      // Get the current user first
       const { data: { user }, error: authError } = await supabase.auth.getUser();
       
       if (authError || !user) {
@@ -183,6 +182,13 @@ export const useContentGeneration = () => {
 
       if (updateError) throw updateError;
 
+      if (newStatus === 'Scheduled') {
+        const scheduled = await scheduleContentIdea(dbItem.id);
+        if (!scheduled) {
+          throw new Error("Failed to schedule the content");
+        }
+      }
+
       setGeneratedContent(prev =>
         prev.map(content =>
           content.id === id ? { ...content, status: newStatus } : content
@@ -191,7 +197,7 @@ export const useContentGeneration = () => {
 
       toast({
         title: "Status Updated",
-        description: `Content status changed to ${newStatus}`,
+        description: `Content status changed to ${newStatus}${newStatus === 'Scheduled' ? ' and added to your schedule' : ''}`,
       });
     } catch (error: any) {
       console.error('Status update error:', error);
@@ -205,7 +211,6 @@ export const useContentGeneration = () => {
 
   const updateContent = async (id: string, content: string) => {
     try {
-      // Get the current user first
       const { data: { user }, error: authError } = await supabase.auth.getUser();
       
       if (authError || !user) {
@@ -262,7 +267,6 @@ export const useContentGeneration = () => {
 
   const deleteContent = async (id: string) => {
     try {
-      // Get the current user first
       const { data: { user }, error: authError } = await supabase.auth.getUser();
       
       if (authError || !user) {
@@ -287,7 +291,6 @@ export const useContentGeneration = () => {
         
       if (fetchError) {
         console.error('Error fetching item from database:', fetchError);
-        // If we can't find it in DB, just remove it from UI
         setGeneratedContent(prev => prev.filter(item => item.id !== id));
         return;
       }
