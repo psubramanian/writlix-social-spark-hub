@@ -92,6 +92,9 @@ export function useScheduledPosts() {
       // Calculate next run time based on schedule settings
       const nextRunAt = calculateNextRunTime(settings);
 
+      // Convert Date object to ISO string for Supabase
+      const nextRunAtString = nextRunAt.toISOString();
+
       // Then, create the schedule settings
       const { error: settingsError } = await supabase
         .from('schedule_settings')
@@ -101,7 +104,7 @@ export function useScheduledPosts() {
           time_of_day: settings.timeOfDay,
           day_of_week: settings.dayOfWeek,
           day_of_month: settings.dayOfMonth,
-          next_run_at: nextRunAt,
+          next_run_at: nextRunAtString,
         });
 
       if (settingsError) throw settingsError;
