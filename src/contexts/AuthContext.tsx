@@ -51,7 +51,7 @@ export const AuthProvider: React.FC<{children: React.ReactNode}> = ({ children }
   };
 
   useEffect(() => {
-    // Set up auth state listener
+    // Set up auth state listener first
     const { data: { subscription } } = supabase.auth.onAuthStateChange(
       (event, session) => {
         setSession(session);
@@ -60,7 +60,7 @@ export const AuthProvider: React.FC<{children: React.ReactNode}> = ({ children }
       }
     );
 
-    // Check for existing session
+    // Then check for existing session
     supabase.auth.getSession().then(({ data: { session } }) => {
       setSession(session);
       setUser(processUserData(session));
@@ -73,31 +73,32 @@ export const AuthProvider: React.FC<{children: React.ReactNode}> = ({ children }
   const login = async (provider: 'google' | 'linkedin_oidc') => {
     try {
       // Get the current URL origin for redirection
-      const redirectUrl = window.location.origin + '/dashboard';
+      const redirectTo = `${window.location.origin}/dashboard`;
       
-      const { data: { url }, error } = await supabase.auth.signInWithOAuth({
+      const { data, error } = await supabase.auth.signInWithOAuth({
         provider,
         options: {
-          redirectTo: `${window.location.origin}/dashboard`,
-          // Use queryParams for captcha instead of captchaToken
+          redirectTo,
+          // Remove captcha parameter as it may be causing issues
           queryParams: {
-            captchaRequired: 'true'
+            // Only add specific provider parameters if needed
+            // For Google, you might need specific scopes
+            ...(provider === 'google' && {
+              access_type: 'offline',
+              prompt: 'consent',
+            })
           }
         }
       });
 
       if (error) throw error;
       
-      // Redirect to the OAuth provider's login page
-      if (url) window.location.href = url;
+      // Redirect to the OAuth provider's login page if URL is provided
+      if (data.url) window.location.href = data.url;
       
     } catch (error) {
       console.error('Login error:', error);
-      toast({
-        title: "Login Failed",
-        description: error.message,
-        variant: "destructive",
-      });
+      throw error; // Let the Login component handle the error display
     }
   };
   
