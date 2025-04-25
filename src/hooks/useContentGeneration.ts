@@ -99,12 +99,24 @@ export const useContentGeneration = () => {
     const newStatus = item.status === 'Review' ? 'Scheduled' : 'Review';
 
     try {
-      // Convert string ID to number when interacting with the database
-      // or if the ID is a string in the database, parse it correctly
+      // Instead of parsing the ID, use a match on the database ID column
+      // First, need to get the database ID for this item
+      const { data: dbItem, error: fetchError } = await supabase
+        .from('content_ideas')
+        .select('id, title')
+        .eq('title', item.title)
+        .single();
+
+      if (fetchError) {
+        console.error('Error fetching item from database:', fetchError);
+        throw fetchError;
+      }
+
+      // Now update using the database ID
       const { error: updateError } = await supabase
         .from('content_ideas')
         .update({ status: newStatus })
-        .eq('id', parseInt(id, 10)); // Convert string to number
+        .eq('id', dbItem.id);
 
       if (updateError) throw updateError;
 
@@ -130,10 +142,27 @@ export const useContentGeneration = () => {
 
   const updateContent = async (id: string, content: string) => {
     try {
+      // First, find the item in our local state to get its title
+      const item = generatedContent.find(content => content.id === id);
+      if (!item) return;
+
+      // Look up the database ID using the title
+      const { data: dbItem, error: fetchError } = await supabase
+        .from('content_ideas')
+        .select('id')
+        .eq('title', item.title)
+        .single();
+
+      if (fetchError) {
+        console.error('Error fetching item from database:', fetchError);
+        throw fetchError;
+      }
+
+      // Update using the database ID
       const { error: updateError } = await supabase
         .from('content_ideas')
         .update({ content })
-        .eq('id', parseInt(id, 10)); // Convert string to number
+        .eq('id', dbItem.id);
 
       if (updateError) throw updateError;
 
