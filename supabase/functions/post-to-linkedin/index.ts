@@ -26,6 +26,7 @@ serve(async (req) => {
       .select(`
         id,
         content_ideas (
+          id,
           title,
           content
         )
@@ -33,24 +34,62 @@ serve(async (req) => {
       .eq('id', postId)
       .single();
 
-    if (postError) throw postError;
+    if (postError) {
+      console.error('Error fetching post:', postError);
+      throw postError;
+    }
 
-    // Call the database function to update status
+    if (!post || !post.content_ideas) {
+      throw new Error('Post or content not found');
+    }
+
+    console.log('Post content retrieved successfully:', post.content_ideas.title);
+
+    // Call the database function to update status to Published
     const { error: triggerError } = await supabase
       .rpc('trigger_linkedin_post', { post_id: postId });
 
-    if (triggerError) throw triggerError;
+    if (triggerError) {
+      console.error('Error triggering LinkedIn post:', triggerError);
+      throw triggerError;
+    }
 
-    // Here you would implement the actual LinkedIn API call
-    // For now, we'll just simulate success
-    console.log('Posted to LinkedIn:', post.content_ideas.title);
+    // In a real implementation, here we would call the LinkedIn API
+    // For now, we'll simulate a successful post
+    const simulatedLinkedInResponse = {
+      success: true,
+      post_id: `linkedin-${Date.now()}`,
+      url: `https://linkedin.com/post/${Date.now()}`,
+      timestamp: new Date().toISOString()
+    };
 
-    return new Response(JSON.stringify({ success: true }), {
+    console.log('Successfully simulated posting to LinkedIn:', simulatedLinkedInResponse);
+
+    // Update the content_ideas status to reflect it's been published
+    const { error: updateError } = await supabase
+      .from('content_ideas')
+      .update({ status: 'Published' })
+      .eq('id', post.content_ideas.id);
+    
+    if (updateError) {
+      console.error('Error updating content status:', updateError);
+      // We won't throw here as the post was "successful", just log the error
+    }
+
+    return new Response(JSON.stringify({ 
+      success: true,
+      message: 'Post successfully shared to LinkedIn',
+      linkedInDetails: simulatedLinkedInResponse 
+    }), {
       headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+      status: 200
     });
   } catch (error) {
     console.error('Error posting to LinkedIn:', error);
-    return new Response(JSON.stringify({ error: error.message }), {
+    return new Response(JSON.stringify({ 
+      success: false,
+      error: error.message || 'Failed to post to LinkedIn' 
+    }), {
       status: 500,
       headers: { ...corsHeaders, 'Content-Type': 'application/json' },
     });

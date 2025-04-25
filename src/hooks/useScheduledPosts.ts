@@ -277,11 +277,25 @@ export function useScheduledPosts() {
 
   const postToLinkedIn = async (postId: string) => {
     try {
-      const { error } = await supabase.functions.invoke('post-to-linkedin', {
+      setLoading(true);
+      
+      console.log(`Attempting to post content with ID: ${postId} to LinkedIn`);
+      
+      const { data, error } = await supabase.functions.invoke('post-to-linkedin', {
         body: { postId }
       });
 
-      if (error) throw error;
+      if (error) {
+        console.error('Edge function error:', error);
+        throw new Error(error.message || 'Error posting to LinkedIn');
+      }
+
+      if (!data || !data.success) {
+        console.error('Post was not successful:', data);
+        throw new Error(data?.message || 'Failed to post to LinkedIn');
+      }
+
+      console.log('LinkedIn post response:', data);
 
       toast({
         title: "Success",
@@ -289,13 +303,18 @@ export function useScheduledPosts() {
       });
 
       await fetchPosts();
+      
+      return data;
     } catch (error: any) {
       console.error('Error posting to LinkedIn:', error);
       toast({
         title: "Failed to post",
-        description: error.message,
+        description: error.message || "An error occurred while posting to LinkedIn",
         variant: "destructive",
       });
+      return null;
+    } finally {
+      setLoading(false);
     }
   };
 

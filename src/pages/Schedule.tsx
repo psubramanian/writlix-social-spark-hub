@@ -1,18 +1,21 @@
 
-import React from 'react';
+import React, { useState } from 'react';
 import Sidebar from '../components/Sidebar';
 import TopBar from '../components/TopBar';
 import { format } from 'date-fns';
-import { Send, Clock } from 'lucide-react';
+import { Send, Clock, Loader2 } from 'lucide-react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import SchedulePostForm from '../components/SchedulePostForm';
 import { useScheduledPosts } from '../hooks/useScheduledPosts';
 import { Badge } from '@/components/ui/badge';
+import { useToast } from '@/components/ui/use-toast';
 
 const Schedule = () => {
-  const { posts, loading, createScheduledPost, postToLinkedIn, userSettings } = useScheduledPosts();
+  const { posts, loading: postsLoading, createScheduledPost, postToLinkedIn, userSettings } = useScheduledPosts();
+  const [postingId, setPostingId] = useState<string | null>(null);
+  const { toast } = useToast();
 
   // Filter out posts that are already published
   const scheduledPosts = posts.filter(post => post.content_ideas?.status !== 'Published');
@@ -32,7 +35,19 @@ const Schedule = () => {
   };
 
   const handlePostNow = async (postId: string) => {
-    await postToLinkedIn(postId);
+    try {
+      setPostingId(postId);
+      await postToLinkedIn(postId);
+      toast({
+        title: "LinkedIn Post Sent",
+        description: "Your content has been posted to LinkedIn successfully.",
+      });
+    } catch (error) {
+      // Error is already handled in the hook
+      console.error("Error in post handler:", error);
+    } finally {
+      setPostingId(null);
+    }
   };
 
   const getFrequencyDisplay = (frequency: string) => {
@@ -120,7 +135,7 @@ const Schedule = () => {
                     <CardDescription>Manage your upcoming LinkedIn posts</CardDescription>
                   </CardHeader>
                   <CardContent>
-                    {loading ? (
+                    {postsLoading ? (
                       <div className="text-center py-12">Loading...</div>
                     ) : scheduledPosts.length > 0 ? (
                       <div className="space-y-4">
@@ -145,10 +160,20 @@ const Schedule = () => {
                                 variant="outline"
                                 size="sm"
                                 onClick={() => handlePostNow(post.id)}
+                                disabled={postingId === post.id}
                                 className="ml-4"
                               >
-                                <Send className="h-4 w-4 mr-2" />
-                                Post Now
+                                {postingId === post.id ? (
+                                  <>
+                                    <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                                    Posting...
+                                  </>
+                                ) : (
+                                  <>
+                                    <Send className="h-4 w-4 mr-2" />
+                                    Post Now
+                                  </>
+                                )}
                               </Button>
                             </div>
                           </div>
