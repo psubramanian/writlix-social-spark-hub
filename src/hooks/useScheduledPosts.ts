@@ -1,4 +1,3 @@
-
 import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useToast } from '@/components/ui/use-toast';
@@ -26,7 +25,7 @@ interface ScheduledPost {
     day_of_week?: number;
     day_of_month?: number;
     next_run_at: string;
-    timezone?: string; // Make timezone optional since it might not exist in the database
+    timezone: string;
   }[];
 }
 
@@ -64,19 +63,18 @@ export function useScheduledPosts() {
             next_run_at
           )
         `)
-        .eq('content_ideas.status', 'Scheduled');
+        .eq('user_id', user.id);
 
       if (postsError) throw postsError;
-      
-      // Map the data to the expected type
+
       const formattedPosts = (postsData || []).map((post: any) => ({
         ...post,
         schedule_settings: post.schedule_settings.map((setting: any) => ({
           ...setting,
-          timezone: setting.timezone || 'UTC' // Add a default timezone if missing in DB
+          timezone: setting.timezone || 'UTC'
         }))
       }));
-      
+
       setPosts(formattedPosts as ScheduledPost[]);
     } catch (error: any) {
       console.error('Error fetching posts:', error);
@@ -102,16 +100,28 @@ export function useScheduledPosts() {
 
       const nextRunAt = calculateNextRunTime(settings);
 
-      // Create the schedule settings
+      // First create the scheduled post
+      const { data: postData, error: postError } = await supabase
+        .from('scheduled_posts')
+        .insert({
+          user_id: user.id,
+          status: 'pending'
+        })
+        .select()
+        .single();
+
+      if (postError) throw postError;
+
+      // Then create the schedule settings
       const { error: settingsError } = await supabase
         .from('schedule_settings')
         .insert({
+          post_id: postData.id,
           frequency: settings.frequency,
           time_of_day: settings.timeOfDay,
           day_of_week: settings.dayOfWeek,
           day_of_month: settings.dayOfMonth,
-          next_run_at: nextRunAt.toISOString(),
-          // We don't insert timezone as it doesn't exist in the database
+          next_run_at: nextRunAt.toISOString()
         });
 
       if (settingsError) throw settingsError;
@@ -119,13 +129,13 @@ export function useScheduledPosts() {
       await fetchPosts();
       
       toast({
-        title: "Schedule Updated",
-        description: "Your schedule has been updated successfully.",
+        title: "Schedule Created",
+        description: "Your schedule has been created successfully.",
       });
     } catch (error: any) {
-      console.error('Error updating schedule:', error);
+      console.error('Error creating schedule:', error);
       toast({
-        title: "Failed to update schedule",
+        title: "Failed to create schedule",
         description: error.message,
         variant: "destructive",
       });
