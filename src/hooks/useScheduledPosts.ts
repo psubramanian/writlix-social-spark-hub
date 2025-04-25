@@ -77,7 +77,7 @@ export function useScheduledPosts() {
           .from('schedule_settings')
           .insert({
             user_id: user.id,
-            post_id: null, // Null post_id indicates these are user default settings
+            post_id: null,
             frequency: defaultSettings.frequency,
             time_of_day: defaultSettings.timeOfDay,
             next_run_at: nextRunAt.toISOString(),
@@ -329,7 +329,15 @@ export function useScheduledPosts() {
 
       if (postError) throw postError;
 
-      const nextRunAt = calculateNextRunTime(settings);
+      const scheduleConfig = {
+        frequency: settings.frequency,
+        timeOfDay: settings.timeOfDay,
+        dayOfWeek: settings.dayOfWeek,
+        dayOfMonth: settings.dayOfMonth,
+        timezone: settings.timezone
+      };
+
+      const nextRunAt = calculateNextRunTime(scheduleConfig);
 
       const { error: settingsError } = await supabase
         .from('schedule_settings')
