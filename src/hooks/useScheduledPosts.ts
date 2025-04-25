@@ -13,10 +13,19 @@ interface ScheduleSettings {
 
 interface ScheduledPost {
   id: string;
-  title: string;
-  content: string;
-  status: string;
-  settings?: ScheduleSettings;
+  content_ideas: {
+    id: number;
+    title: string;
+    content: string;
+    status: string;
+  };
+  schedule_settings: {
+    frequency: 'daily' | 'weekly' | 'monthly';
+    time_of_day: string;
+    day_of_week?: number;
+    day_of_month?: number;
+    next_run_at: string;
+  }[];
 }
 
 export function useScheduledPosts() {
@@ -35,11 +44,16 @@ export function useScheduledPosts() {
         return;
       }
 
-      // Fetch posts and their schedule settings
       const { data: postsData, error: postsError } = await supabase
         .from('scheduled_posts')
         .select(`
           *,
+          content_ideas (
+            id,
+            title,
+            content,
+            status
+          ),
           schedule_settings (
             frequency,
             time_of_day,
@@ -47,12 +61,10 @@ export function useScheduledPosts() {
             day_of_month,
             next_run_at
           )
-        `);
+        `)
+        .eq('content_ideas.status', 'Scheduled');
 
-      if (postsError) {
-        throw postsError;
-      }
-
+      if (postsError) throw postsError;
       setPosts(postsData || []);
     } catch (error: any) {
       console.error('Error fetching posts:', error);
@@ -66,7 +78,7 @@ export function useScheduledPosts() {
     }
   };
 
-  const createPost = async (title: string, content: string, settings: ScheduleSettings) => {
+  const createScheduledPost = async (contentId: number, settings: ScheduleSettings) => {
     try {
       const { data: { user }, error: authError } = await supabase.auth.getUser();
       
@@ -76,12 +88,11 @@ export function useScheduledPosts() {
         return;
       }
 
-      // First, create the post
+      // First, create the scheduled post
       const { data: post, error: postError } = await supabase
         .from('scheduled_posts')
         .insert({
-          title,
-          content,
+          content_id: contentId,
           user_id: user.id,
         })
         .select()
@@ -89,13 +100,11 @@ export function useScheduledPosts() {
 
       if (postError) throw postError;
 
-      // Calculate next run time based on schedule settings
+      // Calculate next run time
       const nextRunAt = calculateNextRunTime(settings);
-
-      // Convert Date object to ISO string for Supabase
       const nextRunAtString = nextRunAt.toISOString();
 
-      // Then, create the schedule settings
+      // Create the schedule settings
       const { error: settingsError } = await supabase
         .from('schedule_settings')
         .insert({
@@ -109,6 +118,14 @@ export function useScheduledPosts() {
 
       if (settingsError) throw settingsError;
 
+      // Update content status to Scheduled
+      const { error: statusError } = await supabase
+        .from('content_ideas')
+        .update({ status: 'Scheduled' })
+        .eq('id', contentId);
+
+      if (statusError) throw statusError;
+
       await fetchPosts();
       
       toast({
@@ -116,9 +133,33 @@ export function useScheduledPosts() {
         description: "Your post has been scheduled successfully.",
       });
     } catch (error: any) {
-      console.error('Error creating post:', error);
+      console.error('Error scheduling post:', error);
       toast({
         title: "Failed to schedule post",
+        description: error.message,
+        variant: "destructive",
+      });
+    }
+  };
+
+  const postToLinkedIn = async (postId: string) => {
+    try {
+      const { error } = await supabase.functions.invoke('post-to-linkedin', {
+        body: { postId }
+      });
+
+      if (error) throw error;
+
+      toast({
+        title: "Success",
+        description: "Post has been shared to LinkedIn",
+      });
+
+      await fetchPosts();
+    } catch (error: any) {
+      console.error('Error posting to LinkedIn:', error);
+      toast({
+        title: "Failed to post",
         description: error.message,
         variant: "destructive",
       });
@@ -169,7 +210,8 @@ export function useScheduledPosts() {
   return {
     posts,
     loading,
-    createPost,
+    createScheduledPost,
+    postToLinkedIn,
     fetchPosts,
   };
 }

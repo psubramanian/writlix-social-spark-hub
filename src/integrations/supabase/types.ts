@@ -109,40 +109,48 @@ export type Database = {
       }
       scheduled_posts: {
         Row: {
-          content: string
+          content_id: number | null
           created_at: string
           id: string
           status: string
-          title: string
           updated_at: string
           user_id: string
         }
         Insert: {
-          content: string
+          content_id?: number | null
           created_at?: string
           id?: string
           status?: string
-          title: string
           updated_at?: string
           user_id: string
         }
         Update: {
-          content?: string
+          content_id?: number | null
           created_at?: string
           id?: string
           status?: string
-          title?: string
           updated_at?: string
           user_id?: string
         }
-        Relationships: []
+        Relationships: [
+          {
+            foreignKeyName: "scheduled_posts_content_id_fkey"
+            columns: ["content_id"]
+            isOneToOne: false
+            referencedRelation: "content_ideas"
+            referencedColumns: ["id"]
+          },
+        ]
       }
     }
     Views: {
       [_ in never]: never
     }
     Functions: {
-      [_ in never]: never
+      trigger_linkedin_post: {
+        Args: { post_id: string }
+        Returns: undefined
+      }
     }
     Enums: {
       schedule_frequency: "daily" | "weekly" | "monthly"

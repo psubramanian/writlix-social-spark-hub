@@ -1,14 +1,14 @@
 
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { Card, CardContent, CardFooter, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
-import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { supabase } from '@/integrations/supabase/client';
 
 interface SchedulePostFormProps {
-  onSchedule: (title: string, content: string, settings: {
+  onSchedule: (contentId: number, settings: {
     frequency: 'daily' | 'weekly' | 'monthly';
     timeOfDay: string;
     dayOfWeek?: number;
@@ -17,17 +17,37 @@ interface SchedulePostFormProps {
 }
 
 const SchedulePostForm: React.FC<SchedulePostFormProps> = ({ onSchedule }) => {
-  const [title, setTitle] = useState('');
-  const [content, setContent] = useState('');
   const [frequency, setFrequency] = useState<'daily' | 'weekly' | 'monthly'>('daily');
   const [timeOfDay, setTimeOfDay] = useState('09:00');
   const [dayOfWeek, setDayOfWeek] = useState<number>(1);
   const [dayOfMonth, setDayOfMonth] = useState<number>(1);
+  const [contentId, setContentId] = useState<number | null>(null);
+  const [availableContent, setAvailableContent] = useState<Array<{ id: number, title: string }>>([]);
+
+  useEffect(() => {
+    fetchAvailableContent();
+  }, []);
+
+  const fetchAvailableContent = async () => {
+    const { data, error } = await supabase
+      .from('content_ideas')
+      .select('id, title')
+      .eq('status', 'Review');
+    
+    if (error) {
+      console.error('Error fetching content:', error);
+      return;
+    }
+    
+    setAvailableContent(data || []);
+  };
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     
-    onSchedule(title, content, {
+    if (!contentId) return;
+    
+    onSchedule(contentId, {
       frequency,
       timeOfDay,
       ...(frequency === 'weekly' && { dayOfWeek }),
@@ -35,8 +55,7 @@ const SchedulePostForm: React.FC<SchedulePostFormProps> = ({ onSchedule }) => {
     });
 
     // Reset form
-    setTitle('');
-    setContent('');
+    setContentId(null);
   };
 
   return (
@@ -47,23 +66,22 @@ const SchedulePostForm: React.FC<SchedulePostFormProps> = ({ onSchedule }) => {
       <CardContent>
         <form onSubmit={handleSubmit} className="space-y-6">
           <div className="space-y-2">
-            <Label htmlFor="title">Post Title</Label>
-            <Input
-              id="title"
-              value={title}
-              onChange={(e) => setTitle(e.target.value)}
-              required
-            />
-          </div>
-
-          <div className="space-y-2">
-            <Label htmlFor="content">Content</Label>
-            <Input
-              id="content"
-              value={content}
-              onChange={(e) => setContent(e.target.value)}
-              required
-            />
+            <Label>Select Content</Label>
+            <Select
+              value={contentId?.toString()}
+              onValueChange={(value) => setContentId(Number(value))}
+            >
+              <SelectTrigger>
+                <SelectValue placeholder="Select content to schedule" />
+              </SelectTrigger>
+              <SelectContent>
+                {availableContent.map((content) => (
+                  <SelectItem key={content.id} value={content.id.toString()}>
+                    {content.title}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
           </div>
 
           <div className="space-y-4">
@@ -90,11 +108,12 @@ const SchedulePostForm: React.FC<SchedulePostFormProps> = ({ onSchedule }) => {
 
           <div className="space-y-2">
             <Label htmlFor="timeOfDay">Time of Day</Label>
-            <Input
+            <input
               id="timeOfDay"
               type="time"
               value={timeOfDay}
               onChange={(e) => setTimeOfDay(e.target.value)}
+              className="w-full px-3 py-2 border rounded-md"
               required
             />
           </div>
@@ -143,7 +162,13 @@ const SchedulePostForm: React.FC<SchedulePostFormProps> = ({ onSchedule }) => {
             </div>
           )}
 
-          <Button type="submit" className="w-full">Schedule Post</Button>
+          <Button 
+            type="submit" 
+            className="w-full"
+            disabled={!contentId}
+          >
+            Schedule Post
+          </Button>
         </form>
       </CardContent>
     </Card>
