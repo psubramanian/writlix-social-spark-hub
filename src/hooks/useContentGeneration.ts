@@ -1,4 +1,3 @@
-
 import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useToast } from '@/components/ui/use-toast';
@@ -144,6 +143,72 @@ export const useContentGeneration = () => {
       });
     } finally {
       setGenerating(false);
+    }
+  };
+
+  const regenerateContent = async (id: string, title: string) => {
+    try {
+      const { data: { user }, error: authError } = await supabase.auth.getUser();
+      
+      if (authError || !user) {
+        console.error("Authentication error:", authError);
+        toast({
+          title: "Authentication Error",
+          description: "You must be logged in to regenerate content",
+          variant: "destructive",
+        });
+        navigate('/login');
+        return;
+      }
+
+      const { data: generationData, error: generationError } = await supabase.functions.invoke('generate-content', {
+        body: {
+          topic: title,
+          quantity: 1,
+        },
+      });
+
+      if (generationError) throw new Error(generationError.message || 'Failed to regenerate content');
+
+      const newContent = generationData[0];
+      
+      const item = generatedContent.find(content => content.id === id);
+      if (!item) return;
+
+      const { error: dbError } = await supabase
+        .from('content_ideas')
+        .update({
+          content: newContent.content,
+          title: newContent.title,
+        })
+        .eq('title', item.title);
+
+      if (dbError) throw dbError;
+
+      setGeneratedContent(prev =>
+        prev.map(content =>
+          content.id === id
+            ? {
+                ...content,
+                title: newContent.title,
+                preview: newContent.preview,
+                content: newContent.content,
+              }
+            : content
+        )
+      );
+
+      toast({
+        title: "Content Regenerated",
+        description: "Your content has been regenerated successfully.",
+      });
+    } catch (error: any) {
+      console.error('Content regeneration error:', error);
+      toast({
+        title: "Regeneration Failed",
+        description: error.message || "Failed to regenerate content",
+        variant: "destructive",
+      });
     }
   };
 
@@ -393,20 +458,60 @@ export const useContentGeneration = () => {
     }
   };
 
-  const importFromCsv = (data: any[]) => {
-    const contentFromCsv = data.map((row, index) => ({
-      id: `csv-${Date.now()}-${index}`,
-      title: row.title || row[0] || `Imported Topic ${index + 1}`,
-      preview: row.preview || '',
-      content: row.content || '',
-      status: 'Review' as const,
-    }));
-    
-    setGeneratedContent(contentFromCsv);
-    toast({
-      title: "CSV Imported",
-      description: `${contentFromCsv.length} post ideas imported.`,
-    });
+  const importFromCsv = async (data: any[]) => {
+    try {
+      const { data: { user }, error: authError } = await supabase.auth.getUser();
+      
+      if (authError || !user) {
+        console.error("Authentication error:", authError);
+        toast({
+          title: "Authentication Error",
+          description: "You must be logged in to import content",
+          variant: "destructive",
+        });
+        navigate('/login');
+        return;
+      }
+
+      const contentFromCsv = data.map((row, index) => ({
+        id: `csv-${Date.now()}-${index}`,
+        title: row.title || row[0] || `Imported Topic ${index + 1}`,
+        preview: row.preview || '',
+        content: row.content || '',
+        status: 'Review' as const,
+      }));
+
+      // Insert into database
+      for (const item of contentFromCsv) {
+        const { error: dbError } = await supabase
+          .from('content_ideas')
+          .insert({
+            title: item.title,
+            content: item.content,
+            status: item.status,
+            user_id: user.id.toString(),
+          });
+
+        if (dbError) {
+          console.error('Database insertion error:', dbError);
+          throw new Error(`Failed to save content to database: ${dbError.message}`);
+        }
+      }
+      
+      setGeneratedContent(prev => [...prev, ...contentFromCsv]);
+      
+      toast({
+        title: "CSV Imported",
+        description: `${contentFromCsv.length} post ideas imported and saved.`,
+      });
+    } catch (error: any) {
+      console.error('CSV import error:', error);
+      toast({
+        title: "Import Failed",
+        description: error.message || "Failed to import CSV content",
+        variant: "destructive",
+      });
+    }
   };
 
   return {
@@ -414,6 +519,7 @@ export const useContentGeneration = () => {
     loading,
     generatedContent,
     generateContent,
+    regenerateContent,
     toggleStatus,
     deleteContent,
     importFromCsv,

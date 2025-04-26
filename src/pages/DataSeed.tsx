@@ -21,6 +21,7 @@ const DataSeed = () => {
     loading,
     generatedContent,
     generateContent,
+    regenerateContent,
     toggleStatus,
     deleteContent,
     importFromCsv,
@@ -28,6 +29,18 @@ const DataSeed = () => {
   } = useContentGeneration();
   
   const [selectedContent, setSelectedContent] = React.useState<ContentItem | null>(null);
+
+  const handleRegenerate = async (id: string) => {
+    const item = generatedContent.find(content => content.id === id);
+    if (item) {
+      await regenerateContent(id, item.title);
+      // Update the selected content with the new regenerated content
+      const updatedContent = generatedContent.find(content => content.id === id);
+      if (updatedContent) {
+        setSelectedContent(updatedContent);
+      }
+    }
+  };
 
   return (
     <div className="flex h-screen bg-writlix-lightgray">
@@ -64,6 +77,7 @@ const DataSeed = () => {
         content={selectedContent}
         onClose={() => setSelectedContent(null)}
         onUpdate={updateContent}
+        onRegenerate={handleRegenerate}
       />
     </div>
   );
