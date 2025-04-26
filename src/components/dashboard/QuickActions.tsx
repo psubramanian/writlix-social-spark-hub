@@ -2,6 +2,7 @@
 import { Link } from 'react-router-dom';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
+import { Linkedin } from 'lucide-react';
 
 export function QuickActions() {
   return (
@@ -32,6 +33,13 @@ export function QuickActions() {
                 <line x1="3" y1="10" x2="21" y2="10"></line>
               </svg>
               Schedule your content
+            </Button>
+          </Link>
+          
+          <Link to="/settings?tab=connections" className="block">
+            <Button variant="outline" className="w-full justify-start">
+              <Linkedin className="mr-2 h-4 w-4" />
+              Connect LinkedIn account
             </Button>
           </Link>
           

@@ -1,5 +1,6 @@
 
-import React from 'react';
+import React, { useEffect, useState } from 'react';
+import { useNavigate, useLocation } from 'react-router-dom';
 import Sidebar from '../components/Sidebar';
 import TopBar from '../components/TopBar';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
@@ -9,6 +10,26 @@ import LinkedInCredentialsForm from '../components/LinkedInCredentialsForm';
 import { AccountSettingsForm } from '../components/AccountSettingsForm';
 
 const Settings = () => {
+  const location = useLocation();
+  const navigate = useNavigate();
+  const [activeTab, setActiveTab] = useState('account');
+  
+  useEffect(() => {
+    // Get tab from URL query parameter
+    const searchParams = new URLSearchParams(location.search);
+    const tabParam = searchParams.get('tab');
+    
+    // Set active tab if valid
+    if (tabParam && ['account', 'connections', 'notifications'].includes(tabParam)) {
+      setActiveTab(tabParam);
+    }
+  }, [location]);
+
+  const handleTabChange = (value: string) => {
+    setActiveTab(value);
+    navigate(`/settings?tab=${value}`, { replace: true });
+  };
+  
   return (
     <div className="flex h-screen bg-writlix-lightgray">
       <Sidebar />
@@ -22,7 +43,7 @@ const Settings = () => {
             <p className="text-muted-foreground">Manage your account and connections</p>
           </div>
           
-          <Tabs defaultValue="account">
+          <Tabs value={activeTab} onValueChange={handleTabChange}>
             <TabsList className="mb-6">
               <TabsTrigger value="account">Account</TabsTrigger>
               <TabsTrigger value="connections">Connections</TabsTrigger>

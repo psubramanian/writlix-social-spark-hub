@@ -24,6 +24,7 @@ export function usePostOperations() {
         
       if (tokensError) {
         console.error('Error checking LinkedIn tokens:', tokensError);
+        throw new Error("Error checking LinkedIn connection");
       }
       
       if (!credentials?.access_token) {

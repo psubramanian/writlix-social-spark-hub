@@ -1,4 +1,6 @@
+
 import React, { useState, useEffect } from 'react';
+import { useNavigate } from 'react-router-dom';
 import Sidebar from '../components/Sidebar';
 import TopBar from '../components/TopBar';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
@@ -14,6 +16,7 @@ import { useAuth } from '../contexts/AuthContext';
 import { useScheduleSettings } from '@/hooks/useScheduleSettings';
 
 const Schedule = () => {
+  const navigate = useNavigate();
   const { posts, loading: postsLoading, userSettings, fetchPosts } = useScheduledPosts();
   const { postToLinkedIn } = usePostOperations();
   const [postingId, setPostingId] = useState<string | null>(null);
@@ -62,6 +65,15 @@ const Schedule = () => {
   };
 
   const handlePostNow = async (postId: string) => {
+    if (!hasLinkedInConnection) {
+      toast({
+        title: "LinkedIn not connected",
+        description: "Please connect your LinkedIn account in Settings first.",
+        variant: "destructive",
+      });
+      return;
+    }
+    
     try {
       setPostingId(postId);
       
@@ -93,6 +105,10 @@ const Schedule = () => {
     } finally {
       setPostingId(null);
     }
+  };
+  
+  const handleConnectLinkedIn = () => {
+    navigate('/settings?tab=connections');
   };
 
   return (
@@ -126,7 +142,9 @@ const Schedule = () => {
                 </div>
                 
                 <div className="lg:col-span-1">
-                  {!checkingConnection && !hasLinkedInConnection && <LinkedInWarning />}
+                  {!checkingConnection && !hasLinkedInConnection && (
+                    <LinkedInWarning onClick={handleConnectLinkedIn} />
+                  )}
                   <ScheduledPostsList
                     posts={scheduledPosts}
                     postingId={postingId}
