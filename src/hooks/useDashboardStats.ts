@@ -30,10 +30,10 @@ export function useDashboardStats(selectedMonth: Date) {
       const monthStart = startOfMonth(selectedMonth);
       const monthEnd = endOfMonth(selectedMonth);
 
-      // Count created posts for the current month
-      const { count: createdCount, error: createdError } = await supabase
+      // Count all content ideas for the current month (includes both created and imported)
+      const { count: totalContentCount, error: createdError } = await supabase
         .from('content_ideas')
-        .select('id', { count: 'exact', head: false })
+        .select('*', { count: 'exact', head: true })
         .eq('user_id', user.id)
         .gte('created_at', monthStart.toISOString())
         .lte('created_at', monthEnd.toISOString());
@@ -41,14 +41,14 @@ export function useDashboardStats(selectedMonth: Date) {
       // Count scheduled posts (current, not filtered by month)
       const { count: scheduledCount, error: scheduledError } = await supabase
         .from('scheduled_posts')
-        .select('id', { count: 'exact', head: false })
+        .select('id', { count: 'exact', head: true })
         .eq('user_id', user.id)
         .eq('status', 'pending');
 
       // Count published posts for the current month
       const { count: publishedCount, error: publishedError } = await supabase
         .from('content_ideas')
-        .select('id', { count: 'exact', head: false })
+        .select('id', { count: 'exact', head: true })
         .eq('user_id', user.id)
         .eq('status', 'Published')
         .gte('created_at', monthStart.toISOString())
@@ -57,7 +57,7 @@ export function useDashboardStats(selectedMonth: Date) {
       // Count posts to review
       const { count: reviewCount, error: reviewError } = await supabase
         .from('content_ideas')
-        .select('id', { count: 'exact', head: false })
+        .select('id', { count: 'exact', head: true })
         .eq('user_id', user.id)
         .eq('status', 'Review')
         .gte('created_at', monthStart.toISOString())
@@ -68,7 +68,7 @@ export function useDashboardStats(selectedMonth: Date) {
       }
 
       setStats({
-        postsCreated: createdCount || 0,
+        postsCreated: totalContentCount || 0,
         postsScheduled: scheduledCount || 0,
         postsPublished: publishedCount || 0,
         postsToReview: reviewCount || 0
