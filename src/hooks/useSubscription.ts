@@ -50,7 +50,17 @@ export function useSubscription() {
     }
     
     try {
-      // Create subscription in Razorpay
+      // Check if Razorpay script is loaded
+      if (!(window as any).Razorpay) {
+        toast({
+          title: "Error",
+          description: "Razorpay script not loaded. Please refresh the page and try again.",
+          variant: "destructive",
+        });
+        return;
+      }
+
+      // Create order in Razorpay
       const { data, error } = await supabase.functions.invoke('create-subscription', {
         body: { user_id: user?.id }
       });
@@ -58,25 +68,43 @@ export function useSubscription() {
       if (error) throw error;
       
       if (!data || !data.id) {
-        throw new Error("Failed to create subscription. No data returned from server.");
+        throw new Error("Failed to create order. No data returned from server.");
       }
 
-      // Check if window.Razorpay exists
-      if (!(window as any).Razorpay) {
-        throw new Error("Razorpay script not loaded. Please refresh the page and try again.");
-      }
+      console.log("Razorpay order created:", data);
 
       // Initialize Razorpay
       const options = {
-        key: data.key_id || "rzp_test_YOUR_KEY_HERE", // Use the key from the response or fallback
-        subscription_id: data.id,
+        key: data.key_id,
+        amount: data.amount,
+        currency: data.currency,
         name: "Writlix PRO",
         description: "Monthly PRO Subscription",
+        order_id: data.id,
         handler: async (response: any) => {
+          console.log("Payment successful:", response);
+          
+          // Update the subscription status in the database
+          const { error: updateError } = await supabase
+            .from('user_subscriptions')
+            .update({ 
+              status: 'active',
+              active_till: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString(),
+              payment_provider: 'razorpay',
+              payment_provider_subscription_id: response.razorpay_order_id
+            })
+            .eq('user_id', user?.id);
+            
+          if (updateError) {
+            console.error("Error updating subscription:", updateError);
+            throw updateError;
+          }
+          
           toast({
             title: "Subscription Activated",
             description: "Welcome to Writlix PRO! Your subscription is now active.",
           });
+          
           await fetchSubscription();
         },
       };

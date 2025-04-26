@@ -63,22 +63,20 @@ serve(async (req) => {
     // Calculate amount in paise/cents (Razorpay expects amount in smallest currency unit)
     const amountInPaise = Math.round(planData.price * 100)
     
-    // Create a Razorpay subscription plan (or use an existing one)
-    // Ideally, you'd create plans in the Razorpay dashboard and reference them here
     console.log(`Creating Razorpay subscription with amount: ${amountInPaise}`)
     
-    // Create a subscription directly (simplified for this example)
-    const response = await fetch('https://api.razorpay.com/v1/subscriptions', {
+    // Instead of using plan_id directly which might not exist yet, 
+    // create a one-time order for the subscription payment
+    const response = await fetch('https://api.razorpay.com/v1/orders', {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
         'Authorization': 'Basic ' + btoa(`${RAZORPAY_KEY_ID}:${RAZORPAY_KEY_SECRET}`)
       },
       body: JSON.stringify({
-        plan_id: 'plan_monthly_pro', // You'll need to create this in Razorpay dashboard first
-        customer_notify: 1,
-        quantity: 1,
-        total_count: 12, // 12 months
+        amount: amountInPaise,
+        currency: 'INR',
+        receipt: `order_rcpt_${user_id.substring(0, 8)}`,
         notes: {
           user_id: user_id
         }
@@ -91,14 +89,14 @@ serve(async (req) => {
       throw new Error(`Razorpay API error: ${response.status} ${errorText}`)
     }
 
-    const subscriptionData = await response.json()
-    console.log('Subscription created:', subscriptionData.id)
+    const orderData = await response.json()
+    console.log('Order created:', orderData.id)
 
     // Add key_id to the response so frontend can use it
-    subscriptionData.key_id = RAZORPAY_KEY_ID
+    orderData.key_id = RAZORPAY_KEY_ID
 
     return new Response(
-      JSON.stringify(subscriptionData),
+      JSON.stringify(orderData),
       { 
         headers: { 
           ...corsHeaders, 
@@ -111,8 +109,7 @@ serve(async (req) => {
     console.error('Error:', error)
     return new Response(
       JSON.stringify({ 
-        error: error.message || 'Unknown error occurred',
-        stack: process.env.NODE_ENV === 'development' ? error.stack : undefined
+        error: error.message || 'Unknown error occurred'
       }),
       { 
         headers: { ...corsHeaders, 'Content-Type': 'application/json' },
