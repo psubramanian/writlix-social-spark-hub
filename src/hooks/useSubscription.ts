@@ -40,6 +40,15 @@ export function useSubscription() {
   };
 
   const handleUpgrade = async () => {
+    if (!user?.id) {
+      toast({
+        title: "Error",
+        description: "You need to be logged in to upgrade.",
+        variant: "destructive",
+      });
+      return;
+    }
+    
     try {
       // Create subscription in Razorpay
       const { data, error } = await supabase.functions.invoke('create-subscription', {
@@ -47,10 +56,19 @@ export function useSubscription() {
       });
 
       if (error) throw error;
+      
+      if (!data || !data.id) {
+        throw new Error("Failed to create subscription. No data returned from server.");
+      }
+
+      // Check if window.Razorpay exists
+      if (!(window as any).Razorpay) {
+        throw new Error("Razorpay script not loaded. Please refresh the page and try again.");
+      }
 
       // Initialize Razorpay
       const options = {
-        key: "rzp_test_YOUR_KEY_HERE", // Replace with your key in production
+        key: data.key_id || "rzp_test_YOUR_KEY_HERE", // Use the key from the response or fallback
         subscription_id: data.id,
         name: "Writlix PRO",
         description: "Monthly PRO Subscription",
@@ -65,10 +83,12 @@ export function useSubscription() {
 
       const razorpay = new (window as any).Razorpay(options);
       razorpay.open();
+      
     } catch (error: any) {
+      console.error("Subscription error:", error);
       toast({
         title: "Error",
-        description: error.message,
+        description: error.message || "Failed to process subscription. Please try again.",
         variant: "destructive",
       });
     }

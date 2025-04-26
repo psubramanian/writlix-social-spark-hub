@@ -18,18 +18,56 @@ const supabase = createClient(
 )
 
 serve(async (req) => {
+  // Handle CORS preflight requests
   if (req.method === 'OPTIONS') {
     return new Response('ok', { headers: corsHeaders })
   }
 
   try {
+    // Verify keys are available
+    if (!RAZORPAY_KEY_ID || !RAZORPAY_KEY_SECRET) {
+      throw new Error('Razorpay API keys are not configured')
+    }
+
     const { user_id } = await req.json()
 
     if (!user_id) {
       throw new Error('User ID is required')
     }
 
-    // Create a Razorpay subscription
+    console.log(`Creating subscription for user: ${user_id}`)
+
+    // Get plan details from database
+    const { data: planData, error: planError } = await supabase
+      .from('subscription_plans')
+      .select('*')
+      .eq('name', 'PRO')
+      .single()
+      
+    if (planError || !planData) {
+      console.error('Plan fetch error:', planError)
+      throw new Error('Could not find subscription plan')
+    }
+
+    // Get user details to use for customer info
+    const { data: userData, error: userError } = await supabase
+      .from('profiles')
+      .select('*')
+      .eq('id', user_id)
+      .single()
+      
+    if (userError) {
+      console.error('User fetch error:', userError)
+    }
+    
+    // Calculate amount in paise/cents (Razorpay expects amount in smallest currency unit)
+    const amountInPaise = Math.round(planData.price * 100)
+    
+    // Create a Razorpay subscription plan (or use an existing one)
+    // Ideally, you'd create plans in the Razorpay dashboard and reference them here
+    console.log(`Creating Razorpay subscription with amount: ${amountInPaise}`)
+    
+    // Create a subscription directly (simplified for this example)
     const response = await fetch('https://api.razorpay.com/v1/subscriptions', {
       method: 'POST',
       headers: {
@@ -37,40 +75,45 @@ serve(async (req) => {
         'Authorization': 'Basic ' + btoa(`${RAZORPAY_KEY_ID}:${RAZORPAY_KEY_SECRET}`)
       },
       body: JSON.stringify({
-        plan_id: 'plan_monthly_pro', // You'll need to create this in Razorpay dashboard
+        plan_id: 'plan_monthly_pro', // You'll need to create this in Razorpay dashboard first
         customer_notify: 1,
-        total_count: 12, // 12 months
         quantity: 1,
+        total_count: 12, // 12 months
         notes: {
           user_id: user_id
         }
       })
     })
 
+    if (!response.ok) {
+      const errorText = await response.text()
+      console.error('Razorpay API error:', errorText)
+      throw new Error(`Razorpay API error: ${response.status} ${errorText}`)
+    }
+
     const subscriptionData = await response.json()
+    console.log('Subscription created:', subscriptionData.id)
 
-    // Update user subscription status
-    const { error: updateError } = await supabase
-      .from('user_subscriptions')
-      .update({
-        status: 'active',
-        payment_provider: 'razorpay',
-        payment_provider_subscription_id: subscriptionData.id,
-        active_till: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString() // 30 days from now
-      })
-      .eq('user_id', user_id)
-
-    if (updateError) throw updateError
+    // Add key_id to the response so frontend can use it
+    subscriptionData.key_id = RAZORPAY_KEY_ID
 
     return new Response(
       JSON.stringify(subscriptionData),
-      { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      { 
+        headers: { 
+          ...corsHeaders, 
+          'Content-Type': 'application/json' 
+        } 
+      }
     )
 
   } catch (error) {
     console.error('Error:', error)
     return new Response(
-      JSON.stringify({ error: error.message }),
+      JSON.stringify({ 
+        error: error.message || 'Unknown error occurred',
+        stack: process.env.NODE_ENV === 'development' ? error.stack : undefined
+      }),
       { 
         headers: { ...corsHeaders, 'Content-Type': 'application/json' },
         status: 400
