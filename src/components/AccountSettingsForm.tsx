@@ -10,11 +10,44 @@ import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
-import { CalendarIcon } from 'lucide-react';
+import { CalendarIcon, MapPin } from 'lucide-react';
 import { cn } from "@/lib/utils";
 import { supabase } from '@/integrations/supabase/client';
 import { getCurrentUser } from '@/utils/supabaseUserUtils';
 import { toast } from 'sonner';
+import { parsePhoneNumber, isValidPhoneNumber } from 'libphonenumber-js';
+
+// List of countries for the dropdown
+const countries = [
+  { name: "United States", code: "US" },
+  { name: "Canada", code: "CA" },
+  { name: "United Kingdom", code: "GB" },
+  { name: "Australia", code: "AU" },
+  { name: "Germany", code: "DE" },
+  { name: "France", code: "FR" },
+  { name: "Spain", code: "ES" },
+  { name: "Italy", code: "IT" },
+  { name: "Japan", code: "JP" },
+  { name: "China", code: "CN" },
+  { name: "India", code: "IN" },
+  // Add more countries as needed
+].sort((a, b) => a.name.localeCompare(b.name));
+
+// Country calling codes
+const countryCodes = [
+  { country: "US", code: "+1" },
+  { country: "CA", code: "+1" },
+  { country: "GB", code: "+44" },
+  { country: "AU", code: "+61" },
+  { country: "DE", code: "+49" },
+  { country: "FR", code: "+33" },
+  { country: "ES", code: "+34" },
+  { country: "IT", code: "+39" },
+  { country: "JP", code: "+81" },
+  { country: "CN", code: "+86" },
+  { country: "IN", code: "+91" },
+  // Add more country codes as needed
+];
 
 const formSchema = z.object({
   first_name: z.string().min(1, "First name is required"),
@@ -23,11 +56,19 @@ const formSchema = z.object({
   date_of_birth: z.date(),
   country: z.string().min(1, "Country is required"),
   email: z.string().email("Invalid email address"),
-  mobile_number: z.string().min(1, "Mobile number is required"),
+  mobile_number: z.string().refine((value) => {
+    if (!value) return false;
+    try {
+      return isValidPhoneNumber(value);
+    } catch {
+      return false;
+    }
+  }, "Invalid phone number"),
 });
 
 export function AccountSettingsForm() {
   const [isLoading, setIsLoading] = useState(false);
+  const [selectedCountryCode, setSelectedCountryCode] = useState("+1");
 
   const form = useForm<z.infer<typeof formSchema>>({
     resolver: zodResolver(formSchema),
@@ -59,6 +100,18 @@ export function AccountSettingsForm() {
       }
 
       if (profile) {
+        // If mobile number exists, try to determine the country code
+        if (profile.mobile_number) {
+          try {
+            const phoneNumber = parsePhoneNumber(profile.mobile_number);
+            if (phoneNumber) {
+              setSelectedCountryCode(`+${phoneNumber.countryCallingCode}`);
+            }
+          } catch (error) {
+            console.error('Error parsing phone number:', error);
+          }
+        }
+
         form.reset({
           first_name: profile.first_name || "",
           last_name: profile.last_name || "",
@@ -203,9 +256,25 @@ export function AccountSettingsForm() {
             render={({ field }) => (
               <FormItem>
                 <FormLabel>Country</FormLabel>
-                <FormControl>
-                  <Input placeholder="Enter your country" {...field} />
-                </FormControl>
+                <Select onValueChange={field.onChange} defaultValue={field.value}>
+                  <FormControl>
+                    <SelectTrigger>
+                      <SelectValue placeholder="Select your country">
+                        <div className="flex items-center gap-2">
+                          <MapPin className="h-4 w-4" />
+                          <span>{field.value ? countries.find(c => c.code === field.value)?.name : "Select your country"}</span>
+                        </div>
+                      </SelectValue>
+                    </SelectTrigger>
+                  </FormControl>
+                  <SelectContent>
+                    {countries.map((country) => (
+                      <SelectItem key={country.code} value={country.code}>
+                        {country.name}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
                 <FormMessage />
               </FormItem>
             )}
@@ -231,9 +300,34 @@ export function AccountSettingsForm() {
             render={({ field }) => (
               <FormItem>
                 <FormLabel>Mobile Number</FormLabel>
-                <FormControl>
-                  <Input placeholder="Enter your mobile number" {...field} />
-                </FormControl>
+                <div className="flex gap-2">
+                  <Select 
+                    value={selectedCountryCode} 
+                    onValueChange={setSelectedCountryCode}
+                  >
+                    <SelectTrigger className="w-[100px]">
+                      <SelectValue>{selectedCountryCode}</SelectValue>
+                    </SelectTrigger>
+                    <SelectContent>
+                      {countryCodes.map((cc) => (
+                        <SelectItem key={cc.country} value={cc.code}>
+                          {cc.code}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                  <FormControl>
+                    <Input 
+                      placeholder="Enter your mobile number"
+                      {...field}
+                      onChange={(e) => {
+                        const value = e.target.value.replace(/[^0-9]/g, '');
+                        field.onChange(`${selectedCountryCode}${value}`);
+                      }}
+                      value={field.value.replace(selectedCountryCode, '') || ''}
+                    />
+                  </FormControl>
+                </div>
                 <FormMessage />
               </FormItem>
             )}
