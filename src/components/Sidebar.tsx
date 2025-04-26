@@ -1,10 +1,9 @@
-
 import React from 'react';
 import { Link, useLocation } from "react-router-dom";
 import { useAuth } from '../contexts/AuthContext';
 import { useSubscription } from '../hooks/useSubscription';
 import { format } from 'date-fns';
-import { Calendar, BarChart, Settings, LogOut, FileText, CreditCard, PanelLeft } from 'lucide-react';
+import { Calendar, BarChart, Settings, LogOut, FileText, CreditCard, PanelLeft, Menu } from 'lucide-react';
 import {
   Sidebar as ShadcnSidebar,
   SidebarContent,
@@ -15,12 +14,14 @@ import {
   SidebarMenu,
   SidebarMenuItem,
   SidebarMenuButton,
+  useSidebar,
 } from "@/components/ui/sidebar";
 
 const SidebarWrapper = () => {
   const location = useLocation();
   const { logout } = useAuth();
   const { subscription, loading } = useSubscription();
+  const { state } = useSidebar();
   
   const menuItems = [
     { icon: BarChart, label: 'Dashboard', path: '/dashboard' },
@@ -53,6 +54,15 @@ const SidebarWrapper = () => {
         </div>
         <SidebarTrigger className="absolute right-2 top-3" />
       </SidebarHeader>
+      
+      {state === "collapsed" && (
+        <button 
+          className="fixed left-0 top-1/2 -translate-y-1/2 z-50 bg-sidebar hover:bg-sidebar-accent p-2 rounded-r-md transition-colors"
+          onClick={() => document.querySelector('[data-sidebar="trigger"]')?.click()}
+        >
+          <Menu className="w-5 h-5 text-sidebar-foreground" />
+        </button>
+      )}
       
       <SidebarContent>
         <SidebarMenu>
