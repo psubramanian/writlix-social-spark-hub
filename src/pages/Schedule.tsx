@@ -31,6 +31,13 @@ const Schedule = () => {
   const handlePostNow = async (postId: string) => {
     try {
       setPostingId(postId);
+      
+      // Clear previous toast notifications
+      toast({
+        title: "Posting to LinkedIn",
+        description: "Sending your content to LinkedIn...",
+      });
+      
       const result = await postToLinkedIn(postId);
       
       if (result) {
@@ -41,9 +48,13 @@ const Schedule = () => {
       }
     } catch (error: any) {
       console.error("Error in post handler:", error);
+      
+      // Show more specific error message
+      const errorMessage = error.message || "There was an error posting to LinkedIn";
+      
       toast({
         title: "Post Failed",
-        description: error.message || "There was an error posting to LinkedIn",
+        description: errorMessage.includes("LinkedIn") ? errorMessage : "Failed to post to LinkedIn. Please check your connection.",
         variant: "destructive",
       });
     } finally {

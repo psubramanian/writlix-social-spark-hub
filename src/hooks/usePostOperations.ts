@@ -31,12 +31,9 @@ export function usePostOperations() {
 
       console.log('LinkedIn post response:', data);
       
-      // We no longer show the toast here as it's done in the calling component
-      
       return data;
     } catch (error: any) {
       console.error('Error posting to LinkedIn:', error);
-      // We no longer show the toast here as it's done in the calling component
       throw error; // Re-throw the error for the calling component to handle
     }
   };

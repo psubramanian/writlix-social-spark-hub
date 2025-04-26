@@ -52,7 +52,7 @@ serve(async (req) => {
 
     console.log('Post content retrieved successfully:', post.content_ideas.title);
     
-    // Get the user's LinkedIn credentials
+    // Get the user's LinkedIn credentials - Use user_id from the post to ensure we're getting the right credentials
     const { data: credentials, error: credentialsError } = await supabase
       .from('user_linkedin_credentials')
       .select('client_id, client_secret, access_token, refresh_token, expires_at, linkedin_profile_id')
@@ -64,7 +64,7 @@ serve(async (req) => {
       throw new Error('Failed to retrieve LinkedIn credentials');
     }
     
-    if (!credentials || !credentials.client_id) {
+    if (!credentials) {
       throw new Error('LinkedIn credentials not found. Please connect your LinkedIn account in the Settings page.');
     }
     
@@ -101,8 +101,8 @@ serve(async (req) => {
     };
 
     try {
-      // For simplified implementation, we'll just simulate the post
-      console.log('Simulating post to LinkedIn with content:', postContent);
+      // For simplified implementation, we'll simulate the post
+      console.log('Simulating post to LinkedIn with content:', JSON.stringify(postContent));
       
       // In a real implementation, you would make an API call to LinkedIn:
       /*
