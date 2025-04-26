@@ -1,3 +1,4 @@
+
 import { useState, useEffect } from 'react';
 import { useAuth } from '@/contexts/AuthContext';
 import { supabase } from '@/integrations/supabase/client';
@@ -14,6 +15,7 @@ export function useSubscription() {
   const { toast } = useToast();
   const [subscription, setSubscription] = useState<SubscriptionData | null>(null);
   const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
     if (user) {
@@ -30,6 +32,7 @@ export function useSubscription() {
     
     try {
       setLoading(true);
+      setError(null);
       console.log(`Fetching subscription for user: ${user.id}`);
       
       const { data, error } = await supabase
@@ -40,6 +43,7 @@ export function useSubscription() {
 
       if (error) {
         console.error('Error fetching subscription:', error);
+        setError(error.message);
         throw error;
       }
       
@@ -51,12 +55,13 @@ export function useSubscription() {
         await createTrialSubscription(user.id);
       } else {
         setSubscription(data);
-        setLoading(false);
       }
     } catch (error: any) {
       console.error('Error in subscription process:', error);
-      setLoading(false);
       // Don't show error toast to users, just log it
+      setError(error.message);
+    } finally {
+      setLoading(false);
     }
   };
 
@@ -86,8 +91,7 @@ export function useSubscription() {
       setSubscription(data);
     } catch (error: any) {
       console.error('Error creating trial subscription:', error);
-    } finally {
-      setLoading(false);
+      setError(error.message);
     }
   };
 
@@ -183,6 +187,7 @@ export function useSubscription() {
   return {
     subscription,
     loading,
+    error,
     handleUpgrade,
     getDaysLeft,
     fetchSubscription,

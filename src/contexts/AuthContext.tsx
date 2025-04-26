@@ -50,13 +50,119 @@ export const AuthProvider: React.FC<{children: React.ReactNode}> = ({ children }
     return userData;
   };
 
+  // Create or ensure profile exists
+  const ensureProfileExists = async (userId: string, userData: ExtendedUser) => {
+    try {
+      console.log("Checking if profile exists for user:", userId);
+      
+      // Check if profile exists
+      const { data: existingProfile, error: fetchError } = await supabase
+        .from('profiles')
+        .select('*')
+        .eq('id', userId)
+        .maybeSingle();
+      
+      if (fetchError) {
+        console.error("Error checking for profile:", fetchError);
+        throw fetchError;
+      }
+      
+      // If profile doesn't exist, create it
+      if (!existingProfile) {
+        console.log("Creating profile for user:", userId);
+        
+        const { error: insertError } = await supabase
+          .from('profiles')
+          .insert({
+            id: userId,
+            full_name: userData.name,
+            avatar_url: userData.avatar,
+            email: userData.email,
+            provider: userData.app_metadata?.provider
+          });
+        
+        if (insertError) {
+          console.error("Error creating profile:", insertError);
+          throw insertError;
+        }
+        
+        console.log("Profile created successfully");
+      } else {
+        console.log("Profile already exists");
+      }
+    } catch (error) {
+      console.error("Error in ensureProfileExists:", error);
+      // Don't throw error here - we want auth to succeed even if profile creation fails
+    }
+  };
+
+  // Create or ensure subscription exists
+  const ensureSubscriptionExists = async (userId: string) => {
+    try {
+      console.log("Checking if subscription exists for user:", userId);
+      
+      // Check if subscription exists
+      const { data: existingSubscription, error: fetchError } = await supabase
+        .from('user_subscriptions')
+        .select('*')
+        .eq('user_id', userId)
+        .maybeSingle();
+      
+      if (fetchError) {
+        console.error("Error checking for subscription:", fetchError);
+        throw fetchError;
+      }
+      
+      // If subscription doesn't exist, create trial subscription
+      if (!existingSubscription) {
+        console.log("Creating trial subscription for user:", userId);
+        
+        const trialEndDate = new Date();
+        trialEndDate.setDate(trialEndDate.getDate() + 7); // 7-day trial
+        
+        const { error: insertError } = await supabase
+          .from('user_subscriptions')
+          .insert({
+            user_id: userId,
+            status: 'trial',
+            active_till: trialEndDate.toISOString(),
+            first_login_at: new Date().toISOString()
+          });
+        
+        if (insertError) {
+          console.error("Error creating subscription:", insertError);
+          throw insertError;
+        }
+        
+        console.log("Trial subscription created successfully");
+      } else {
+        console.log("Subscription already exists");
+      }
+    } catch (error) {
+      console.error("Error in ensureSubscriptionExists:", error);
+      // Don't throw error here - we want auth to succeed even if subscription creation fails
+    }
+  };
+
   useEffect(() => {
     // Set up auth state listener first
     const { data: { subscription } } = supabase.auth.onAuthStateChange(
       (event, session) => {
         console.log("Auth state changed:", event, session?.user?.email);
         setSession(session);
-        setUser(processUserData(session));
+        
+        const processedUser = processUserData(session);
+        setUser(processedUser);
+        
+        // If user is authenticated, ensure profile and subscription exist
+        if (event === 'SIGNED_IN' && session?.user?.id && processedUser) {
+          // Use setTimeout to defer these operations to avoid blocking auth flow
+          setTimeout(() => {
+            ensureProfileExists(session.user.id, processedUser);
+            ensureSubscriptionExists(session.user.id);
+          }, 0);
+        }
+        
         setIsLoading(false);
       }
     );
@@ -65,7 +171,16 @@ export const AuthProvider: React.FC<{children: React.ReactNode}> = ({ children }
     supabase.auth.getSession().then(({ data: { session } }) => {
       console.log("Initial session check:", session?.user?.email);
       setSession(session);
-      setUser(processUserData(session));
+      
+      const processedUser = processUserData(session);
+      setUser(processedUser);
+      
+      // If session exists, ensure profile and subscription
+      if (session?.user?.id && processedUser) {
+        ensureProfileExists(session.user.id, processedUser);
+        ensureSubscriptionExists(session.user.id);
+      }
+      
       setIsLoading(false);
     });
 

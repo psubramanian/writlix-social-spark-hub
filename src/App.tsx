@@ -1,3 +1,4 @@
+
 import { Toaster } from "@/components/ui/toaster";
 import { Toaster as Sonner } from "@/components/ui/sonner";
 import { TooltipProvider } from "@/components/ui/tooltip";
@@ -14,6 +15,9 @@ import Settings from "./pages/Settings";
 import NotFound from "./pages/NotFound";
 import PublishedContent from "./pages/PublishedContent";
 import Subscription from "./pages/Subscription";
+import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
+import { AlertCircle, Loader2 } from "lucide-react";
+import { useEffect, useState } from "react";
 
 const queryClient = new QueryClient({
   defaultOptions: {
@@ -26,11 +30,27 @@ const queryClient = new QueryClient({
 
 const ProtectedRoute = ({ children }: { children: React.ReactNode }) => {
   const { isAuthenticated, isLoading } = useAuth();
+  const [authCheckComplete, setAuthCheckComplete] = useState(false);
   
-  if (isLoading) {
+  // Add a slight delay to avoid flash of login screen
+  useEffect(() => {
+    if (!isLoading) {
+      const timer = setTimeout(() => {
+        setAuthCheckComplete(true);
+      }, 100);
+      
+      return () => clearTimeout(timer);
+    }
+    return undefined;
+  }, [isLoading]);
+  
+  if (isLoading || !authCheckComplete) {
     return (
-      <div className="flex items-center justify-center h-screen">
-        <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-writlix-blue"></div>
+      <div className="flex items-center justify-center h-screen bg-background">
+        <div className="flex flex-col items-center space-y-4">
+          <Loader2 className="h-12 w-12 animate-spin text-primary" />
+          <p className="text-sm text-muted-foreground">Loading...</p>
+        </div>
       </div>
     );
   }
