@@ -6,6 +6,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import LinkedInOAuth from '../components/LinkedInOAuth';
 import LinkedInCredentialsForm from '../components/LinkedInCredentialsForm';
+import { AccountSettingsForm } from '../components/AccountSettingsForm';
 
 const Settings = () => {
   return (
@@ -21,12 +22,24 @@ const Settings = () => {
             <p className="text-muted-foreground">Manage your account and connections</p>
           </div>
           
-          <Tabs defaultValue="connections">
+          <Tabs defaultValue="account">
             <TabsList className="mb-6">
-              <TabsTrigger value="connections">Connections</TabsTrigger>
               <TabsTrigger value="account">Account</TabsTrigger>
+              <TabsTrigger value="connections">Connections</TabsTrigger>
               <TabsTrigger value="notifications">Notifications</TabsTrigger>
             </TabsList>
+            
+            <TabsContent value="account" className="mt-0">
+              <Card>
+                <CardHeader>
+                  <CardTitle>Account Settings</CardTitle>
+                  <CardDescription>Manage your personal information</CardDescription>
+                </CardHeader>
+                <CardContent>
+                  <AccountSettingsForm />
+                </CardContent>
+              </Card>
+            </TabsContent>
             
             <TabsContent value="connections" className="mt-0 space-y-6">
               <LinkedInCredentialsForm />
@@ -37,20 +50,6 @@ const Settings = () => {
                 </CardHeader>
                 <CardContent>
                   <LinkedInOAuth />
-                </CardContent>
-              </Card>
-            </TabsContent>
-            
-            <TabsContent value="account" className="mt-0">
-              <Card>
-                <CardHeader>
-                  <CardTitle>Account Settings</CardTitle>
-                  <CardDescription>Manage your account information</CardDescription>
-                </CardHeader>
-                <CardContent>
-                  <p className="text-muted-foreground">
-                    Account settings will be available in a future update.
-                  </p>
                 </CardContent>
               </Card>
             </TabsContent>
