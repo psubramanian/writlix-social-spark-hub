@@ -1,16 +1,12 @@
-import { useState, useEffect } from 'react';
-import { useNavigate } from 'react-router-dom';
-import { useToast } from '@/components/ui/use-toast';
-import { supabase } from '@/integrations/supabase/client';
-import { DEFAULT_SCHEDULE_SETTINGS, calculateNextRunTime } from '@/utils/scheduleUtils';
 
-interface ScheduleSettings {
-  frequency: 'daily' | 'weekly' | 'monthly';
-  timeOfDay: string;
-  dayOfWeek?: number;
-  dayOfMonth?: number;
-  timezone: string;
-}
+import { useState, useEffect } from 'react';
+import { supabase } from '@/integrations/supabase/client';
+import { useToast } from '@/components/ui/use-toast';
+import { getCurrentUser } from '@/utils/supabaseUserUtils';
+import { useAuthRedirect } from '@/utils/supabaseUserUtils';
+import { useScheduleSettings, type ScheduleSettings } from './useScheduleSettings';
+import { usePostOperations } from './usePostOperations';
+import { calculateNextRunTime } from '@/utils/scheduleUtils';
 
 interface ScheduledPost {
   id: string;
@@ -34,72 +30,16 @@ interface ScheduledPost {
 export function useScheduledPosts() {
   const [posts, setPosts] = useState<ScheduledPost[]>([]);
   const [loading, setLoading] = useState(true);
-  const [userSettings, setUserSettings] = useState<ScheduleSettings>(DEFAULT_SCHEDULE_SETTINGS);
   const { toast } = useToast();
-  const navigate = useNavigate();
-
-  const fetchUserSettings = async () => {
-    try {
-      const { data: { user }, error: authError } = await supabase.auth.getUser();
-      
-      if (authError || !user) {
-        console.error("Authentication error:", authError);
-        navigate('/login');
-        return null;
-      }
-
-      const { data, error } = await supabase
-        .from('schedule_settings')
-        .select('*')
-        .eq('user_id', user.id)
-        .is('post_id', null)
-        .maybeSingle();
-
-      if (error) throw error;
-
-      if (data) {
-        return {
-          frequency: data.frequency,
-          timeOfDay: data.time_of_day,
-          dayOfWeek: data.day_of_week ?? undefined,
-          dayOfMonth: data.day_of_month ?? undefined,
-          timezone: data.timezone || 'Asia/Kolkata'
-        } as ScheduleSettings;
-      } else {
-        const nextRunAt = calculateNextRunTime(DEFAULT_SCHEDULE_SETTINGS);
-        
-        const { data: newSettings, error: insertError } = await supabase
-          .from('schedule_settings')
-          .insert({
-            user_id: user.id,
-            post_id: null,
-            frequency: DEFAULT_SCHEDULE_SETTINGS.frequency,
-            time_of_day: DEFAULT_SCHEDULE_SETTINGS.timeOfDay,
-            day_of_week: DEFAULT_SCHEDULE_SETTINGS.dayOfWeek,
-            day_of_month: DEFAULT_SCHEDULE_SETTINGS.dayOfMonth,
-            next_run_at: nextRunAt.toISOString(),
-            timezone: DEFAULT_SCHEDULE_SETTINGS.timezone
-          })
-          .select()
-          .single();
-          
-        if (insertError) throw insertError;
-        
-        return DEFAULT_SCHEDULE_SETTINGS;
-      }
-    } catch (error) {
-      console.error("Error fetching user settings:", error);
-      return DEFAULT_SCHEDULE_SETTINGS;
-    }
-  };
+  const { redirectToLogin } = useAuthRedirect();
+  const { userSettings, fetchUserSettings } = useScheduleSettings();
+  const { postToLinkedIn } = usePostOperations();
 
   const fetchPosts = async () => {
     try {
-      const { data: { user }, error: authError } = await supabase.auth.getUser();
-      
-      if (authError || !user) {
-        console.error("Authentication error:", authError);
-        navigate('/login');
+      const user = await getCurrentUser();
+      if (!user) {
+        redirectToLogin();
         return;
       }
 
@@ -148,92 +88,9 @@ export function useScheduledPosts() {
     }
   };
 
-  const createScheduledPost = async (settings: ScheduleSettings) => {
-    try {
-      const { data: { user }, error: authError } = await supabase.auth.getUser();
-      
-      if (authError || !user) {
-        console.error("Authentication error:", authError);
-        navigate('/login');
-        return;
-      }
-
-      await saveUserSettings(settings);
-
-      await updateAllScheduledPosts(settings);
-      
-      toast({
-        title: "Schedule Updated",
-        description: "Your schedule has been updated and all scheduled posts have been adjusted.",
-      });
-    } catch (error: any) {
-      console.error('Error creating/updating schedule:', error);
-      toast({
-        title: "Failed to update schedule",
-        description: error.message,
-        variant: "destructive",
-      });
-    }
-  };
-
-  const saveUserSettings = async (settings: ScheduleSettings) => {
-    const { data: { user }, error: authError } = await supabase.auth.getUser();
-      
-    if (authError || !user) {
-      console.error("Authentication error:", authError);
-      throw new Error("Authentication required");
-    }
-
-    const nextRunAt = calculateNextRunTime(settings);
-
-    const { data, error } = await supabase
-      .from('schedule_settings')
-      .select('id')
-      .eq('user_id', user.id)
-      .is('post_id', null)
-      .maybeSingle();
-
-    if (error) throw error;
-
-    if (data) {
-      const { error: updateError } = await supabase
-        .from('schedule_settings')
-        .update({
-          frequency: settings.frequency,
-          time_of_day: settings.timeOfDay,
-          day_of_week: settings.dayOfWeek,
-          day_of_month: settings.dayOfMonth,
-          next_run_at: nextRunAt.toISOString(),
-          timezone: settings.timezone
-        })
-        .eq('id', data.id);
-
-      if (updateError) throw updateError;
-    } else {
-      const { error: insertError } = await supabase
-        .from('schedule_settings')
-        .insert({
-          user_id: user.id,
-          post_id: null,
-          frequency: settings.frequency,
-          time_of_day: settings.timeOfDay,
-          day_of_week: settings.dayOfWeek,
-          day_of_month: settings.dayOfMonth,
-          next_run_at: nextRunAt.toISOString(),
-          timezone: settings.timezone
-        });
-
-      if (insertError) throw insertError;
-    }
-
-    setUserSettings(settings);
-  };
-
   const updateAllScheduledPosts = async (settings: ScheduleSettings) => {
-    const { data: { user }, error: authError } = await supabase.auth.getUser();
-      
-    if (authError || !user) {
-      console.error("Authentication error:", authError);
+    const user = await getCurrentUser();
+    if (!user) {
       throw new Error("Authentication required");
     }
 
@@ -275,64 +132,12 @@ export function useScheduledPosts() {
     await fetchPosts();
   };
 
-  const postToLinkedIn = async (postId: string) => {
-    try {
-      setLoading(true);
-      
-      console.log(`Attempting to post content with ID: ${postId} to LinkedIn`);
-      
-      const { data: { user }, error: authError } = await supabase.auth.getUser();
-      
-      if (authError || !user) {
-        console.error("Authentication error:", authError);
-        throw new Error("Authentication required");
-      }
-      
-      const { data, error } = await supabase.functions.invoke('post-to-linkedin', {
-        body: { postId, userId: user.id }
-      });
-
-      if (error) {
-        console.error('Edge function error:', error);
-        throw new Error(error.message || 'Error posting to LinkedIn');
-      }
-
-      if (!data || !data.success) {
-        console.error('Post was not successful:', data);
-        throw new Error(data?.message || 'Failed to post to LinkedIn');
-      }
-
-      console.log('LinkedIn post response:', data);
-
-      toast({
-        title: "Success",
-        description: "Post has been shared to LinkedIn",
-      });
-
-      await fetchPosts();
-      
-      return data;
-    } catch (error: any) {
-      console.error('Error posting to LinkedIn:', error);
-      toast({
-        title: "Failed to post",
-        description: error.message || "An error occurred while posting to LinkedIn",
-        variant: "destructive",
-      });
-      return null;
-    } finally {
-      setLoading(false);
-    }
-  };
-
   const scheduleContentIdea = async (contentId: number) => {
     try {
-      const { data: { user }, error: authError } = await supabase.auth.getUser();
-      
-      if (authError || !user) {
-        console.error("Authentication error:", authError);
-        navigate('/login');
-        return;
+      const user = await getCurrentUser();
+      if (!user) {
+        redirectToLogin();
+        return false;
       }
 
       const settings = await fetchUserSettings();
@@ -370,7 +175,6 @@ export function useScheduledPosts() {
       if (settingsError) throw settingsError;
 
       await fetchPosts();
-      
       return true;
     } catch (error: any) {
       console.error('Error scheduling content:', error);
@@ -383,12 +187,82 @@ export function useScheduledPosts() {
     }
   };
 
+  const createScheduledPost = async (settings: ScheduleSettings) => {
+    try {
+      const user = await getCurrentUser();
+      if (!user) {
+        redirectToLogin();
+        return;
+      }
+
+      await saveUserSettings(settings);
+      await updateAllScheduledPosts(settings);
+      
+      toast({
+        title: "Schedule Updated",
+        description: "Your schedule has been updated and all scheduled posts have been adjusted.",
+      });
+    } catch (error: any) {
+      console.error('Error creating/updating schedule:', error);
+      toast({
+        title: "Failed to update schedule",
+        description: error.message,
+        variant: "destructive",
+      });
+    }
+  };
+
+  const saveUserSettings = async (settings: ScheduleSettings) => {
+    const user = await getCurrentUser();
+    if (!user) {
+      throw new Error("Authentication required");
+    }
+
+    const nextRunAt = calculateNextRunTime(settings);
+    const { data, error } = await supabase
+      .from('schedule_settings')
+      .select('id')
+      .eq('user_id', user.id)
+      .is('post_id', null)
+      .maybeSingle();
+
+    if (error) throw error;
+
+    if (data) {
+      const { error: updateError } = await supabase
+        .from('schedule_settings')
+        .update({
+          frequency: settings.frequency,
+          time_of_day: settings.timeOfDay,
+          day_of_week: settings.dayOfWeek,
+          day_of_month: settings.dayOfMonth,
+          next_run_at: nextRunAt.toISOString(),
+          timezone: settings.timezone
+        })
+        .eq('id', data.id);
+
+      if (updateError) throw updateError;
+    } else {
+      const { error: insertError } = await supabase
+        .from('schedule_settings')
+        .insert({
+          user_id: user.id,
+          post_id: null,
+          frequency: settings.frequency,
+          time_of_day: settings.timeOfDay,
+          day_of_week: settings.dayOfWeek,
+          day_of_month: settings.dayOfMonth,
+          next_run_at: nextRunAt.toISOString(),
+          timezone: settings.timezone
+        });
+
+      if (insertError) throw insertError;
+    }
+  };
+
   useEffect(() => {
     const initialize = async () => {
       const settings = await fetchUserSettings();
-      if (settings) {
-        setUserSettings(settings);
-      }
       await fetchPosts();
     };
     
