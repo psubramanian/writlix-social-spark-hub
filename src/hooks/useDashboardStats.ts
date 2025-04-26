@@ -37,13 +37,12 @@ export function useDashboardStats(selectedMonth: Date) {
         .gte('created_at', monthStart.toISOString())
         .lte('created_at', monthEnd.toISOString());
 
+      // Count currently scheduled posts (not filtered by month of creation)
       const { data: scheduledPosts, error: scheduledError } = await supabase
         .from('scheduled_posts')
         .select('id', { count: 'exact' })
         .eq('user_id', user.id)
-        .eq('status', 'pending')
-        .gte('created_at', monthStart.toISOString())
-        .lte('created_at', monthEnd.toISOString());
+        .eq('status', 'pending');
 
       const { data: publishedPosts, error: publishedError } = await supabase
         .from('content_ideas')
