@@ -51,8 +51,12 @@ export default function Dashboard() {
               onValueChange={(value) => setDate(new Date(value))}
             >
               <SelectTrigger className="w-[200px]">
-                <CalendarIcon className="mr-2 h-4 w-4" />
-                <SelectValue placeholder="Select month" />
+                <div className="flex items-center">
+                  <CalendarIcon className="mr-2 h-4 w-4" />
+                  <SelectValue placeholder="Select month">
+                    {format(date, "MMMM yyyy")}
+                  </SelectValue>
+                </div>
               </SelectTrigger>
               <SelectContent>
                 {last12Months.map((month) => (
