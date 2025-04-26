@@ -23,61 +23,46 @@ export default {
         border: 'hsl(var(--border))',
         input: 'hsl(var(--input))',
         ring: 'hsl(var(--ring))',
-        background: 'hsl(var(--background))',
-        foreground: 'hsl(var(--foreground))',
+        background: '#FFFFFF',
+        foreground: '#000000',
         primary: {
-          DEFAULT: '#9b87f5',
-          foreground: '#ffffff'
+          DEFAULT: '#0FA0CE',
+          foreground: '#FFFFFF'
         },
         secondary: {
-          DEFAULT: '#1EAEDB',
-          foreground: '#ffffff'
+          DEFAULT: '#F97316',
+          foreground: '#FFFFFF'
         },
         destructive: {
           DEFAULT: 'hsl(var(--destructive))',
           foreground: 'hsl(var(--destructive-foreground))'
         },
         muted: {
-          DEFAULT: 'hsl(var(--muted))',
-          foreground: '#666666'
+          DEFAULT: '#F6F6F7',
+          foreground: '#9F9EA1'
         },
         accent: {
-          DEFAULT: 'hsl(var(--accent))',
-          foreground: 'hsl(var(--accent-foreground))'
+          DEFAULT: '#0FA0CE',
+          foreground: '#FFFFFF'
         },
         popover: {
-          DEFAULT: 'hsl(var(--popover))',
-          foreground: 'hsl(var(--popover-foreground))'
+          DEFAULT: '#FFFFFF',
+          foreground: '#000000'
         },
         card: {
-          DEFAULT: 'hsl(var(--card))',
-          foreground: 'hsl(var(--card-foreground))'
+          DEFAULT: '#FFFFFF',
+          foreground: '#000000'
         },
         sidebar: {
-          DEFAULT: 'hsl(var(--sidebar-background))',
-          foreground: 'hsl(var(--sidebar-foreground))',
-          border: 'hsl(var(--sidebar-border))',
-          ring: 'hsl(var(--sidebar-ring))',
-          primary: 'hsl(var(--sidebar-primary))',
-          'primary-foreground': 'hsl(var(--sidebar-primary-foreground))',
-          accent: 'hsl(var(--sidebar-accent))',
-          'accent-foreground': 'hsl(var(--sidebar-accent-foreground))'
-        },
-        writlix: {
-          purple: '#6E59A5',
-          blue: '#0EA5E9',
-          orange: '#F97316',
-          lightblue: '#D3E4FD',
-          lightgray: '#F6F6F7',
-        },
-        newsletter: {
-          background: '#1E3A8A',
-          popup: '#EF4444',
-          text: '#FFFFFF',
+          DEFAULT: '#000000',
+          foreground: '#FFFFFF',
+          border: '#333333',
+          ring: '#0FA0CE',
+          primary: '#0FA0CE',
+          'primary-foreground': '#FFFFFF',
+          accent: '#1A1A1A',
+          'accent-foreground': '#FFFFFF'
         }
-      },
-      backgroundImage: {
-        'newsletter-background': 'linear-gradient(to bottom, #1E3A8A, #1E3A8A)',
       }
     }
   },
