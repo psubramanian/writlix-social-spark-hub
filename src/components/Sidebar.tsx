@@ -1,3 +1,4 @@
+
 import React from 'react';
 import { Link, useLocation } from "react-router-dom";
 import { useAuth } from '../contexts/AuthContext';
@@ -43,6 +44,13 @@ const SidebarWrapper = () => {
     return `Subscription status: ${subscription.status}`;
   };
 
+  const handleSidebarToggle = () => {
+    const trigger = document.querySelector('[data-sidebar="trigger"]') as HTMLElement | null;
+    if (trigger) {
+      trigger.click();
+    }
+  };
+
   return (
     <ShadcnSidebar>
       <SidebarHeader className="p-4">
@@ -58,7 +66,7 @@ const SidebarWrapper = () => {
       {state === "collapsed" && (
         <button 
           className="fixed left-0 top-1/2 -translate-y-1/2 z-50 bg-sidebar hover:bg-sidebar-accent p-2 rounded-r-md transition-colors"
-          onClick={() => document.querySelector('[data-sidebar="trigger"]')?.click()}
+          onClick={handleSidebarToggle}
         >
           <Menu className="w-5 h-5 text-sidebar-foreground" />
         </button>
