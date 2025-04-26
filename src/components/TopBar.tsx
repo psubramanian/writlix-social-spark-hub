@@ -18,18 +18,18 @@ const TopBar = () => {
     if (subscription.status === 'trial') {
       const trialEnd = new Date(subscription.active_till);
       return (
-        <Badge variant="secondary" className="ml-2">
+        <p className="text-xs text-muted-foreground mt-1">
           Trial ends {format(trialEnd, 'MMM dd, yyyy')}
-        </Badge>
+        </p>
       );
     }
     
     if (subscription.status === 'active') {
       const renewalDate = new Date(subscription.active_till);
       return (
-        <Badge variant="default" className="ml-2">
+        <p className="text-xs text-muted-foreground mt-1">
           PRO - Renews {format(renewalDate, 'MMM dd, yyyy')}
-        </Badge>
+        </p>
       );
     }
     
@@ -53,11 +53,9 @@ const TopBar = () => {
             <AvatarFallback>{user?.name?.charAt(0) || 'U'}</AvatarFallback>
           </Avatar>
           <div>
-            <div className="flex items-center">
-              <p className="text-sm font-medium">{user?.name || 'Guest'}</p>
-              {getSubscriptionBadge()}
-            </div>
+            <p className="text-sm font-medium">{user?.name || 'Guest'}</p>
             <p className="text-xs text-muted-foreground">{user?.email || ''}</p>
+            {getSubscriptionBadge()}
           </div>
         </div>
       </div>
