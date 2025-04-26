@@ -13,7 +13,14 @@ const TopBar = () => {
   const { subscription } = useSubscription();
   
   const getSubscriptionBadge = () => {
-    if (!subscription) return null;
+    if (!subscription) {
+      // Default message for users without subscription data
+      return (
+        <p className="text-xs text-muted-foreground mt-1">
+          Trial status unavailable
+        </p>
+      );
+    }
     
     if (subscription.status === 'trial') {
       const trialEnd = new Date(subscription.active_till);
@@ -33,7 +40,12 @@ const TopBar = () => {
       );
     }
     
-    return null;
+    // Fallback for any other status
+    return (
+      <p className="text-xs text-muted-foreground mt-1">
+        Subscription status: {subscription.status}
+      </p>
+    );
   };
   
   return (

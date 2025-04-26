@@ -1,14 +1,52 @@
+
 import React from 'react';
 import { Link, useLocation } from "react-router-dom";
 import { useAuth } from '../contexts/AuthContext';
+import { useSubscription } from '../hooks/useSubscription';
+import { format } from 'date-fns';
 import { Calendar, BarChart, Settings, LogOut, FileText, CreditCard } from 'lucide-react';
 
 const Sidebar = () => {
   const location = useLocation();
   const { logout } = useAuth();
+  const { subscription } = useSubscription();
   
   const isActive = (path: string) => {
     return location.pathname === path;
+  };
+  
+  const getSubscriptionStatus = () => {
+    if (!subscription) {
+      return (
+        <div className="text-xs text-sidebar-foreground opacity-75 px-3 py-2">
+          Trial status unavailable
+        </div>
+      );
+    }
+    
+    if (subscription.status === 'trial') {
+      const trialEnd = new Date(subscription.active_till);
+      return (
+        <div className="text-xs text-sidebar-foreground opacity-75 px-3 py-2">
+          Trial ends {format(trialEnd, 'MMM dd, yyyy')}
+        </div>
+      );
+    }
+    
+    if (subscription.status === 'active') {
+      const renewalDate = new Date(subscription.active_till);
+      return (
+        <div className="text-xs text-sidebar-foreground opacity-75 px-3 py-2">
+          PRO - Renews {format(renewalDate, 'MMM dd, yyyy')}
+        </div>
+      );
+    }
+    
+    return (
+      <div className="text-xs text-sidebar-foreground opacity-75 px-3 py-2">
+        Subscription status: {subscription.status}
+      </div>
+    );
   };
 
   return (
@@ -64,8 +102,9 @@ const Sidebar = () => {
       </div>
       
       <div className="mt-auto p-4">
+        {getSubscriptionStatus()}
         <button 
-          className="sidebar-item w-full justify-center text-sidebar-foreground"
+          className="sidebar-item w-full justify-center text-sidebar-foreground mt-2"
           onClick={() => logout()}
         >
           <LogOut size={18} />

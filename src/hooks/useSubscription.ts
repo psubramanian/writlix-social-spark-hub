@@ -19,23 +19,57 @@ export function useSubscription() {
   useEffect(() => {
     if (user) {
       fetchSubscription();
+    } else {
+      // Reset subscription when user logs out
+      setSubscription(null);
     }
   }, [user]);
 
   const fetchSubscription = async () => {
     try {
+      setLoading(true);
       const { data, error } = await supabase
         .from('user_subscriptions')
         .select('*')
         .eq('user_id', user?.id)
-        .single();
+        .maybeSingle();
 
       if (error) throw error;
-      setSubscription(data);
+      
+      // If no subscription found, create a trial subscription
+      if (!data && user?.id) {
+        await createTrialSubscription(user.id);
+      } else if (data) {
+        setSubscription(data);
+      }
     } catch (error: any) {
       console.error('Error fetching subscription:', error);
     } finally {
       setLoading(false);
+    }
+  };
+
+  const createTrialSubscription = async (userId: string) => {
+    try {
+      const trialEndDate = new Date();
+      trialEndDate.setDate(trialEndDate.getDate() + 7); // 7-day trial
+      
+      const { data, error } = await supabase
+        .from('user_subscriptions')
+        .insert({
+          user_id: userId,
+          status: 'trial',
+          active_till: trialEndDate.toISOString(),
+          first_login_at: new Date().toISOString()
+        })
+        .select('*')
+        .single();
+      
+      if (error) throw error;
+      setSubscription(data);
+      
+    } catch (error: any) {
+      console.error('Error creating trial subscription:', error);
     }
   };
 
@@ -133,5 +167,6 @@ export function useSubscription() {
     loading,
     handleUpgrade,
     getDaysLeft,
+    fetchSubscription,
   };
 }
