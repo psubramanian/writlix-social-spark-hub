@@ -100,7 +100,7 @@ export function UpcomingPosts({ scheduledPostsCount }: UpcomingPostsProps) {
                 ))}
                 <Link to="/schedule">
                   <Button variant="outline" size="sm" className="w-full mt-2">
-                    View All Scheduled Posts
+                    View All Scheduled Posts ({scheduledPostsCount})
                   </Button>
                 </Link>
               </>

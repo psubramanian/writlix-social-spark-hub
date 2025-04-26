@@ -1,9 +1,9 @@
 
 import { useState, useEffect } from 'react';
-import { useAuth } from '../contexts/AuthContext';
 import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/components/ui/use-toast';
 import { startOfMonth, endOfMonth } from 'date-fns';
+import { getCurrentUser } from '@/utils/supabaseUserUtils';
 
 interface DashboardStats {
   postsCreated: number;
@@ -20,41 +20,44 @@ export function useDashboardStats(selectedMonth: Date) {
     postsToReview: 0
   });
   const [loading, setLoading] = useState(true);
-  const { user } = useAuth();
   const { toast } = useToast();
 
   const fetchStats = async () => {
     try {
+      const user = await getCurrentUser();
       if (!user) return;
 
       const monthStart = startOfMonth(selectedMonth);
       const monthEnd = endOfMonth(selectedMonth);
 
-      const { data: createdPosts, error: createdError } = await supabase
+      // Count created posts for the current month
+      const { count: createdCount, error: createdError } = await supabase
         .from('content_ideas')
-        .select('id', { count: 'exact' })
+        .select('id', { count: 'exact', head: false })
         .eq('user_id', user.id)
         .gte('created_at', monthStart.toISOString())
         .lte('created_at', monthEnd.toISOString());
 
-      // Count currently scheduled posts (not filtered by month of creation)
-      const { data: scheduledPosts, error: scheduledError } = await supabase
+      // Count scheduled posts (current, not filtered by month)
+      const { count: scheduledCount, error: scheduledError } = await supabase
         .from('scheduled_posts')
-        .select('id', { count: 'exact' })
+        .select('id', { count: 'exact', head: false })
         .eq('user_id', user.id)
         .eq('status', 'pending');
 
-      const { data: publishedPosts, error: publishedError } = await supabase
+      // Count published posts for the current month
+      const { count: publishedCount, error: publishedError } = await supabase
         .from('content_ideas')
-        .select('id', { count: 'exact' })
+        .select('id', { count: 'exact', head: false })
         .eq('user_id', user.id)
         .eq('status', 'Published')
         .gte('created_at', monthStart.toISOString())
         .lte('created_at', monthEnd.toISOString());
 
-      const { data: reviewPosts, error: reviewError } = await supabase
+      // Count posts to review
+      const { count: reviewCount, error: reviewError } = await supabase
         .from('content_ideas')
-        .select('id', { count: 'exact' })
+        .select('id', { count: 'exact', head: false })
         .eq('user_id', user.id)
         .eq('status', 'Review')
         .gte('created_at', monthStart.toISOString())
@@ -65,10 +68,10 @@ export function useDashboardStats(selectedMonth: Date) {
       }
 
       setStats({
-        postsCreated: createdPosts?.length || 0,
-        postsScheduled: scheduledPosts?.length || 0,
-        postsPublished: publishedPosts?.length || 0,
-        postsToReview: reviewPosts?.length || 0
+        postsCreated: createdCount || 0,
+        postsScheduled: scheduledCount || 0,
+        postsPublished: publishedCount || 0,
+        postsToReview: reviewCount || 0
       });
     } catch (error: any) {
       console.error('Error fetching dashboard stats:', error);
@@ -84,7 +87,7 @@ export function useDashboardStats(selectedMonth: Date) {
 
   useEffect(() => {
     fetchStats();
-  }, [user, selectedMonth]);
+  }, [selectedMonth]);
 
   return { stats, loading, refetch: fetchStats };
 }

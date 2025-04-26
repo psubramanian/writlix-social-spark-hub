@@ -32,6 +32,8 @@ export default function Dashboard() {
     };
   });
   
+  const formatDate = (date: Date) => format(date, "MMMM yyyy");
+  
   return (
     <div className="flex h-screen bg-writlix-lightgray">
       <Sidebar />
@@ -53,8 +55,8 @@ export default function Dashboard() {
               <SelectTrigger className="w-[200px]">
                 <div className="flex items-center">
                   <CalendarIcon className="mr-2 h-4 w-4" />
-                  <SelectValue placeholder="Select month">
-                    {format(date, "MMMM yyyy")}
+                  <SelectValue>
+                    {formatDate(date)}
                   </SelectValue>
                 </div>
               </SelectTrigger>
