@@ -9,7 +9,7 @@ interface DashboardStats {
   postsCreated: number;
   postsScheduled: number;
   postsPublished: number;
-  engagement: string;
+  postsToReview: number;
 }
 
 export function useDashboardStats(selectedMonth: Date) {
@@ -17,7 +17,7 @@ export function useDashboardStats(selectedMonth: Date) {
     postsCreated: 0,
     postsScheduled: 0,
     postsPublished: 0,
-    engagement: '0%'
+    postsToReview: 0
   });
   const [loading, setLoading] = useState(true);
   const { user } = useAuth();
@@ -53,7 +53,15 @@ export function useDashboardStats(selectedMonth: Date) {
         .gte('created_at', monthStart.toISOString())
         .lte('created_at', monthEnd.toISOString());
 
-      if (createdError || scheduledError || publishedError) {
+      const { data: reviewPosts, error: reviewError } = await supabase
+        .from('content_ideas')
+        .select('id', { count: 'exact' })
+        .eq('user_id', user.id)
+        .eq('status', 'Review')
+        .gte('created_at', monthStart.toISOString())
+        .lte('created_at', monthEnd.toISOString());
+
+      if (createdError || scheduledError || publishedError || reviewError) {
         throw new Error('Error fetching dashboard stats');
       }
 
@@ -61,7 +69,7 @@ export function useDashboardStats(selectedMonth: Date) {
         postsCreated: createdPosts?.length || 0,
         postsScheduled: scheduledPosts?.length || 0,
         postsPublished: publishedPosts?.length || 0,
-        engagement: '24%' // Note: Keeping this static since we don't track engagement yet
+        postsToReview: reviewPosts?.length || 0
       });
     } catch (error: any) {
       console.error('Error fetching dashboard stats:', error);
