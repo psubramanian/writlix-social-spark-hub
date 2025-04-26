@@ -27,11 +27,13 @@ export function UpcomingPosts({ scheduledPostsCount }: UpcomingPostsProps) {
         const user = await getCurrentUser();
         if (!user) return;
 
+        // Modified query to properly join tables and fetch scheduled posts
         const { data, error } = await supabase
           .from('scheduled_posts')
           .select(`
             id,
             content_ideas (
+              id,
               title
             ),
             schedule_settings (
@@ -40,18 +42,27 @@ export function UpcomingPosts({ scheduledPostsCount }: UpcomingPostsProps) {
           `)
           .eq('user_id', user.id)
           .eq('status', 'pending')
-          .order('schedule_settings(next_run_at)', { ascending: true })
+          .order('created_at', { ascending: false })
           .limit(2);
 
-        if (error) throw error;
+        if (error) {
+          console.error('Error fetching upcoming posts:', error);
+          throw error;
+        }
 
-        const formattedPosts = data.map((post: any) => ({
-          id: post.id,
-          title: post.content_ideas?.title || 'Untitled Post',
-          nextRunAt: post.schedule_settings?.[0]?.next_run_at || new Date().toISOString()
-        }));
-
-        setUpcomingPosts(formattedPosts);
+        if (data && data.length > 0) {
+          const formattedPosts = data.map((post) => ({
+            id: post.id,
+            title: post.content_ideas?.title || 'Untitled Post',
+            nextRunAt: post.schedule_settings?.[0]?.next_run_at || new Date().toISOString()
+          }));
+          
+          console.log('Formatted upcoming posts:', formattedPosts);
+          setUpcomingPosts(formattedPosts);
+        } else {
+          console.log('No upcoming posts found');
+          setUpcomingPosts([]);
+        }
       } catch (error) {
         console.error('Error fetching upcoming posts:', error);
       } finally {
