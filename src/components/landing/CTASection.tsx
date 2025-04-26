@@ -2,24 +2,27 @@
 import React from 'react';
 import { Button } from '@/components/ui/button';
 import { useNavigate } from 'react-router-dom';
+import { ArrowRight } from 'lucide-react';
 
 const CTASection = () => {
   const navigate = useNavigate();
   
   return (
-    <section className="py-24 px-6 bg-primary text-primary-foreground">
-      <div className="container mx-auto max-w-4xl text-center">
-        <h2 className="text-3xl font-bold mb-6">Ready to Transform Your LinkedIn Presence?</h2>
-        <p className="text-xl mb-8 text-primary-foreground/90">
+    <section className="py-32 px-6 bg-gradient-to-b from-primary/5 to-background">
+      <div className="container mx-auto max-w-4xl text-center space-y-8">
+        <h2 className="text-4xl font-bold bg-gradient-to-r from-primary via-secondary to-primary bg-clip-text text-transparent">
+          Ready to Transform Your LinkedIn Presence?
+        </h2>
+        <p className="text-xl text-muted-foreground max-w-2xl mx-auto">
           Join thousands of professionals who use Writlix to create consistent, engaging LinkedIn content.
         </p>
         <Button 
           size="lg" 
-          variant="secondary"
           onClick={() => navigate('/login')}
-          className="bg-white text-primary hover:bg-white/90"
+          className="bg-primary hover:bg-primary/90 text-lg group"
         >
-          Get Started for Free
+          Get Started Free
+          <ArrowRight className="ml-2 h-5 w-5 group-hover:translate-x-1 transition-transform" />
         </Button>
       </div>
     </section>
