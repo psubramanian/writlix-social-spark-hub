@@ -8,9 +8,11 @@ import { useScheduledPosts } from '../hooks/useScheduledPosts';
 import { useToast } from '@/components/ui/use-toast';
 import { CurrentScheduleCard } from '@/components/schedule/CurrentScheduleCard';
 import { ScheduledPostsList } from '@/components/schedule/ScheduledPostsList';
+import { usePostOperations } from '@/hooks/usePostOperations';
 
 const Schedule = () => {
-  const { posts, loading: postsLoading, postToLinkedIn, userSettings } = useScheduledPosts();
+  const { posts, loading: postsLoading, userSettings } = useScheduledPosts();
+  const { postToLinkedIn } = usePostOperations();
   const [postingId, setPostingId] = useState<string | null>(null);
   const { toast } = useToast();
 
@@ -27,11 +29,14 @@ const Schedule = () => {
   const handlePostNow = async (postId: string) => {
     try {
       setPostingId(postId);
-      await postToLinkedIn(postId);
-      toast({
-        title: "LinkedIn Post Sent",
-        description: "Your content has been posted to LinkedIn successfully.",
-      });
+      const result = await postToLinkedIn(postId);
+      
+      if (result) {
+        toast({
+          title: "LinkedIn Post Sent",
+          description: "Your content has been posted to LinkedIn successfully.",
+        });
+      }
     } catch (error) {
       console.error("Error in post handler:", error);
     } finally {

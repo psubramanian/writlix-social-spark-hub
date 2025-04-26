@@ -41,7 +41,7 @@ serve(async (req) => {
 
     if (postError) {
       console.error('Error fetching post:', postError);
-      throw postError;
+      throw new Error(`Failed to fetch post: ${postError.message}`);
     }
 
     if (!post || !post.content_ideas) {
@@ -53,7 +53,7 @@ serve(async (req) => {
     // Get the user's LinkedIn credentials
     const { data: credentials, error: credentialsError } = await supabase
       .from('user_linkedin_credentials')
-      .select('client_id, client_secret, access_token, refresh_token, expires_at')
+      .select('client_id, client_secret, access_token, refresh_token, expires_at, linkedin_profile_id')
       .eq('user_id', post.user_id)
       .maybeSingle();
       
@@ -131,7 +131,7 @@ serve(async (req) => {
 
       if (triggerError) {
         console.error('Error triggering LinkedIn post:', triggerError);
-        throw triggerError;
+        throw new Error(`Failed to update post status: ${triggerError.message}`);
       }
 
       // Update the content_ideas status to reflect it's been published
@@ -157,11 +157,11 @@ serve(async (req) => {
         headers: { ...corsHeaders, 'Content-Type': 'application/json' },
         status: 200
       });
-    } catch (apiError) {
+    } catch (apiError: any) {
       console.error('LinkedIn API error:', apiError);
       throw new Error(`Failed to post to LinkedIn: ${apiError.message}`);
     }
-  } catch (error) {
+  } catch (error: any) {
     console.error('Error posting to LinkedIn:', error);
     return new Response(JSON.stringify({ 
       success: false,

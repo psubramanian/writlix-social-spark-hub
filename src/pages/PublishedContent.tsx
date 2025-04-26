@@ -1,3 +1,4 @@
+
 import React from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
@@ -23,19 +24,26 @@ const PublishedContent = () => {
   const { data: publishedPosts, isLoading } = useQuery({
     queryKey: ['published-posts'],
     queryFn: async () => {
-      const response = await fetch(`${import.meta.env.VITE_SUPABASE_URL}/rest/v1/published_content?order=published_at.desc`, {
-        headers: {
-          'apikey': import.meta.env.VITE_SUPABASE_ANON_KEY,
-          'Content-Type': 'application/json'
-        }
-      });
+      // Query the content_ideas table directly to get published content
+      const { data, error } = await supabase
+        .from('content_ideas')
+        .select('id, title, content, status, created_at')
+        .eq('status', 'Published')
+        .order('created_at', { ascending: false });
       
-      if (!response.ok) {
+      if (error) {
+        console.error('Error fetching published content:', error);
         throw new Error('Failed to fetch published content');
       }
       
-      const data = await response.json();
-      return data as PublishedPost[];
+      // Transform the data to match the expected format
+      return data.map((post: any) => ({
+        id: post.id,
+        title: post.title,
+        content: post.content,
+        preview: post.content.substring(0, 100) + '...',
+        published_at: post.created_at
+      })) as PublishedPost[];
     }
   });
 
@@ -65,31 +73,42 @@ const PublishedContent = () => {
                   ))}
                 </div>
               ) : (
-                <Table>
-                  <TableHeader>
-                    <TableRow>
-                      <TableHead className="w-[40%]">Title</TableHead>
-                      <TableHead className="w-[40%]">Preview</TableHead>
-                      <TableHead>Published At</TableHead>
-                    </TableRow>
-                  </TableHeader>
-                  <TableBody>
-                    {publishedPosts?.map((post) => (
-                      <TableRow 
-                        key={post.id}
-                        className="cursor-pointer"
-                        onClick={() => setSelectedContent({
-                          ...post,
-                          status: 'Published'
-                        })}
-                      >
-                        <TableCell className="font-medium">{post.title}</TableCell>
-                        <TableCell>{post.preview}</TableCell>
-                        <TableCell>{format(new Date(post.published_at), 'MMM d, yyyy')}</TableCell>
-                      </TableRow>
-                    ))}
-                  </TableBody>
-                </Table>
+                <>
+                  {publishedPosts && publishedPosts.length > 0 ? (
+                    <Table>
+                      <TableHeader>
+                        <TableRow>
+                          <TableHead className="w-[40%]">Title</TableHead>
+                          <TableHead className="w-[40%]">Preview</TableHead>
+                          <TableHead>Published At</TableHead>
+                        </TableRow>
+                      </TableHeader>
+                      <TableBody>
+                        {publishedPosts.map((post) => (
+                          <TableRow 
+                            key={post.id}
+                            className="cursor-pointer"
+                            onClick={() => setSelectedContent({
+                              ...post,
+                              status: 'Published'
+                            })}
+                          >
+                            <TableCell className="font-medium">{post.title}</TableCell>
+                            <TableCell>{post.preview}</TableCell>
+                            <TableCell>{format(new Date(post.published_at), 'MMM d, yyyy')}</TableCell>
+                          </TableRow>
+                        ))}
+                      </TableBody>
+                    </Table>
+                  ) : (
+                    <div className="text-center py-12">
+                      <p className="text-muted-foreground">No published posts found</p>
+                      <p className="text-sm text-muted-foreground mt-2">
+                        Posts will appear here after they've been published to LinkedIn
+                      </p>
+                    </div>
+                  )}
+                </>
               )}
             </CardContent>
           </Card>
