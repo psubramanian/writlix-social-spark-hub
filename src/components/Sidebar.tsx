@@ -1,4 +1,3 @@
-
 import React from 'react';
 import { Link, useLocation } from "react-router-dom";
 import { useAuth } from '../contexts/AuthContext';
@@ -9,17 +8,25 @@ import { Calendar, BarChart, Settings, LogOut, FileText, CreditCard } from 'luci
 const Sidebar = () => {
   const location = useLocation();
   const { logout } = useAuth();
-  const { subscription } = useSubscription();
+  const { subscription, loading } = useSubscription();
   
   const isActive = (path: string) => {
     return location.pathname === path;
   };
   
   const getSubscriptionStatus = () => {
+    if (loading) {
+      return (
+        <div className="text-xs text-sidebar-foreground opacity-75 px-3 py-2">
+          Loading subscription...
+        </div>
+      );
+    }
+    
     if (!subscription) {
       return (
         <div className="text-xs text-sidebar-foreground opacity-75 px-3 py-2">
-          Trial status unavailable
+          Starting 7-day trial...
         </div>
       );
     }

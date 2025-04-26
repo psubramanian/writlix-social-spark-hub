@@ -1,4 +1,3 @@
-
 import { useState, useEffect } from 'react';
 import { useAuth } from '@/contexts/AuthContext';
 import { supabase } from '@/integrations/supabase/client';
@@ -22,35 +21,48 @@ export function useSubscription() {
     } else {
       // Reset subscription when user logs out
       setSubscription(null);
+      setLoading(false);
     }
   }, [user]);
 
   const fetchSubscription = async () => {
+    if (!user?.id) return;
+    
     try {
       setLoading(true);
+      console.log(`Fetching subscription for user: ${user.id}`);
+      
       const { data, error } = await supabase
         .from('user_subscriptions')
         .select('*')
-        .eq('user_id', user?.id)
+        .eq('user_id', user.id)
         .maybeSingle();
 
-      if (error) throw error;
+      if (error) {
+        console.error('Error fetching subscription:', error);
+        throw error;
+      }
+      
+      console.log('Subscription data:', data);
       
       // If no subscription found, create a trial subscription
-      if (!data && user?.id) {
+      if (!data) {
+        console.log('No subscription found, creating trial subscription');
         await createTrialSubscription(user.id);
-      } else if (data) {
+      } else {
         setSubscription(data);
+        setLoading(false);
       }
     } catch (error: any) {
-      console.error('Error fetching subscription:', error);
-    } finally {
+      console.error('Error in subscription process:', error);
       setLoading(false);
+      // Don't show error toast to users, just log it
     }
   };
 
   const createTrialSubscription = async (userId: string) => {
     try {
+      console.log('Creating trial subscription for user:', userId);
       const trialEndDate = new Date();
       trialEndDate.setDate(trialEndDate.getDate() + 7); // 7-day trial
       
@@ -65,11 +77,17 @@ export function useSubscription() {
         .select('*')
         .single();
       
-      if (error) throw error;
-      setSubscription(data);
+      if (error) {
+        console.error('Error creating trial subscription:', error);
+        throw error;
+      }
       
+      console.log('Trial subscription created:', data);
+      setSubscription(data);
     } catch (error: any) {
       console.error('Error creating trial subscription:', error);
+    } finally {
+      setLoading(false);
     }
   };
 

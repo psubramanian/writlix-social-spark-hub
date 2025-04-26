@@ -10,14 +10,21 @@ import { Badge } from '@/components/ui/badge';
 
 const TopBar = () => {
   const { user } = useAuth();
-  const { subscription } = useSubscription();
+  const { subscription, loading } = useSubscription();
   
   const getSubscriptionBadge = () => {
-    if (!subscription) {
-      // Default message for users without subscription data
+    if (loading) {
       return (
         <p className="text-xs text-muted-foreground mt-1">
-          Trial status unavailable
+          Loading subscription...
+        </p>
+      );
+    }
+    
+    if (!subscription) {
+      return (
+        <p className="text-xs text-muted-foreground mt-1">
+          Starting 7-day trial...
         </p>
       );
     }
@@ -40,7 +47,6 @@ const TopBar = () => {
       );
     }
     
-    // Fallback for any other status
     return (
       <p className="text-xs text-muted-foreground mt-1">
         Subscription status: {subscription.status}
