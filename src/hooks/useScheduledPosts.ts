@@ -25,6 +25,7 @@ interface ScheduledPost {
     next_run_at: string;
     timezone: string;
   }[];
+  user_id: string; // Added user_id field for filtering
 }
 
 export function useScheduledPosts() {
@@ -64,7 +65,7 @@ export function useScheduledPosts() {
             timezone
           )
         `)
-        .eq('user_id', user.id);
+        .eq('user_id', user.id); // Explicitly filter by current user's ID
 
       if (postsError) throw postsError;
 

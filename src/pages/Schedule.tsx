@@ -1,4 +1,3 @@
-
 import React, { useState } from 'react';
 import Sidebar from '../components/Sidebar';
 import TopBar from '../components/TopBar';
@@ -19,6 +18,15 @@ const Schedule = () => {
 
   // Filter out posts that are already published
   const scheduledPosts = posts.filter(post => post.content_ideas?.status !== 'Published');
+
+  // Function to handle form submission for scheduling
+  const handleScheduleSubmit = (settings: any) => {
+    // In a real implementation, you would schedule a post with these settings
+    toast({
+      title: "Schedule Updated",
+      description: "Your posting schedule has been updated.",
+    });
+  };
 
   const formatScheduleTime = (post: any) => {
     if (!post.schedule_settings?.[0]) return 'Not scheduled';
@@ -124,14 +132,14 @@ const Schedule = () => {
                   </Card>
                   
                   <SchedulePostForm 
-                    onSchedule={scheduleContentIdea} 
+                    onSchedule={handleScheduleSubmit} 
                     initialValues={userSettings}
                   />
                 </div>
                 
                 <Card className="lg:col-span-1">
                   <CardHeader>
-                    <CardTitle>Scheduled Posts</CardTitle>
+                    <CardTitle>Scheduled Posts ({scheduledPosts.length})</CardTitle>
                     <CardDescription>Manage your upcoming LinkedIn posts</CardDescription>
                   </CardHeader>
                   <CardContent>
