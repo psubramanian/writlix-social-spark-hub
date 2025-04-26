@@ -52,9 +52,9 @@ serve(async (req) => {
 
     console.log('Post content retrieved successfully:', post.content_ideas.title);
     
-    // Get the user's LinkedIn tokens from the new user_linkedin_tokens table
-    const { data: tokens, error: tokensError } = await supabase
-      .from('user_linkedin_tokens')
+    // Get the user's LinkedIn tokens from the user_linkedin_credentials table
+    const { data: credentials, error: tokensError } = await supabase
+      .from('user_linkedin_credentials')
       .select('access_token, refresh_token, expires_at, linkedin_profile_id')
       .eq('user_id', post.user_id)
       .maybeSingle();
@@ -64,28 +64,28 @@ serve(async (req) => {
       throw new Error('Failed to retrieve LinkedIn tokens');
     }
     
-    if (!tokens) {
+    if (!credentials) {
       throw new Error('LinkedIn tokens not found. Please connect your LinkedIn account in the Settings page.');
     }
     
     console.log('LinkedIn tokens found for user');
 
     // Check if we have a valid access token
-    const accessToken = tokens.access_token;
+    const accessToken = credentials.access_token;
     
     if (!accessToken) {
       throw new Error('LinkedIn access token not found. Please reconnect your LinkedIn account in Settings.');
     }
     
     // Check if token needs refresh (we're not implementing refresh for simplicity)
-    const expiresAt = tokens.expires_at ? new Date(tokens.expires_at) : null;
+    const expiresAt = credentials.expires_at ? new Date(credentials.expires_at) : null;
     if (expiresAt && expiresAt < new Date()) {
       throw new Error('LinkedIn access token has expired. Please reconnect your LinkedIn account in Settings.');
     }
 
     // Format the post content for LinkedIn
     const postContent = {
-      author: `urn:li:person:${tokens.linkedin_profile_id || 'me'}`,
+      author: `urn:li:person:${credentials.linkedin_profile_id || 'me'}`,
       lifecycleState: "PUBLISHED",
       specificContent: {
         "com.linkedin.ugc.ShareContent": {
@@ -153,7 +153,7 @@ serve(async (req) => {
         linkedInDetails: {
           id: responseData.id,
           createdAt: new Date().toISOString(),
-          profileId: tokens.linkedin_profile_id || 'simulated'
+          profileId: credentials.linkedin_profile_id || 'simulated'
         }
       }), {
         headers: { ...corsHeaders, 'Content-Type': 'application/json' },

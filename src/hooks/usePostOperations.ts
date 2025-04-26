@@ -16,8 +16,8 @@ export function usePostOperations() {
       }
       
       // Check if the user has LinkedIn tokens
-      const { data: tokens, error: tokensError } = await supabase
-        .from('user_linkedin_tokens')
+      const { data: credentials, error: tokensError } = await supabase
+        .from('user_linkedin_credentials')
         .select('access_token')
         .eq('user_id', user.id)
         .maybeSingle();
@@ -26,7 +26,7 @@ export function usePostOperations() {
         console.error('Error checking LinkedIn tokens:', tokensError);
       }
       
-      if (!tokens?.access_token) {
+      if (!credentials?.access_token) {
         throw new Error("LinkedIn account not connected. Please connect your LinkedIn account in Settings.");
       }
       

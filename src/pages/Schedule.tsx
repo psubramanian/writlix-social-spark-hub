@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect } from 'react';
 import Sidebar from '../components/Sidebar';
 import TopBar from '../components/TopBar';
@@ -31,7 +30,7 @@ const Schedule = () => {
 
       try {
         const { data, error } = await supabase
-          .from('user_linkedin_tokens')
+          .from('user_linkedin_credentials')
           .select('access_token')
           .eq('user_id', user.id)
           .maybeSingle();
