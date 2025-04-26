@@ -1,22 +1,14 @@
-
 import React, { useState, useEffect } from 'react';
-import { Card, CardContent, CardFooter, CardHeader, CardTitle } from '@/components/ui/card';
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Label } from '@/components/ui/label';
 import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Clock } from 'lucide-react';
-
-export interface ScheduleSettings {
-  frequency: 'daily' | 'weekly' | 'monthly';
-  timeOfDay: string;
-  dayOfWeek?: number;
-  dayOfMonth?: number;
-  timezone: string;
-}
+import type { ScheduleSettings } from '@/hooks/useScheduleSettings';
 
 interface SchedulePostFormProps {
-  onSchedule: (settings: ScheduleSettings) => void;
+  onSchedule: (settings: ScheduleSettings) => Promise<void>;
   initialValues?: ScheduleSettings;
 }
 
@@ -43,6 +35,7 @@ const SchedulePostForm: React.FC<SchedulePostFormProps> = ({ onSchedule, initial
   const [dayOfWeek, setDayOfWeek] = useState<number>(1);
   const [dayOfMonth, setDayOfMonth] = useState<number>(1);
   const [timezone, setTimezone] = useState('Asia/Kolkata');
+  const [isSubmitting, setIsSubmitting] = useState(false);
 
   useEffect(() => {
     if (initialValues) {
@@ -54,16 +47,21 @@ const SchedulePostForm: React.FC<SchedulePostFormProps> = ({ onSchedule, initial
     }
   }, [initialValues]);
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+    setIsSubmitting(true);
     
-    onSchedule({
-      frequency,
-      timeOfDay,
-      ...(frequency === 'weekly' && { dayOfWeek }),
-      ...(frequency === 'monthly' && { dayOfMonth }),
-      timezone,
-    });
+    try {
+      await onSchedule({
+        frequency,
+        timeOfDay,
+        ...(frequency === 'weekly' && { dayOfWeek }),
+        ...(frequency === 'monthly' && { dayOfMonth }),
+        timezone,
+      });
+    } finally {
+      setIsSubmitting(false);
+    }
   };
 
   return (
@@ -170,8 +168,12 @@ const SchedulePostForm: React.FC<SchedulePostFormProps> = ({ onSchedule, initial
             </div>
           )}
 
-          <Button type="submit" className="w-full">
-            Update Schedule
+          <Button 
+            type="submit" 
+            className="w-full"
+            disabled={isSubmitting}
+          >
+            {isSubmitting ? 'Updating...' : 'Update Schedule'}
           </Button>
         </form>
       </CardContent>

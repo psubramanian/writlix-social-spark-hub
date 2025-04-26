@@ -71,8 +71,49 @@ export function useScheduleSettings() {
     }
   };
 
+  const updateUserSettings = async (settings: ScheduleSettings) => {
+    try {
+      const user = await getCurrentUser();
+      if (!user) throw new Error("User not authenticated");
+
+      const nextRunAt = calculateNextRunTime(settings);
+
+      const { error } = await supabase
+        .from('schedule_settings')
+        .update({
+          frequency: settings.frequency,
+          time_of_day: settings.timeOfDay,
+          day_of_week: settings.dayOfWeek,
+          day_of_month: settings.dayOfMonth,
+          next_run_at: nextRunAt.toISOString(),
+          timezone: settings.timezone
+        })
+        .eq('user_id', user.id)
+        .is('post_id', null);
+
+      if (error) throw error;
+
+      setUserSettings(settings);
+      toast({
+        title: "Schedule Updated",
+        description: "Your posting schedule has been updated successfully.",
+      });
+
+      return true;
+    } catch (error: any) {
+      console.error("Error updating schedule settings:", error);
+      toast({
+        title: "Update Failed",
+        description: "Failed to update schedule settings. Please try again.",
+        variant: "destructive",
+      });
+      return false;
+    }
+  };
+
   return {
     userSettings,
-    fetchUserSettings
+    fetchUserSettings,
+    updateUserSettings
   };
 }

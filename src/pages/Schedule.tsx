@@ -11,9 +11,10 @@ import { usePostOperations } from '@/hooks/usePostOperations';
 import { LinkedInWarning } from '@/components/dashboard/LinkedInWarning';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '../contexts/AuthContext';
+import { useScheduleSettings } from '@/hooks/useScheduleSettings';
 
 const Schedule = () => {
-  const { posts, loading: postsLoading, userSettings } = useScheduledPosts();
+  const { posts, loading: postsLoading, userSettings, fetchPosts } = useScheduledPosts();
   const { postToLinkedIn } = usePostOperations();
   const [postingId, setPostingId] = useState<string | null>(null);
   const [hasLinkedInConnection, setHasLinkedInConnection] = useState(false);
@@ -51,11 +52,13 @@ const Schedule = () => {
   // Filter out posts that are already published
   const scheduledPosts = posts.filter(post => post.content_ideas?.status !== 'Published');
 
-  const handleScheduleSubmit = (settings: any) => {
-    toast({
-      title: "Schedule Updated",
-      description: "Your posting schedule has been updated.",
-    });
+  const { updateUserSettings } = useScheduleSettings();
+
+  const handleScheduleSubmit = async (settings: any) => {
+    const success = await updateUserSettings(settings);
+    if (success) {
+      await fetchPosts(); // Refresh the posts list after updating schedule
+    }
   };
 
   const handlePostNow = async (postId: string) => {
