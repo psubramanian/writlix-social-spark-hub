@@ -1,68 +1,4 @@
 
-import React, { useState } from 'react';
-import Sidebar from '../components/Sidebar';
-import TopBar from '../components/TopBar';
-import { format } from 'date-fns';
-import { Send, Clock, Loader2 } from 'lucide-react';
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
-import { Button } from '@/components/ui/button';
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import SchedulePostForm from '../components/SchedulePostForm';
-import { useScheduledPosts } from '../hooks/useScheduledPosts';
-import { Badge } from '@/components/ui/badge';
-import { useToast } from '@/components/ui/use-toast';
-
-const Schedule = () => {
-  const { posts, loading: postsLoading, createScheduledPost, postToLinkedIn, userSettings } = useScheduledPosts();
-  const [postingId, setPostingId] = useState<string | null>(null);
-  const { toast } = useToast();
-
-  // Filter out posts that are already published
-  const scheduledPosts = posts.filter(post => post.content_ideas?.status !== 'Published');
-
-  const formatScheduleTime = (post: any) => {
-    if (!post.schedule_settings?.[0]) return 'Not scheduled';
-    
-    const settings = post.schedule_settings[0];
-    const nextRun = new Date(settings.next_run_at);
-    const time = settings.time_of_day;
-    const timezone = settings.timezone || 'UTC';
-    
-    const formattedDate = format(nextRun, 'PPP');
-    const formattedTime = format(nextRun, 'p');
-    
-    return `${formattedDate} at ${formattedTime} (${timezone})`;
-  };
-
-  const handlePostNow = async (postId: string) => {
-    try {
-      setPostingId(postId);
-      await postToLinkedIn(postId);
-      toast({
-        title: "LinkedIn Post Sent",
-        description: "Your content has been posted to LinkedIn successfully.",
-      });
-    } catch (error) {
-      // Error is already handled in the hook
-      console.error("Error in post handler:", error);
-    } finally {
-      setPostingId(null);
-    }
-  };
-
-  const getFrequencyDisplay = (frequency: string) => {
-    switch (frequency) {
-      case 'daily': return 'Daily';
-      case 'weekly': return userSettings.dayOfWeek !== undefined ? 
-        `Weekly on ${['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'][userSettings.dayOfWeek]}` : 
-        'Weekly';
-      case 'monthly': return userSettings.dayOfMonth !== undefined ? 
-        `Monthly on day ${userSettings.dayOfMonth}` :
-        'Monthly';
-      default: return frequency;
-    }
-  };
-
   return (
     <div className="flex h-screen bg-background">
       <Sidebar />
@@ -124,7 +60,7 @@ const Schedule = () => {
                   </Card>
                   
                   <SchedulePostForm 
-                    onSchedule={createScheduledPost} 
+                    onSchedule={scheduleContentIdea} 
                     initialValues={userSettings}
                   />
                 </div>
