@@ -1,7 +1,7 @@
 import React from 'react';
 import { Link, useLocation } from "react-router-dom";
 import { useAuth } from '../contexts/AuthContext';
-import { Calendar, BarChart, Settings, LogOut, FileText } from 'lucide-react';
+import { Calendar, BarChart, Settings, LogOut, FileText, CreditCard } from 'lucide-react';
 
 const Sidebar = () => {
   const location = useLocation();
@@ -12,7 +12,7 @@ const Sidebar = () => {
   };
 
   return (
-    <div className="min-h-screen w-64 bg-sidebar flex flex-col">
+    <aside className="min-h-screen w-64 bg-sidebar flex flex-col">
       <div className="p-4">
         <div className="flex items-center gap-2 mb-8">
           <div className="bg-writlix-blue rounded-md p-1">
@@ -50,6 +50,16 @@ const Sidebar = () => {
             <FileText size={18} />
             <span>Published</span>
           </Link>
+          
+          <Link
+            to="/subscription"
+            className={`flex items-center gap-3 rounded-lg px-3 py-2 text-gray-500 transition-all hover:text-gray-900 dark:text-gray-400 dark:hover:text-gray-50 ${
+              location.pathname === '/subscription' ? 'bg-gray-100 text-gray-900' : ''
+            }`}
+          >
+            <CreditCard className="h-4 w-4" />
+            Subscription
+          </Link>
         </nav>
       </div>
       
@@ -62,7 +72,7 @@ const Sidebar = () => {
           <span>Logout</span>
         </button>
       </div>
-    </div>
+    </aside>
   );
 };
 

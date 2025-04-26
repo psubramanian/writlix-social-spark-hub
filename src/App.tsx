@@ -13,6 +13,7 @@ import Schedule from "./pages/Schedule";
 import Settings from "./pages/Settings";
 import NotFound from "./pages/NotFound";
 import PublishedContent from "./pages/PublishedContent";
+import Subscription from "./pages/Subscription";
 
 const queryClient = new QueryClient({
   defaultOptions: {
@@ -75,6 +76,12 @@ const AppRoutes = () => {
       <Route path="/published" element={
         <ProtectedRoute>
           <PublishedContent />
+        </ProtectedRoute>
+      } />
+      
+      <Route path="/subscription" element={
+        <ProtectedRoute>
+          <Subscription />
         </ProtectedRoute>
       } />
       

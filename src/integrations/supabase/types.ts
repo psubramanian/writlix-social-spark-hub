@@ -169,6 +169,36 @@ export type Database = {
           },
         ]
       }
+      subscription_plans: {
+        Row: {
+          billing_period: string
+          created_at: string
+          description: string | null
+          id: string
+          name: string
+          price: number
+          updated_at: string
+        }
+        Insert: {
+          billing_period: string
+          created_at?: string
+          description?: string | null
+          id?: string
+          name: string
+          price: number
+          updated_at?: string
+        }
+        Update: {
+          billing_period?: string
+          created_at?: string
+          description?: string | null
+          id?: string
+          name?: string
+          price?: number
+          updated_at?: string
+        }
+        Relationships: []
+      }
       user_linkedin_credentials: {
         Row: {
           access_token: string | null
@@ -210,6 +240,56 @@ export type Database = {
           user_id?: string
         }
         Relationships: []
+      }
+      user_subscriptions: {
+        Row: {
+          active_till: string
+          created_at: string
+          first_login_at: string | null
+          id: string
+          payment_provider: string | null
+          payment_provider_customer_id: string | null
+          payment_provider_subscription_id: string | null
+          plan_id: string | null
+          status: string
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          active_till: string
+          created_at?: string
+          first_login_at?: string | null
+          id?: string
+          payment_provider?: string | null
+          payment_provider_customer_id?: string | null
+          payment_provider_subscription_id?: string | null
+          plan_id?: string | null
+          status?: string
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          active_till?: string
+          created_at?: string
+          first_login_at?: string | null
+          id?: string
+          payment_provider?: string | null
+          payment_provider_customer_id?: string | null
+          payment_provider_subscription_id?: string | null
+          plan_id?: string | null
+          status?: string
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "user_subscriptions_plan_id_fkey"
+            columns: ["plan_id"]
+            isOneToOne: false
+            referencedRelation: "subscription_plans"
+            referencedColumns: ["id"]
+          },
+        ]
       }
     }
     Views: {
