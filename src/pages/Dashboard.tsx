@@ -1,8 +1,6 @@
 
 import React, { useState } from 'react';
 import { useAuth } from '../contexts/AuthContext';
-import Sidebar from '../components/Sidebar';
-import TopBar from '../components/TopBar';
 import { format, subMonths } from 'date-fns';
 import { CalendarIcon } from 'lucide-react';
 import {
@@ -35,71 +33,63 @@ export default function Dashboard() {
   const formatDate = (date: Date) => format(date, "MMMM yyyy");
   
   return (
-    <div className="flex h-screen bg-writlix-lightgray">
-      <Sidebar />
-      
-      <div className="flex-1 flex flex-col overflow-hidden">
-        <TopBar />
+    <div className="p-6">
+      <div className="flex justify-between items-center mb-8">
+        <div>
+          <h1 className="text-2xl font-bold">Dashboard</h1>
+          <p className="text-muted-foreground">Overview of your content and performance</p>
+        </div>
         
-        <main className="flex-1 overflow-y-auto p-6">
-          <div className="flex justify-between items-center mb-8">
-            <div>
-              <h1 className="text-2xl font-bold">Dashboard</h1>
-              <p className="text-muted-foreground">Overview of your content and performance</p>
+        <Select
+          value={date.toISOString()}
+          onValueChange={(value) => setDate(new Date(value))}
+        >
+          <SelectTrigger className="w-[200px]">
+            <div className="flex items-center">
+              <CalendarIcon className="mr-2 h-4 w-4" />
+              <SelectValue>
+                {formatDate(date)}
+              </SelectValue>
             </div>
-            
-            <Select
-              value={date.toISOString()}
-              onValueChange={(value) => setDate(new Date(value))}
-            >
-              <SelectTrigger className="w-[200px]">
-                <div className="flex items-center">
-                  <CalendarIcon className="mr-2 h-4 w-4" />
-                  <SelectValue>
-                    {formatDate(date)}
-                  </SelectValue>
-                </div>
-              </SelectTrigger>
-              <SelectContent>
-                {last12Months.map((month) => (
-                  <SelectItem key={month.value} value={month.value}>
-                    {month.label}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-          </div>
-          
-          {!user?.linkedInConnected && <LinkedInWarning />}
-          
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
-            <DashboardStatCard
-              title="Posts Created"
-              value={stats.postsCreated}
-              isLoading={loading}
-            />
-            <DashboardStatCard
-              title="Posts Scheduled"
-              value={stats.postsScheduled}
-              isLoading={loading}
-            />
-            <DashboardStatCard
-              title="Posts Published"
-              value={stats.postsPublished}
-              isLoading={loading}
-            />
-            <DashboardStatCard
-              title="To Be Reviewed"
-              value={stats.postsToReview}
-              isLoading={loading}
-            />
-          </div>
-          
-          <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-            <UpcomingPosts scheduledPostsCount={stats.postsScheduled} />
-            <QuickActions />
-          </div>
-        </main>
+          </SelectTrigger>
+          <SelectContent>
+            {last12Months.map((month) => (
+              <SelectItem key={month.value} value={month.value}>
+                {month.label}
+              </SelectItem>
+            ))}
+          </SelectContent>
+        </Select>
+      </div>
+      
+      {!user?.linkedInConnected && <LinkedInWarning />}
+      
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
+        <DashboardStatCard
+          title="Posts Created"
+          value={stats.postsCreated}
+          isLoading={loading}
+        />
+        <DashboardStatCard
+          title="Posts Scheduled"
+          value={stats.postsScheduled}
+          isLoading={loading}
+        />
+        <DashboardStatCard
+          title="Posts Published"
+          value={stats.postsPublished}
+          isLoading={loading}
+        />
+        <DashboardStatCard
+          title="To Be Reviewed"
+          value={stats.postsToReview}
+          isLoading={loading}
+        />
+      </div>
+      
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+        <UpcomingPosts scheduledPostsCount={stats.postsScheduled} />
+        <QuickActions />
       </div>
     </div>
   );
