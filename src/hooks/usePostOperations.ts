@@ -26,25 +26,18 @@ export function usePostOperations() {
 
       if (!data || !data.success) {
         console.error('Post was not successful:', data);
-        throw new Error(data?.message || 'Failed to post to LinkedIn');
+        throw new Error(data?.error || 'Failed to post to LinkedIn');
       }
 
       console.log('LinkedIn post response:', data);
-
-      toast({
-        title: "Success",
-        description: "Post has been shared to LinkedIn",
-      });
+      
+      // We no longer show the toast here as it's done in the calling component
       
       return data;
     } catch (error: any) {
       console.error('Error posting to LinkedIn:', error);
-      toast({
-        title: "Failed to post",
-        description: error.message || "An error occurred while posting to LinkedIn",
-        variant: "destructive",
-      });
-      return null;
+      // We no longer show the toast here as it's done in the calling component
+      throw error; // Re-throw the error for the calling component to handle
     }
   };
 

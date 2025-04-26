@@ -9,6 +9,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { format } from 'date-fns';
 import { Skeleton } from '@/components/ui/skeleton';
 import ContentDialog from '@/components/data-seed/ContentDialog';
+import { getCurrentUser } from '@/utils/supabaseUserUtils';
 
 interface PublishedPost {
   id: string;
@@ -24,11 +25,15 @@ const PublishedContent = () => {
   const { data: publishedPosts, isLoading } = useQuery({
     queryKey: ['published-posts'],
     queryFn: async () => {
+      const user = await getCurrentUser();
+      if (!user) throw new Error('User not authenticated');
+      
       // Query the content_ideas table directly to get published content
       const { data, error } = await supabase
         .from('content_ideas')
         .select('id, title, content, status, created_at')
         .eq('status', 'Published')
+        .eq('user_id', user.id)
         .order('created_at', { ascending: false });
       
       if (error) {
@@ -36,8 +41,10 @@ const PublishedContent = () => {
         throw new Error('Failed to fetch published content');
       }
       
+      console.log('Published posts fetched:', data);
+      
       // Transform the data to match the expected format
-      return data.map((post: any) => ({
+      return (data || []).map((post: any) => ({
         id: post.id,
         title: post.title,
         content: post.content,

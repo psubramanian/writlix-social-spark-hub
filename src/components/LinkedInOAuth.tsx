@@ -165,7 +165,7 @@ const LinkedInOAuth = () => {
       if (!credentials || !credentials.client_id) {
         toast({
           title: "LinkedIn Credentials Missing",
-          description: "Please add your LinkedIn API credentials in the Settings page",
+          description: "Please add your LinkedIn API credentials in the Settings page first",
           variant: "destructive",
         });
         return;

@@ -24,6 +24,8 @@ serve(async (req) => {
     const supabaseKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!;
     const supabase = createClient(supabaseUrl, supabaseKey);
 
+    console.log(`Processing post request for postId: ${postId} and userId: ${userId}`);
+
     // Get post content
     const { data: post, error: postError } = await supabase
       .from('scheduled_posts')
@@ -69,7 +71,7 @@ serve(async (req) => {
     console.log('LinkedIn credentials found for user');
 
     // Check if we have a valid access token
-    let accessToken = credentials.access_token;
+    const accessToken = credentials.access_token;
     
     if (!accessToken) {
       throw new Error('LinkedIn access token not found. Please reconnect your LinkedIn account in Settings.');
@@ -125,15 +127,6 @@ serve(async (req) => {
       // Simulate successful response
       const responseData = { id: 'simulated-' + new Date().getTime() };
       
-      // Call the database function to update status to Published
-      const { error: triggerError } = await supabase
-        .rpc('trigger_linkedin_post', { post_id: postId });
-
-      if (triggerError) {
-        console.error('Error triggering LinkedIn post:', triggerError);
-        throw new Error(`Failed to update post status: ${triggerError.message}`);
-      }
-
       // Update the content_ideas status to reflect it's been published
       const { error: updateError } = await supabase
         .from('content_ideas')
@@ -143,6 +136,15 @@ serve(async (req) => {
       if (updateError) {
         console.error('Error updating content status:', updateError);
         // We won't throw here as the post was "successful", just log the error
+      }
+
+      // Call the database function to update status to Published
+      const { error: triggerError } = await supabase
+        .rpc('trigger_linkedin_post', { post_id: postId });
+
+      if (triggerError) {
+        console.error('Error triggering LinkedIn post:', triggerError);
+        // Still continue as we've already updated the status
       }
 
       return new Response(JSON.stringify({ 

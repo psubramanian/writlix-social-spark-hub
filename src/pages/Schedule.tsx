@@ -9,6 +9,7 @@ import { useToast } from '@/components/ui/use-toast';
 import { CurrentScheduleCard } from '@/components/schedule/CurrentScheduleCard';
 import { ScheduledPostsList } from '@/components/schedule/ScheduledPostsList';
 import { usePostOperations } from '@/hooks/usePostOperations';
+import { LinkedInWarning } from '@/components/dashboard/LinkedInWarning';
 
 const Schedule = () => {
   const { posts, loading: postsLoading, userSettings } = useScheduledPosts();
@@ -18,6 +19,7 @@ const Schedule = () => {
 
   // Filter out posts that are already published
   const scheduledPosts = posts.filter(post => post.content_ideas?.status !== 'Published');
+  const hasLinkedInConnection = true; // For now we'll assume this is true, would come from a hook or context
 
   const handleScheduleSubmit = (settings: any) => {
     toast({
@@ -37,8 +39,13 @@ const Schedule = () => {
           description: "Your content has been posted to LinkedIn successfully.",
         });
       }
-    } catch (error) {
+    } catch (error: any) {
       console.error("Error in post handler:", error);
+      toast({
+        title: "Post Failed",
+        description: error.message || "There was an error posting to LinkedIn",
+        variant: "destructive",
+      });
     } finally {
       setPostingId(null);
     }
@@ -75,6 +82,7 @@ const Schedule = () => {
                 </div>
                 
                 <div className="lg:col-span-1">
+                  {!hasLinkedInConnection && <LinkedInWarning />}
                   <ScheduledPostsList
                     posts={scheduledPosts}
                     postingId={postingId}
