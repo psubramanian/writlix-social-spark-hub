@@ -85,7 +85,7 @@ export function NewsletterPopup({
           </div>
           <h2 className="text-2xl font-bold text-white mb-4">SUBSCRIBE TODAY</h2>
           <p className="text-white/90 mb-6">
-            Lorem ipsum dolor sit amet consectetur, adipisicing elit. Deleniti aliquid molestias voluptatem fugiat provident tenetur saepe hic, consectetur.
+            Its good to be connected, we will share our newsletter with great content. Stay Tuned.
           </p>
           <form onSubmit={handleSubmit} className="space-y-4">
             <div className="relative">
