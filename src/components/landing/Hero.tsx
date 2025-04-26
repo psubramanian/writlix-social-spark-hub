@@ -42,9 +42,9 @@ const Hero = () => {
               <div className="absolute -inset-1 bg-gradient-to-r from-primary to-secondary rounded-xl blur-xl opacity-30"></div>
               <div className="relative bg-white rounded-xl shadow-xl overflow-hidden border">
                 <img 
-                  src="https://i.imgur.com/JgYmEww.png" 
-                  alt="Writlix Dashboard Preview" 
-                  className="w-full"
+                  src="/public/lovable-uploads/professional-networking.jpg" 
+                  alt="Professional Content Creation Dashboard" 
+                  className="w-full object-cover"
                 />
               </div>
             </div>
@@ -56,3 +56,4 @@ const Hero = () => {
 };
 
 export default Hero;
+
