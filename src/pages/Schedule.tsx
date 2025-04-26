@@ -1,5 +1,5 @@
 
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import Sidebar from '../components/Sidebar';
 import TopBar from '../components/TopBar';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
@@ -10,16 +10,47 @@ import { CurrentScheduleCard } from '@/components/schedule/CurrentScheduleCard';
 import { ScheduledPostsList } from '@/components/schedule/ScheduledPostsList';
 import { usePostOperations } from '@/hooks/usePostOperations';
 import { LinkedInWarning } from '@/components/dashboard/LinkedInWarning';
+import { supabase } from '@/integrations/supabase/client';
+import { useAuth } from '../contexts/AuthContext';
 
 const Schedule = () => {
   const { posts, loading: postsLoading, userSettings } = useScheduledPosts();
   const { postToLinkedIn } = usePostOperations();
   const [postingId, setPostingId] = useState<string | null>(null);
+  const [hasLinkedInConnection, setHasLinkedInConnection] = useState(false);
+  const [checkingConnection, setCheckingConnection] = useState(true);
   const { toast } = useToast();
+  const { user } = useAuth();
+
+  useEffect(() => {
+    const checkLinkedInConnection = async () => {
+      if (!user) {
+        setCheckingConnection(false);
+        return;
+      }
+
+      try {
+        const { data, error } = await supabase
+          .from('user_linkedin_tokens')
+          .select('access_token')
+          .eq('user_id', user.id)
+          .maybeSingle();
+          
+        if (error) throw error;
+        
+        setHasLinkedInConnection(!!data?.access_token);
+      } catch (error) {
+        console.error('Error checking LinkedIn connection:', error);
+      } finally {
+        setCheckingConnection(false);
+      }
+    };
+    
+    checkLinkedInConnection();
+  }, [user]);
 
   // Filter out posts that are already published
   const scheduledPosts = posts.filter(post => post.content_ideas?.status !== 'Published');
-  const hasLinkedInConnection = true; // For now we'll assume this is true, would come from a hook or context
 
   const handleScheduleSubmit = (settings: any) => {
     toast({
@@ -93,7 +124,7 @@ const Schedule = () => {
                 </div>
                 
                 <div className="lg:col-span-1">
-                  {!hasLinkedInConnection && <LinkedInWarning />}
+                  {!checkingConnection && !hasLinkedInConnection && <LinkedInWarning />}
                   <ScheduledPostsList
                     posts={scheduledPosts}
                     postingId={postingId}
