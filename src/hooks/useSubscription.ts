@@ -39,7 +39,7 @@ export function useSubscription() {
         .from('user_subscriptions')
         .select('*')
         .eq('user_id', user.id)
-        .maybeSingle();
+        .maybeSingle(); // Changed from .single() to .maybeSingle()
 
       if (error) {
         console.error('Error fetching subscription:', error);
@@ -80,7 +80,7 @@ export function useSubscription() {
           first_login_at: new Date().toISOString()
         })
         .select('*')
-        .single();
+        .maybeSingle(); // Use maybeSingle() here too
       
       if (error) {
         console.error('Error creating trial subscription:', error);
