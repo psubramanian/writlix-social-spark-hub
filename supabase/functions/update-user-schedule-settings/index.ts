@@ -16,6 +16,7 @@ serve(async (req) => {
   try {
     // Get the request body
     const { user_id, frequency, time_of_day, day_of_week, day_of_month, timezone } = await req.json();
+    console.log('Received update request with params:', { user_id, frequency, time_of_day, timezone });
 
     // Create Supabase client
     const supabaseUrl = Deno.env.get("SUPABASE_URL") || "";
@@ -37,8 +38,11 @@ serve(async (req) => {
       });
 
     if (settingsError) {
+      console.error('Error updating settings:', settingsError);
       throw settingsError;
     }
+
+    console.log('Settings updated successfully');
 
     // Get all pending scheduled posts for this user
     const { data: pendingPosts, error: postsError } = await supabase
@@ -49,11 +53,14 @@ serve(async (req) => {
       .order('created_at', { ascending: true });
 
     if (postsError) {
+      console.error('Error fetching pending posts:', postsError);
       throw postsError;
     }
 
+    console.log(`Found ${pendingPosts?.length || 0} pending posts to update`);
+
     // Update all pending posts with new scheduling
-    for (let i = 0; i < pendingPosts.length; i++) {
+    for (let i = 0; i < (pendingPosts?.length || 0); i++) {
       const post = pendingPosts[i];
       
       // Calculate next run time based on post position and new settings
@@ -65,6 +72,8 @@ serve(async (req) => {
         timezone: timezone || 'UTC'
       }, i);
 
+      console.log(`Updating post ${post.id} with next run time: ${nextRunTime.toISOString()}`);
+
       // Update the post
       const { error: updateError } = await supabase
         .from('scheduled_posts')
@@ -75,12 +84,15 @@ serve(async (req) => {
         .eq('id', post.id);
 
       if (updateError) {
+        console.error(`Error updating post ${post.id}:`, updateError);
         throw updateError;
       }
     }
 
+    console.log('All posts updated successfully');
+
     return new Response(
-      JSON.stringify({ success: true }),
+      JSON.stringify({ success: true, updatedPostsCount: pendingPosts?.length || 0 }),
       { 
         status: 200, 
         headers: { 
@@ -91,10 +103,10 @@ serve(async (req) => {
     );
 
   } catch (error) {
-    console.error('Error:', error);
+    console.error('Error in update-user-schedule-settings:', error);
     
     return new Response(
-      JSON.stringify({ error: error.message }),
+      JSON.stringify({ error: error.message || 'An unexpected error occurred' }),
       { 
         status: 400, 
         headers: { 
@@ -114,6 +126,8 @@ function calculateNextRunTime(settings: {
   dayOfMonth?: number;
   timezone: string;
 }, offset = 0): Date {
+  console.log('Calculating next run time with settings:', settings, 'and offset:', offset);
+  
   // Parse the time of day
   const [hours, minutes] = settings.timeOfDay.split(':').map(Number);
   
@@ -165,6 +179,7 @@ function calculateNextRunTime(settings: {
       break;
   }
   
+  console.log('Calculated next run time:', nextRun.toISOString());
   return nextRun;
 }
 

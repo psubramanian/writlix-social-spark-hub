@@ -16,6 +16,7 @@ serve(async (req) => {
 
   try {
     const { topic, quantity } = await req.json();
+    console.log(`Generating ${quantity} content ideas about "${topic}"`);
     
     if (!openAIApiKey) {
       console.error('OPENAI_API_KEY is not set in environment variables');
@@ -24,8 +25,6 @@ serve(async (req) => {
         { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
       );
     }
-
-    console.log(`Generating ${quantity} content ideas about "${topic}"`);
 
     const response = await fetch('https://api.openai.com/v1/chat/completions', {
       method: 'POST',
@@ -56,8 +55,8 @@ serve(async (req) => {
       }),
     });
 
-    const data = await response.json();
     console.log('OpenAI API response received');
+    const data = await response.json();
     
     if (!data || !data.choices || !data.choices[0] || !data.choices[0].message) {
       console.error('Unexpected API response format:', JSON.stringify(data));

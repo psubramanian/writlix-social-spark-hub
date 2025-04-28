@@ -86,9 +86,17 @@ export function useScheduleSettings() {
       const user = await getCurrentUser();
       if (!user) throw new Error("User not authenticated");
 
-      // Use the functions.invoke method instead of rpc to avoid TypeScript errors
-      // This works around the TypeScript type limitation
-      const { error: updateError } = await supabase.functions.invoke(
+      console.log('Updating user settings with:', {
+        user_id: user.id,
+        frequency: settings.frequency,
+        time_of_day: settings.timeOfDay,
+        day_of_week: settings.dayOfWeek,
+        day_of_month: settings.dayOfMonth,
+        timezone: settings.timezone
+      });
+
+      // Use the functions.invoke method with the update-user-schedule-settings function
+      const { data, error: updateError } = await supabase.functions.invoke(
         'update-user-schedule-settings', 
         {
           body: {
@@ -102,12 +110,21 @@ export function useScheduleSettings() {
         }
       );
 
-      if (updateError) throw updateError;
+      if (updateError) {
+        console.error('Edge function error:', updateError);
+        throw new Error(`Failed to update settings: ${updateError.message}`);
+      }
+
+      console.log('Settings update response:', data);
+
+      if (!data || data.error) {
+        throw new Error(data?.error || 'Unknown error occurred');
+      }
 
       setUserSettings(settings);
       toast({
         title: "Schedule Updated",
-        description: "Your posting schedule has been updated successfully.",
+        description: `Your posting schedule has been updated successfully. ${data.updatedPostsCount || 0} pending posts were rescheduled.`,
       });
 
       return true;
@@ -115,7 +132,7 @@ export function useScheduleSettings() {
       console.error("Error updating schedule settings:", error);
       toast({
         title: "Update Failed",
-        description: "Failed to update schedule settings. Please try again.",
+        description: `Failed to update schedule settings: ${error.message}`,
         variant: "destructive",
       });
       return false;

@@ -1,3 +1,4 @@
+
 import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useToast } from '@/components/ui/use-toast';
@@ -44,7 +45,7 @@ export const useContentGeneration = () => {
       const { data, error } = await supabase
         .from('content_ideas')
         .select('*')
-        .eq('user_id', user.id.toString());
+        .eq('user_id', user.id);
 
       if (error) {
         console.error('Error fetching content:', error);
@@ -95,6 +96,7 @@ export const useContentGeneration = () => {
         return;
       }
 
+      // Invoke the generate-content Edge Function
       const { data: generationData, error: generationError } = await supabase.functions.invoke('generate-content', {
         body: {
           topic: seed,
@@ -102,29 +104,48 @@ export const useContentGeneration = () => {
         },
       });
 
-      if (generationError) throw new Error(generationError.message || 'Failed to generate content');
+      if (generationError) {
+        console.error('Generation error:', generationError);
+        throw new Error(generationError.message || 'Failed to generate content');
+      }
 
-      const newContentItems = generationData.map((item: any, index: number) => ({
-        id: `content-${Date.now()}-${index}`,
-        title: item.title,
-        preview: item.preview,
-        content: item.content,
-        status: 'Review' as const,
-      }));
+      if (!generationData || !Array.isArray(generationData)) {
+        console.error('Invalid generation data:', generationData);
+        throw new Error('Invalid response from content generation service');
+      }
 
-      for (const item of newContentItems) {
-        const { error: dbError } = await supabase
+      console.log('Generated content data:', generationData);
+      
+      const newContentItems: ContentItem[] = [];
+      
+      // Insert each content item individually to get the created IDs
+      for (const item of generationData) {
+        // Insert into database
+        const { data: dbData, error: dbError } = await supabase
           .from('content_ideas')
           .insert({
             title: item.title,
             content: item.content,
-            status: item.status,
-            user_id: user.id.toString(),
-          });
+            status: 'Review',
+            user_id: user.id
+          })
+          .select();
 
         if (dbError) {
           console.error('Database insertion error:', dbError);
           throw new Error(`Failed to save content to database: ${dbError.message}`);
+        }
+
+        if (dbData && dbData.length > 0) {
+          // Add to our local state with the database ID
+          newContentItems.push({
+            id: `content-${Date.now()}-${Math.random().toString(36).substring(2, 9)}`,
+            title: item.title,
+            preview: item.preview,
+            content: item.content,
+            status: 'Review',
+            db_id: dbData[0].id
+          });
         }
       }
 
@@ -132,7 +153,7 @@ export const useContentGeneration = () => {
       
       toast({
         title: "Content Generated",
-        description: `${quantity} new post ideas have been added and saved to the database.`,
+        description: `${newContentItems.length} new post ideas have been added and saved to the database.`,
       });
     } catch (error: any) {
       console.error('Content generation error:', error);
@@ -168,23 +189,36 @@ export const useContentGeneration = () => {
         },
       });
 
-      if (generationError) throw new Error(generationError.message || 'Failed to regenerate content');
+      if (generationError) {
+        console.error('Regeneration error:', generationError);
+        throw new Error(generationError.message || 'Failed to regenerate content');
+      }
 
       const newContent = generationData[0];
+      if (!newContent) {
+        throw new Error('No content was generated');
+      }
       
       const item = generatedContent.find(content => content.id === id);
-      if (!item) return;
+      if (!item || !item.db_id) {
+        throw new Error('Could not find content item to update');
+      }
 
+      // Update the content in the database using the db_id
       const { error: dbError } = await supabase
         .from('content_ideas')
         .update({
           content: newContent.content,
           title: newContent.title,
         })
-        .eq('title', item.title);
+        .eq('id', item.db_id);
 
-      if (dbError) throw dbError;
+      if (dbError) {
+        console.error('Database update error:', dbError);
+        throw dbError;
+      }
 
+      // Update the local state
       setGeneratedContent(prev =>
         prev.map(content =>
           content.id === id
@@ -232,31 +266,57 @@ export const useContentGeneration = () => {
         return;
       }
 
-      const { data: dbItem, error: fetchError } = await supabase
-        .from('content_ideas')
-        .select('id, title')
-        .eq('title', item.title)
-        .single();
+      // If we have the db_id, use it directly
+      if (item.db_id) {
+        const { error: updateError } = await supabase
+          .from('content_ideas')
+          .update({ status: newStatus })
+          .eq('id', item.db_id);
 
-      if (fetchError) {
-        console.error('Error fetching item from database:', fetchError);
-        throw fetchError;
-      }
+        if (updateError) {
+          console.error('Status update error:', updateError);
+          throw updateError;
+        }
 
-      const { error: updateError } = await supabase
-        .from('content_ideas')
-        .update({ status: newStatus })
-        .eq('id', dbItem.id);
+        if (newStatus === 'Scheduled') {
+          const scheduled = await scheduleContentIdea(item.db_id);
+          if (!scheduled) {
+            throw new Error("Failed to schedule the content");
+          }
+        }
+      } else {
+        // Fallback to using title
+        const { data: dbItem, error: fetchError } = await supabase
+          .from('content_ideas')
+          .select('id')
+          .eq('title', item.title)
+          .eq('user_id', user.id)
+          .single();
 
-      if (updateError) throw updateError;
+        if (fetchError) {
+          console.error('Error fetching item from database:', fetchError);
+          throw fetchError;
+        }
 
-      if (newStatus === 'Scheduled') {
-        const scheduled = await scheduleContentIdea(dbItem.id);
-        if (!scheduled) {
-          throw new Error("Failed to schedule the content");
+        const { error: updateError } = await supabase
+          .from('content_ideas')
+          .update({ status: newStatus })
+          .eq('id', dbItem.id);
+
+        if (updateError) {
+          console.error('Status update error:', updateError);
+          throw updateError;
+        }
+
+        if (newStatus === 'Scheduled') {
+          const scheduled = await scheduleContentIdea(dbItem.id);
+          if (!scheduled) {
+            throw new Error("Failed to schedule the content");
+          }
         }
       }
 
+      // Update local state
       setGeneratedContent(prev =>
         prev.map(content =>
           content.id === id ? { ...content, status: newStatus } : content
@@ -267,6 +327,11 @@ export const useContentGeneration = () => {
         title: "Status Updated",
         description: `Content status changed to ${newStatus}${newStatus === 'Scheduled' ? ' and added to your schedule' : ''}`,
       });
+      
+      // Refresh posts list if we scheduled something
+      if (newStatus === 'Scheduled') {
+        await fetchPosts();
+      }
     } catch (error: any) {
       console.error('Status update error:', error);
       toast({
@@ -292,30 +357,49 @@ export const useContentGeneration = () => {
         return;
       }
       
-      const item = generatedContent.find(content => content.id === id);
+      const item = generatedContent.find(item => item.id === id);
       if (!item) return;
 
-      const { data: dbItem, error: fetchError } = await supabase
-        .from('content_ideas')
-        .select('id')
-        .eq('title', item.title)
-        .single();
+      // If we have the db_id, use it directly
+      if (item.db_id) {
+        const { error: updateError } = await supabase
+          .from('content_ideas')
+          .update({ content })
+          .eq('id', item.db_id);
 
-      if (fetchError) {
-        console.error('Error fetching item from database:', fetchError);
-        throw fetchError;
+        if (updateError) {
+          console.error('Content update error:', updateError);
+          throw updateError;
+        }
+      } else {
+        // Fallback to using title
+        const { data: dbItem, error: fetchError } = await supabase
+          .from('content_ideas')
+          .select('id')
+          .eq('title', item.title)
+          .eq('user_id', user.id)
+          .single();
+
+        if (fetchError) {
+          console.error('Error fetching item from database:', fetchError);
+          throw fetchError;
+        }
+
+        const { error: updateError } = await supabase
+          .from('content_ideas')
+          .update({ content })
+          .eq('id', dbItem.id);
+
+        if (updateError) {
+          console.error('Content update error:', updateError);
+          throw updateError;
+        }
       }
 
-      const { error: updateError } = await supabase
-        .from('content_ideas')
-        .update({ content })
-        .eq('id', dbItem.id);
-
-      if (updateError) throw updateError;
-
+      // Update local state
       setGeneratedContent(prev =>
         prev.map(item =>
-          item.id === id ? { ...item, content } : item
+          item.id === id ? { ...item, content, preview: content.substring(0, 100) + '...' } : item
         )
       );
 
@@ -367,44 +451,45 @@ export const useContentGeneration = () => {
         return;
       }
       
-      // First, if it's scheduled, we need to delete the scheduled post entry
-      if (item.status === 'Scheduled' && item.db_id) {
-        console.log('Removing scheduled post for content_id:', item.db_id);
-        const { data: scheduledPost, error: findError } = await supabase
-          .from('scheduled_posts')
-          .select('id')
-          .eq('content_id', item.db_id)
-          .maybeSingle();
+      // Delete from database using db_id if available
+      if (item.db_id) {
+        // First, if it's scheduled, we need to delete the scheduled post entry
+        if (item.status === 'Scheduled') {
+          console.log('Removing scheduled post for content_id:', item.db_id);
+          const { data: scheduledPost, error: findError } = await supabase
+            .from('scheduled_posts')
+            .select('id')
+            .eq('content_id', item.db_id)
+            .maybeSingle();
+            
+          if (findError && findError.code !== 'PGRST116') {
+            console.error('Error finding scheduled post:', findError);
+          }
           
-        if (findError && findError.code !== 'PGRST116') {
-          console.error('Error finding scheduled post:', findError);
+          if (scheduledPost) {
+            // Delete associated schedule settings
+            const { error: settingsError } = await supabase
+              .from('schedule_settings')
+              .delete()
+              .eq('post_id', scheduledPost.id);
+              
+            if (settingsError) {
+              console.error('Error deleting schedule settings:', settingsError);
+            }
+            
+            // Delete scheduled post
+            const { error: deleteScheduleError } = await supabase
+              .from('scheduled_posts')
+              .delete()
+              .eq('id', scheduledPost.id);
+              
+            if (deleteScheduleError) {
+              console.error('Error deleting scheduled post:', deleteScheduleError);
+            }
+          }
         }
         
-        if (scheduledPost) {
-          // Delete associated schedule settings
-          const { error: settingsError } = await supabase
-            .from('schedule_settings')
-            .delete()
-            .eq('post_id', scheduledPost.id);
-            
-          if (settingsError) {
-            console.error('Error deleting schedule settings:', settingsError);
-          }
-          
-          // Delete scheduled post
-          const { error: deleteScheduleError } = await supabase
-            .from('scheduled_posts')
-            .delete()
-            .eq('id', scheduledPost.id);
-            
-          if (deleteScheduleError) {
-            console.error('Error deleting scheduled post:', deleteScheduleError);
-          }
-        }
-      }
-      
-      // Now delete the content idea itself
-      if (item.db_id) {
+        // Now delete the content idea itself
         console.log('Deleting content with db_id:', item.db_id);
         const { error: deleteError } = await supabase
           .from('content_ideas')
@@ -416,16 +501,55 @@ export const useContentGeneration = () => {
           throw deleteError;
         }
       } else {
+        // Fallback to using title
         console.log('Fallback: Deleting using title:', item.title);
         const { data: dbItem, error: fetchError } = await supabase
           .from('content_ideas')
           .select('id')
           .eq('title', item.title)
+          .eq('user_id', user.id)
           .single();
           
         if (fetchError) {
           console.error('Error fetching item from database:', fetchError);
         } else {
+          // First, if it's scheduled, we need to delete the scheduled post entry
+          if (item.status === 'Scheduled') {
+            console.log('Removing scheduled post for content_id:', dbItem.id);
+            const { data: scheduledPost, error: findError } = await supabase
+              .from('scheduled_posts')
+              .select('id')
+              .eq('content_id', dbItem.id)
+              .maybeSingle();
+              
+            if (findError && findError.code !== 'PGRST116') {
+              console.error('Error finding scheduled post:', findError);
+            }
+            
+            if (scheduledPost) {
+              // Delete associated schedule settings
+              const { error: settingsError } = await supabase
+                .from('schedule_settings')
+                .delete()
+                .eq('post_id', scheduledPost.id);
+                
+              if (settingsError) {
+                console.error('Error deleting schedule settings:', settingsError);
+              }
+              
+              // Delete scheduled post
+              const { error: deleteScheduleError } = await supabase
+                .from('scheduled_posts')
+                .delete()
+                .eq('id', scheduledPost.id);
+                
+              if (deleteScheduleError) {
+                console.error('Error deleting scheduled post:', deleteScheduleError);
+              }
+            }
+          }
+
+          // Now delete the content item
           const { error: deleteError } = await supabase
             .from('content_ideas')
             .delete()
@@ -481,28 +605,39 @@ export const useContentGeneration = () => {
         status: 'Review' as const,
       }));
 
+      const newContentItems: ContentItem[] = [];
+      
       // Insert into database
       for (const item of contentFromCsv) {
-        const { error: dbError } = await supabase
+        const { data: dbData, error: dbError } = await supabase
           .from('content_ideas')
           .insert({
             title: item.title,
-            content: item.content,
+            content: item.content || item.preview || item.title,
             status: item.status,
-            user_id: user.id.toString(),
-          });
+            user_id: user.id
+          })
+          .select();
 
         if (dbError) {
           console.error('Database insertion error:', dbError);
           throw new Error(`Failed to save content to database: ${dbError.message}`);
         }
+        
+        if (dbData && dbData.length > 0) {
+          // Add to our local state with the database ID
+          newContentItems.push({
+            ...item,
+            db_id: dbData[0].id
+          });
+        }
       }
       
-      setGeneratedContent(prev => [...prev, ...contentFromCsv]);
+      setGeneratedContent(prev => [...prev, ...newContentItems]);
       
       toast({
         title: "CSV Imported",
-        description: `${contentFromCsv.length} post ideas imported and saved.`,
+        description: `${newContentItems.length} post ideas imported and saved.`,
       });
     } catch (error: any) {
       console.error('CSV import error:', error);

@@ -29,3 +29,6 @@ enabled = true
 
 [functions.update-user-schedule-settings]
 verify_jwt = true
+
+[functions.generate-content]
+verify_jwt = true
