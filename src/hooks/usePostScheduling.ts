@@ -36,7 +36,20 @@ export function usePostScheduling() {
         throw new Error("Could not retrieve user schedule settings");
       }
 
-      const nextRunAt = calculateNextRunTime(settings);
+      // Get existing scheduled posts to determine the appropriate offset
+      const { data: existingPosts, error: existingPostsError } = await supabase
+        .from('schedule_settings')
+        .select('next_run_at')
+        .eq('user_id', user.id)
+        .order('next_run_at', { ascending: true });
+      
+      if (existingPostsError) throw existingPostsError;
+
+      // Calculate the appropriate offset based on existing posts
+      const offset = calculatePostOffset(settings.frequency, existingPosts?.length || 0);
+      
+      // Calculate next run time with the determined offset
+      const nextRunAt = calculateNextRunTime(settings, offset);
 
       const { error: settingsError } = await supabase
         .from('schedule_settings')
@@ -91,6 +104,12 @@ export function usePostScheduling() {
     }
 
     return null;
+  };
+
+  // Helper function to calculate the appropriate offset based on frequency
+  const calculatePostOffset = (frequency: 'daily' | 'weekly' | 'monthly', existingPostsCount: number): number => {
+    // We start with the count of existing posts as our base offset
+    return existingPostsCount;
   };
 
   return {
