@@ -33,7 +33,12 @@ export function useSubscription() {
 
       if (error) throw error;
       
-      setSubscription(data);
+      // If no subscription exists, create a trial subscription
+      if (!data) {
+        await createTrialSubscription(user.id);
+      } else {
+        setSubscription(data);
+      }
     } catch (error: any) {
       console.error('Error fetching subscription:', error);
       setError(error.message);
@@ -61,6 +66,12 @@ export function useSubscription() {
       if (error) throw error;
       
       setSubscription(data);
+      
+      // Show toast notification for new trial users
+      toast({
+        title: "Trial Activated",
+        description: `Your 7-day trial is now active until ${format(trialEndDate, 'MMMM dd, yyyy')}.`,
+      });
     } catch (error: any) {
       console.error('Error creating trial subscription:', error);
       setError(error.message);
@@ -89,8 +100,7 @@ export function useSubscription() {
         return 'Trial expired';
       }
       
-      const daysLeft = Math.ceil((endDate.getTime() - now.getTime()) / (1000 * 60 * 60 * 24));
-      return `Trial ends ${format(endDate, 'MMM dd, yyyy')} (${daysLeft} days left)`;
+      return `Trial ends ${format(endDate, 'MMM dd, yyyy')} (${getDaysLeft()} days left)`;
     }
 
     if (subscription.status === 'active') {
