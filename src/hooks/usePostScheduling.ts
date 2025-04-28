@@ -36,10 +36,36 @@ export function usePostScheduling() {
       
       if (!settings) {
         console.error('No schedule settings found');
-        throw new Error("Could not retrieve user schedule settings");
+        // Create default settings if none exist
+        const defaultSettings = {
+          user_id: user.id,
+          frequency: 'daily',
+          time_of_day: '09:00:00',
+          timezone: 'UTC',
+          next_run_at: new Date(Date.now() + 24 * 60 * 60 * 1000).toISOString() // Tomorrow
+        };
+        
+        const { data: newSettings, error: newSettingsError } = await supabase
+          .from('schedule_settings')
+          .insert(defaultSettings)
+          .select()
+          .single();
+          
+        if (newSettingsError) {
+          console.error('Error creating default settings:', newSettingsError);
+          throw new Error("Could not create default user schedule settings");
+        }
+        
+        console.log('Created default user settings:', newSettings);
       }
 
-      console.log('Found user settings:', settings);
+      const userSettings = settings || {
+        frequency: 'daily',
+        time_of_day: '09:00:00',
+        timezone: 'UTC'
+      };
+      
+      console.log('Found user settings:', userSettings);
 
       // Get existing scheduled posts to determine the appropriate offset
       const { data: existingPosts, error: existingPostsError } = await supabase
@@ -59,11 +85,11 @@ export function usePostScheduling() {
       
       // Calculate next run time with the determined offset
       const nextRunAt = calculateNextRunTime({
-        frequency: settings.frequency,
-        timeOfDay: settings.time_of_day,
-        dayOfWeek: settings.day_of_week,
-        dayOfMonth: settings.day_of_month,
-        timezone: settings.timezone || 'UTC'
+        frequency: userSettings.frequency,
+        timeOfDay: userSettings.time_of_day,
+        dayOfWeek: userSettings.day_of_week,
+        dayOfMonth: userSettings.day_of_month,
+        timezone: userSettings.timezone || 'UTC'
       }, offset);
 
       console.log(`Next run time calculated: ${nextRunAt.toISOString()}`);
@@ -76,7 +102,7 @@ export function usePostScheduling() {
           content_id: contentId,
           status: 'pending',
           next_run_at: nextRunAt.toISOString(),
-          timezone: settings.timezone || 'UTC'
+          timezone: userSettings.timezone || 'UTC'
         })
         .select()
         .single();

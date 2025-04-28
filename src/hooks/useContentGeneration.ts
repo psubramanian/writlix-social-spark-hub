@@ -2,10 +2,11 @@
 import { useContentFetch } from './useContentFetch';
 import { useContentGenerate } from './useContentGenerate';
 import { useContentOperations } from './useContentOperations';
+import { usePostScheduling } from './usePostScheduling';
 import { useNavigate } from 'react-router-dom';
 import { useToast } from '@/components/ui/use-toast';
 import { supabase } from '@/integrations/supabase/client';
-import type { ContentItem } from '@/types/content';
+import type { ContentItem, GenerationOptions } from '@/types/content';
 
 export const useContentGeneration = () => {
   const { 
@@ -25,6 +26,8 @@ export const useContentGeneration = () => {
     updateContent,
     deleteContent
   } = useContentOperations(setGeneratedContent);
+  
+  const { scheduleContentIdea } = usePostScheduling();
 
   const { toast } = useToast();
   const navigate = useNavigate();
@@ -96,17 +99,75 @@ export const useContentGeneration = () => {
     }
   };
 
-  // Add a toggleStatus function since it's being used in DataSeed.tsx
-  const toggleStatus = (id: string) => {
-    // Find the content item
-    const item = generatedContent.find(content => content.id === id);
-    if (!item) return;
-    
-    // Toggle between Review and Scheduled
-    const newStatus = item.status === 'Review' ? 'Scheduled' : 'Review';
-    
-    // Call updateContent to update the status
-    updateContent(id, item.content, newStatus);
+  // Updated toggleStatus function to handle scheduling when status changes to "Scheduled"
+  const toggleStatus = async (id: string) => {
+    try {
+      // Find the content item
+      const item = generatedContent.find(content => content.id === id);
+      if (!item) {
+        console.error(`Content item with ID ${id} not found`);
+        toast({
+          title: "Status Update Failed",
+          description: "Content item not found",
+          variant: "destructive",
+        });
+        return;
+      }
+      
+      console.log('Toggling status for item:', item);
+      
+      // Toggle between Review and Scheduled
+      const newStatus = item.status === 'Review' ? 'Scheduled' : 'Review';
+      
+      // First update the content status in the content_ideas table
+      await updateContent(id, item.content, newStatus);
+      
+      // If changing to Scheduled, we need to create a scheduled post with next_run_at
+      if (newStatus === 'Scheduled') {
+        if (!item.db_id) {
+          console.error('Cannot schedule item without database ID:', item);
+          toast({
+            title: "Scheduling Failed",
+            description: "Item database reference is missing",
+            variant: "destructive",
+          });
+          return;
+        }
+        
+        console.log(`Creating scheduled post for content with db_id: ${item.db_id}`);
+        const scheduled = await scheduleContentIdea(item.db_id);
+        
+        if (!scheduled) {
+          // If scheduling failed, revert the status change
+          console.error('Failed to schedule content, reverting status change');
+          await updateContent(id, item.content, 'Review');
+          
+          toast({
+            title: "Scheduling Failed",
+            description: "Could not create scheduled post",
+            variant: "destructive",
+          });
+        } else {
+          toast({
+            title: "Post Scheduled",
+            description: "Content has been scheduled successfully",
+          });
+        }
+      } else {
+        // Just show a status update toast for Review status
+        toast({
+          title: "Status Updated",
+          description: `Item marked for ${newStatus}`,
+        });
+      }
+    } catch (error: any) {
+      console.error('Toggle status error:', error);
+      toast({
+        title: "Status Update Failed",
+        description: error.message || "An error occurred while updating content status",
+        variant: "destructive",
+      });
+    }
   };
 
   return {
@@ -119,6 +180,6 @@ export const useContentGeneration = () => {
     importFromCsv,
     updateContent,
     fetchAllContent,
-    toggleStatus, // Export the new function
+    toggleStatus,
   };
 };
