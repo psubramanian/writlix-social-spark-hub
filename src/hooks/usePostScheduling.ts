@@ -39,7 +39,7 @@ export function usePostScheduling() {
         // Create default settings if none exist
         const defaultSettings = {
           user_id: user.id,
-          frequency: 'daily',
+          frequency: 'daily' as const, // Explicitly typed as 'daily'
           time_of_day: '09:00:00',
           timezone: 'UTC',
           next_run_at: new Date(Date.now() + 24 * 60 * 60 * 1000).toISOString() // Tomorrow
@@ -60,7 +60,7 @@ export function usePostScheduling() {
       }
 
       const userSettings = settings || {
-        frequency: 'daily',
+        frequency: 'daily' as const, // Explicitly typed as 'daily'
         time_of_day: '09:00:00',
         timezone: 'UTC'
       };
@@ -87,8 +87,8 @@ export function usePostScheduling() {
       const nextRunAt = calculateNextRunTime({
         frequency: userSettings.frequency,
         timeOfDay: userSettings.time_of_day,
-        dayOfWeek: userSettings.day_of_week,
-        dayOfMonth: userSettings.day_of_month,
+        dayOfWeek: 'day_of_week' in userSettings ? userSettings.day_of_week : undefined,
+        dayOfMonth: 'day_of_month' in userSettings ? userSettings.day_of_month : undefined,
         timezone: userSettings.timezone || 'UTC'
       }, offset);
 
