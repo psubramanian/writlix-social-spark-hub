@@ -108,7 +108,7 @@ export function usePostScheduling() {
 
   // Helper function to calculate the appropriate offset based on frequency
   const calculatePostOffset = (frequency: 'daily' | 'weekly' | 'monthly', existingPostsCount: number): number => {
-    // We start with the count of existing posts as our base offset
+    // We use the count of existing posts as our base offset
     return existingPostsCount;
   };
 

@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
@@ -21,6 +22,7 @@ const Schedule = () => {
   const [checkingConnection, setCheckingConnection] = useState(true);
   const { toast } = useToast();
   const { user } = useAuth();
+  const { updateUserSettings, isUpdating } = useScheduleSettings();
 
   useEffect(() => {
     const checkLinkedInConnection = async () => {
@@ -50,8 +52,6 @@ const Schedule = () => {
   }, [user]);
 
   const scheduledPosts = posts.filter(post => post.content_ideas?.status !== 'Published');
-
-  const { updateUserSettings } = useScheduleSettings();
 
   const handleScheduleSubmit = async (settings: any) => {
     const success = await updateUserSettings(settings);
@@ -126,6 +126,7 @@ const Schedule = () => {
               <SchedulePostForm 
                 onSchedule={handleScheduleSubmit} 
                 initialValues={userSettings}
+                isUpdating={isUpdating}
               />
             </div>
             

@@ -1,15 +1,17 @@
+
 import React, { useState, useEffect } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Label } from '@/components/ui/label';
 import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { Clock } from 'lucide-react';
+import { Clock, Loader2 } from 'lucide-react';
 import type { ScheduleSettings } from '@/hooks/useScheduleSettings';
 
 interface SchedulePostFormProps {
   onSchedule: (settings: ScheduleSettings) => Promise<void>;
   initialValues?: ScheduleSettings;
+  isUpdating?: boolean;
 }
 
 // Common timezones list
@@ -29,7 +31,7 @@ const commonTimezones = [
   'Pacific/Auckland'
 ];
 
-const SchedulePostForm: React.FC<SchedulePostFormProps> = ({ onSchedule, initialValues }) => {
+const SchedulePostForm: React.FC<SchedulePostFormProps> = ({ onSchedule, initialValues, isUpdating = false }) => {
   const [frequency, setFrequency] = useState<'daily' | 'weekly' | 'monthly'>('daily');
   const [timeOfDay, setTimeOfDay] = useState('09:00');
   const [dayOfWeek, setDayOfWeek] = useState<number>(1);
@@ -73,7 +75,7 @@ const SchedulePostForm: React.FC<SchedulePostFormProps> = ({ onSchedule, initial
         <form onSubmit={handleSubmit} className="space-y-6">
           <div className="space-y-2">
             <Label>Timezone</Label>
-            <Select value={timezone} onValueChange={setTimezone}>
+            <Select value={timezone} onValueChange={setTimezone} disabled={isUpdating || isSubmitting}>
               <SelectTrigger>
                 <SelectValue placeholder="Select timezone" />
               </SelectTrigger>
@@ -93,6 +95,7 @@ const SchedulePostForm: React.FC<SchedulePostFormProps> = ({ onSchedule, initial
               value={frequency}
               onValueChange={(value) => setFrequency(value as 'daily' | 'weekly' | 'monthly')}
               className="grid grid-cols-3 gap-4"
+              disabled={isUpdating || isSubmitting}
             >
               <div className="flex items-center space-x-2">
                 <RadioGroupItem value="daily" id="daily" />
@@ -120,6 +123,7 @@ const SchedulePostForm: React.FC<SchedulePostFormProps> = ({ onSchedule, initial
                 onChange={(e) => setTimeOfDay(e.target.value)}
                 className="w-full px-3 py-2 border rounded-md"
                 required
+                disabled={isUpdating || isSubmitting}
               />
             </div>
           </div>
@@ -130,6 +134,7 @@ const SchedulePostForm: React.FC<SchedulePostFormProps> = ({ onSchedule, initial
               <Select 
                 value={dayOfWeek.toString()} 
                 onValueChange={(value) => setDayOfWeek(parseInt(value))}
+                disabled={isUpdating || isSubmitting}
               >
                 <SelectTrigger>
                   <SelectValue />
@@ -153,6 +158,7 @@ const SchedulePostForm: React.FC<SchedulePostFormProps> = ({ onSchedule, initial
               <Select 
                 value={dayOfMonth.toString()} 
                 onValueChange={(value) => setDayOfMonth(parseInt(value))}
+                disabled={isUpdating || isSubmitting}
               >
                 <SelectTrigger>
                   <SelectValue />
@@ -171,9 +177,16 @@ const SchedulePostForm: React.FC<SchedulePostFormProps> = ({ onSchedule, initial
           <Button 
             type="submit" 
             className="w-full"
-            disabled={isSubmitting}
+            disabled={isUpdating || isSubmitting}
           >
-            {isSubmitting ? 'Updating...' : 'Update Schedule'}
+            {isUpdating || isSubmitting ? (
+              <>
+                <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                Updating all schedules...
+              </>
+            ) : (
+              'Update Schedule'
+            )}
           </Button>
         </form>
       </CardContent>
