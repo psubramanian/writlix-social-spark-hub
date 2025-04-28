@@ -1,3 +1,4 @@
+
 import { useState, useEffect } from 'react';
 import { useAuth } from '@/contexts/AuthContext';
 import { supabase } from '@/integrations/supabase/client';
@@ -76,11 +77,19 @@ export function useSubscription() {
   }, [user]);
 
   const formatSubscriptionStatus = () => {
-    if (!subscription) return '';
+    if (!subscription) return 'No active subscription';
 
     if (subscription.status === 'trial') {
+      if (!subscription.active_till) return 'Trial active';
+      
       const endDate = new Date(subscription.active_till);
-      const daysLeft = Math.ceil((endDate.getTime() - Date.now()) / (1000 * 60 * 60 * 24));
+      const now = new Date();
+      
+      if (endDate <= now) {
+        return 'Trial expired';
+      }
+      
+      const daysLeft = Math.ceil((endDate.getTime() - now.getTime()) / (1000 * 60 * 60 * 24));
       return `Trial ends ${format(endDate, 'MMM dd, yyyy')} (${daysLeft} days left)`;
     }
 
