@@ -1,3 +1,4 @@
+
 // Default schedule settings for all users
 export const DEFAULT_SCHEDULE_SETTINGS = {
   frequency: 'daily' as const,
@@ -15,26 +16,31 @@ export const calculateNextRunTime = (settings: {
   dayOfMonth?: number;
   timezone: string;
 }, daysOffset: number = 0): Date => {
+  console.log('Calculating next run time with settings:', settings, 'and offset:', daysOffset);
+  
   // Parse the time of day
   const [hours, minutes] = settings.timeOfDay.split(':').map(Number);
   
-  // Start with current time in the user's timezone
-  let nextRun = new Date();
-  nextRun = new Date(nextRun.toLocaleString('en-US', { timeZone: settings.timezone }));
-  nextRun.setHours(hours, minutes, 0, 0);
-
-  // If the time has already passed today, start from tomorrow
+  // Start with current time
   const now = new Date();
+  let nextRun = new Date();
+  
+  // Set the time components
+  nextRun.setHours(hours || 9, minutes || 0, 0, 0);
+  
+  // If the time has already passed today, start from tomorrow
   if (nextRun <= now) {
     nextRun.setDate(nextRun.getDate() + 1);
   }
-
+  
+  console.log('Base next run time (before offset):', nextRun.toISOString());
+  
   switch (settings.frequency) {
-    case 'daily':
+    case "daily":
       nextRun.setDate(nextRun.getDate() + daysOffset);
       break;
 
-    case 'weekly':
+    case "weekly":
       if (settings.dayOfWeek !== undefined) {
         const currentDay = nextRun.getDay();
         const daysUntilTarget = (settings.dayOfWeek - currentDay + 7) % 7;
@@ -42,7 +48,7 @@ export const calculateNextRunTime = (settings: {
       }
       break;
 
-    case 'monthly':
+    case "monthly":
       if (settings.dayOfMonth !== undefined) {
         nextRun.setDate(settings.dayOfMonth);
         if (nextRun <= now) {
@@ -55,5 +61,6 @@ export const calculateNextRunTime = (settings: {
       break;
   }
 
+  console.log('Final calculated next run time:', nextRun.toISOString());
   return nextRun;
 };

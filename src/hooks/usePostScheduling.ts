@@ -35,14 +35,18 @@ export function usePostScheduling() {
       }
       
       if (!settings) {
-        console.error('No schedule settings found');
+        console.error('No schedule settings found, creating default settings');
         // Create default settings if none exist
+        const tomorrow = new Date();
+        tomorrow.setDate(tomorrow.getDate() + 1);
+        tomorrow.setHours(9, 0, 0, 0);
+        
         const defaultSettings = {
           user_id: user.id,
           frequency: 'daily' as const, // Explicitly typed as 'daily'
           time_of_day: '09:00:00',
           timezone: 'UTC',
-          next_run_at: new Date(Date.now() + 24 * 60 * 60 * 1000).toISOString() // Tomorrow
+          next_run_at: tomorrow.toISOString() // Tomorrow at 9 AM
         };
         
         const { data: newSettings, error: newSettingsError } = await supabase
@@ -65,7 +69,7 @@ export function usePostScheduling() {
         timezone: 'UTC'
       };
       
-      console.log('Found user settings:', userSettings);
+      console.log('Using schedule settings:', userSettings);
 
       // Get existing scheduled posts to determine the appropriate offset
       const { data: existingPosts, error: existingPostsError } = await supabase
@@ -92,7 +96,14 @@ export function usePostScheduling() {
         timezone: userSettings.timezone || 'UTC'
       }, offset);
 
-      console.log(`Next run time calculated: ${nextRunAt.toISOString()}`);
+      // Ensure we have a valid date before proceeding
+      if (!nextRunAt || isNaN(nextRunAt.getTime())) {
+        console.error('Invalid next run time calculated:', nextRunAt);
+        throw new Error('Failed to calculate a valid schedule time');
+      }
+
+      const nextRunAtIsoString = nextRunAt.toISOString();
+      console.log(`Next run time calculated: ${nextRunAtIsoString}`);
 
       // Create scheduled post with next_run_at directly
       const { data: postData, error: postError } = await supabase
@@ -101,7 +112,7 @@ export function usePostScheduling() {
           user_id: user.id,
           content_id: contentId,
           status: 'pending',
-          next_run_at: nextRunAt.toISOString(),
+          next_run_at: nextRunAtIsoString, // Use the ISO string
           timezone: userSettings.timezone || 'UTC'
         })
         .select()
