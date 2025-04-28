@@ -1,8 +1,7 @@
-
 import { useState, useEffect } from 'react';
 import { useAuth } from '@/contexts/AuthContext';
 import { supabase } from '@/integrations/supabase/client';
-import { useToast } from '@/components/ui/use-toast';
+import { useToast } from '@/hooks/use-toast';
 import { format } from 'date-fns';
 
 interface SubscriptionData {
@@ -32,49 +31,18 @@ export function useSubscription() {
         .maybeSingle();
 
       if (error) throw error;
-      
-      // If no subscription exists, create a trial subscription
-      if (!data) {
-        await createTrialSubscription(user.id);
-      } else {
-        setSubscription(data);
-      }
+
+      setSubscription(data);
     } catch (error: any) {
       console.error('Error fetching subscription:', error);
       setError(error.message);
+      toast({
+        title: "Error",
+        description: "Failed to fetch subscription details. Please try again.",
+        variant: "destructive",
+      });
     } finally {
       setLoading(false);
-    }
-  };
-
-  const createTrialSubscription = async (userId: string) => {
-    try {
-      const now = new Date();
-      const trialEndDate = new Date(now.getTime() + 7 * 24 * 60 * 60 * 1000);
-      
-      const { data, error } = await supabase
-        .from('user_subscriptions')
-        .upsert({
-          user_id: userId,
-          status: 'trial',
-          first_login_at: now.toISOString(),
-          active_till: trialEndDate.toISOString()
-        })
-        .select()
-        .maybeSingle();
-      
-      if (error) throw error;
-      
-      setSubscription(data);
-      
-      // Show toast notification for new trial users
-      toast({
-        title: "Trial Activated",
-        description: `Your 7-day trial is now active until ${format(trialEndDate, 'MMMM dd, yyyy')}.`,
-      });
-    } catch (error: any) {
-      console.error('Error creating trial subscription:', error);
-      setError(error.message);
     }
   };
 
@@ -100,7 +68,8 @@ export function useSubscription() {
         return 'Trial expired';
       }
       
-      return `Trial ends ${format(endDate, 'MMM dd, yyyy')} (${getDaysLeft()} days left)`;
+      const daysLeft = getDaysLeft();
+      return `Trial ends ${format(endDate, 'MMM dd, yyyy')} (${daysLeft} days left)`;
     }
 
     if (subscription.status === 'active') {
@@ -109,6 +78,12 @@ export function useSubscription() {
     }
 
     return `Subscription status: ${subscription.status}`;
+  };
+
+  const getDaysLeft = () => {
+    if (!subscription?.active_till) return 0;
+    const diffTime = new Date(subscription.active_till).getTime() - Date.now();
+    return Math.max(0, Math.ceil(diffTime / (1000 * 60 * 60 * 24)));
   };
 
   const handleUpgrade = async () => {
@@ -192,12 +167,6 @@ export function useSubscription() {
         variant: "destructive",
       });
     }
-  };
-
-  const getDaysLeft = () => {
-    if (!subscription?.active_till) return 0;
-    const diffTime = new Date(subscription.active_till).getTime() - Date.now();
-    return Math.ceil(diffTime / (1000 * 60 * 60 * 24));
   };
 
   return {
