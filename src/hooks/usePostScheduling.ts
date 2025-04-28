@@ -22,7 +22,7 @@ export function usePostScheduling() {
       console.log(`Scheduling content idea with ID: ${contentId} for user: ${user.id}`);
 
       // Get user's default schedule settings
-      const { data: settings, error: settingsError } = await supabase
+      const { data: userSettings, error: settingsError } = await supabase
         .from('schedule_settings')
         .select('*')
         .eq('user_id', user.id)
@@ -34,19 +34,20 @@ export function usePostScheduling() {
         throw settingsError;
       }
       
-      if (!settings) {
+      if (!userSettings) {
         console.error('No schedule settings found, creating default settings');
-        // Create default settings if none exist
+        
+        // Create default settings with tomorrow at 9 AM
         const tomorrow = new Date();
         tomorrow.setDate(tomorrow.getDate() + 1);
         tomorrow.setHours(9, 0, 0, 0);
         
         const defaultSettings = {
           user_id: user.id,
-          frequency: 'daily' as const, // Explicitly typed as 'daily'
+          frequency: 'daily' as const,
           time_of_day: '09:00:00',
           timezone: 'UTC',
-          next_run_at: tomorrow.toISOString() // Tomorrow at 9 AM
+          next_run_at: tomorrow.toISOString()
         };
         
         const { data: newSettings, error: newSettingsError } = await supabase
@@ -61,58 +62,31 @@ export function usePostScheduling() {
         }
         
         console.log('Created default user settings:', newSettings);
+        
+        // Use the newly created settings
+        userSettings = newSettings;
       }
-
-      const userSettings = settings || {
-        frequency: 'daily' as const, // Explicitly typed as 'daily'
-        time_of_day: '09:00:00',
-        timezone: 'UTC'
-      };
       
       console.log('Using schedule settings:', userSettings);
 
-      // Get existing scheduled posts to determine the appropriate offset
-      const { data: existingPosts, error: existingPostsError } = await supabase
-        .from('scheduled_posts')
-        .select('next_run_at')
-        .eq('user_id', user.id)
-        .order('next_run_at', { ascending: true });
-      
-      if (existingPostsError) {
-        console.error('Error fetching existing posts:', existingPostsError);
-        throw existingPostsError;
+      // 1. Get the current next_run_at value from the schedule settings
+      // This is the slot we'll use for this post
+      const nextAvailableSlot = userSettings.next_run_at;
+      if (!nextAvailableSlot) {
+        console.error('No next_run_at value found in schedule settings');
+        throw new Error('Failed to determine when to schedule the post');
       }
 
-      // Calculate the appropriate offset based on existing posts
-      const offset = existingPosts?.length || 0;
-      console.log(`Calculating next run time with offset: ${offset}`);
-      
-      // Calculate next run time with the determined offset
-      const nextRunAt = calculateNextRunTime({
-        frequency: userSettings.frequency,
-        timeOfDay: userSettings.time_of_day,
-        dayOfWeek: 'day_of_week' in userSettings ? userSettings.day_of_week : undefined,
-        dayOfMonth: 'day_of_month' in userSettings ? userSettings.day_of_month : undefined,
-        timezone: userSettings.timezone || 'UTC'
-      }, offset);
+      console.log(`Next available scheduling slot: ${nextAvailableSlot}`);
 
-      // Ensure we have a valid date before proceeding
-      if (!nextRunAt || isNaN(nextRunAt.getTime())) {
-        console.error('Invalid next run time calculated:', nextRunAt);
-        throw new Error('Failed to calculate a valid schedule time');
-      }
-
-      const nextRunAtIsoString = nextRunAt.toISOString();
-      console.log(`Next run time calculated: ${nextRunAtIsoString}`);
-
-      // Create scheduled post with next_run_at directly
+      // 2. Create the scheduled post with the next available slot
       const { data: postData, error: postError } = await supabase
         .from('scheduled_posts')
         .insert({
           user_id: user.id,
           content_id: contentId,
           status: 'pending',
-          next_run_at: nextRunAtIsoString, // Use the ISO string
+          next_run_at: nextAvailableSlot,
           timezone: userSettings.timezone || 'UTC'
         })
         .select()
@@ -124,6 +98,36 @@ export function usePostScheduling() {
       }
 
       console.log('Post scheduled successfully:', postData);
+
+      // 3. Calculate the next available slot based on frequency
+      const updatedNextRunAt = calculateNextRunTime({
+        frequency: userSettings.frequency,
+        timeOfDay: userSettings.time_of_day,
+        dayOfWeek: userSettings.day_of_week,
+        dayOfMonth: userSettings.day_of_month,
+        timezone: userSettings.timezone || 'UTC'
+      }, 1); // Just increment by 1 unit (day, week, or month)
+
+      // Ensure we have a valid date
+      if (!updatedNextRunAt || isNaN(updatedNextRunAt.getTime())) {
+        console.error('Invalid next run time calculated for settings update:', updatedNextRunAt);
+        throw new Error('Failed to calculate valid next schedule time');
+      }
+
+      const updatedNextRunAtString = updatedNextRunAt.toISOString();
+      console.log(`Updated next available slot: ${updatedNextRunAtString}`);
+
+      // 4. Update the schedule settings with the new next_run_at
+      const { error: updateError } = await supabase
+        .from('schedule_settings')
+        .update({ next_run_at: updatedNextRunAtString })
+        .eq('id', userSettings.id);
+
+      if (updateError) {
+        console.error('Error updating schedule settings:', updateError);
+        // We don't throw here as the post is already scheduled
+        // But we should log this error
+      }
 
       toast({
         title: "Post Scheduled",
