@@ -1,4 +1,3 @@
-
 import { useState } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/components/ui/use-toast';
@@ -106,27 +105,21 @@ export function useScheduleSettings() {
 
       if (postsError) throw postsError;
 
-      // Step 3: Update each post's schedule settings sequentially
+      // Step 3: Update each post's next_run_at sequentially
       for (let i = 0; i < (scheduledPosts?.length || 0); i++) {
         const postId = scheduledPosts[i].id;
-        const postOffset = i; // Use the index as the offset
-        const postNextRunAt = calculateNextRunTime(settings, postOffset);
+        const postNextRunAt = calculateNextRunTime(settings, i);
 
         const { error: updateError } = await supabase
-          .from('schedule_settings')
+          .from('scheduled_posts')
           .update({
-            frequency: settings.frequency,
-            time_of_day: settings.timeOfDay,
-            day_of_week: settings.dayOfWeek,
-            day_of_month: settings.dayOfMonth,
             next_run_at: postNextRunAt.toISOString(),
             timezone: settings.timezone
           })
-          .eq('post_id', postId);
+          .eq('id', postId);
 
         if (updateError) {
           console.error(`Error updating post ${postId}:`, updateError);
-          // Continue with other posts even if one fails
         }
       }
 

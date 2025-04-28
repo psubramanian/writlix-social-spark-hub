@@ -16,16 +16,9 @@ interface ScheduledPost {
     content: string;
     status: string;
   };
-  schedule_settings: {
-    id: string;
-    frequency: 'daily' | 'weekly' | 'monthly';
-    time_of_day: string;
-    day_of_week?: number | null;
-    day_of_month?: number | null;
-    next_run_at: string;
-    timezone: string;
-  }[];
-  user_id: string; // Added user_id field for filtering
+  next_run_at: string;
+  timezone: string;
+  user_id: string;
 }
 
 export function useScheduledPosts() {
@@ -54,30 +47,14 @@ export function useScheduledPosts() {
             title,
             content,
             status
-          ),
-          schedule_settings (
-            id,
-            frequency,
-            time_of_day,
-            day_of_week,
-            day_of_month,
-            next_run_at,
-            timezone
           )
         `)
-        .eq('user_id', user.id); // Explicitly filter by current user's ID
+        .eq('user_id', user.id)
+        .order('next_run_at', { ascending: true });
 
       if (postsError) throw postsError;
 
-      const formattedPosts = (postsData || []).map((post: any) => ({
-        ...post,
-        schedule_settings: post.schedule_settings.map((setting: any) => ({
-          ...setting,
-          timezone: setting.timezone || 'UTC'
-        }))
-      }));
-
-      setPosts(formattedPosts as ScheduledPost[]);
+      setPosts(postsData as ScheduledPost[]);
     } catch (error: any) {
       console.error('Error fetching posts:', error);
       toast({

@@ -19,26 +19,22 @@ export function usePostScheduling() {
         return false;
       }
 
-      const { data: postData, error: postError } = await supabase
-        .from('scheduled_posts')
-        .insert({
-          user_id: user.id,
-          content_id: contentId,
-          status: 'pending'
-        })
-        .select()
-        .single();
+      // Get user's default schedule settings
+      const { data: settings, error: settingsError } = await supabase
+        .from('schedule_settings')
+        .select('*')
+        .eq('user_id', user.id)
+        .is('post_id', null)
+        .maybeSingle();
 
-      if (postError) throw postError;
-
-      const settings = await fetchInitialSettings(user.id);
+      if (settingsError) throw settingsError;
       if (!settings) {
         throw new Error("Could not retrieve user schedule settings");
       }
 
       // Get existing scheduled posts to determine the appropriate offset
       const { data: existingPosts, error: existingPostsError } = await supabase
-        .from('schedule_settings')
+        .from('scheduled_posts')
         .select('next_run_at')
         .eq('user_id', user.id)
         .order('next_run_at', { ascending: true });
@@ -46,25 +42,31 @@ export function usePostScheduling() {
       if (existingPostsError) throw existingPostsError;
 
       // Calculate the appropriate offset based on existing posts
-      const offset = calculatePostOffset(settings.frequency, existingPosts?.length || 0);
+      const offset = existingPosts?.length || 0;
       
       // Calculate next run time with the determined offset
-      const nextRunAt = calculateNextRunTime(settings, offset);
+      const nextRunAt = calculateNextRunTime({
+        frequency: settings.frequency,
+        timeOfDay: settings.time_of_day,
+        dayOfWeek: settings.day_of_week,
+        dayOfMonth: settings.day_of_month,
+        timezone: settings.timezone || 'UTC'
+      }, offset);
 
-      const { error: settingsError } = await supabase
-        .from('schedule_settings')
+      // Create scheduled post with next_run_at directly
+      const { data: postData, error: postError } = await supabase
+        .from('scheduled_posts')
         .insert({
-          post_id: postData.id,
           user_id: user.id,
-          frequency: settings.frequency,
-          time_of_day: settings.timeOfDay,
-          day_of_week: settings.dayOfWeek,
-          day_of_month: settings.dayOfMonth,
+          content_id: contentId,
+          status: 'pending',
           next_run_at: nextRunAt.toISOString(),
-          timezone: settings.timezone
-        });
+          timezone: settings.timezone || 'UTC'
+        })
+        .select()
+        .single();
 
-      if (settingsError) throw settingsError;
+      if (postError) throw postError;
 
       toast({
         title: "Post Scheduled",
@@ -81,35 +83,6 @@ export function usePostScheduling() {
       });
       return false;
     }
-  };
-
-  const fetchInitialSettings = async (userId: string) => {
-    const { data, error } = await supabase
-      .from('schedule_settings')
-      .select('*')
-      .eq('user_id', userId)
-      .is('post_id', null)
-      .maybeSingle();
-
-    if (error) throw error;
-
-    if (data) {
-      return {
-        frequency: data.frequency,
-        timeOfDay: data.time_of_day,
-        dayOfWeek: data.day_of_week ?? undefined,
-        dayOfMonth: data.day_of_month ?? undefined,
-        timezone: data.timezone || 'UTC'
-      } as ScheduleSettings;
-    }
-
-    return null;
-  };
-
-  // Helper function to calculate the appropriate offset based on frequency
-  const calculatePostOffset = (frequency: 'daily' | 'weekly' | 'monthly', existingPostsCount: number): number => {
-    // We use the count of existing posts as our base offset
-    return existingPostsCount;
   };
 
   return {

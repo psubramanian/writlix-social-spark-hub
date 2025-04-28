@@ -160,7 +160,9 @@ export type Database = {
           content_id: number | null
           created_at: string
           id: string
+          next_run_at: string | null
           status: string
+          timezone: string | null
           updated_at: string
           user_id: string
         }
@@ -168,7 +170,9 @@ export type Database = {
           content_id?: number | null
           created_at?: string
           id?: string
+          next_run_at?: string | null
           status?: string
+          timezone?: string | null
           updated_at?: string
           user_id: string
         }
@@ -176,7 +180,9 @@ export type Database = {
           content_id?: number | null
           created_at?: string
           id?: string
+          next_run_at?: string | null
           status?: string
+          timezone?: string | null
           updated_at?: string
           user_id?: string
         }
