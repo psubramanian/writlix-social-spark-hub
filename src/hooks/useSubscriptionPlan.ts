@@ -15,10 +15,19 @@ export function useSubscriptionPlan(planName: string) {
         .eq('name', planName)
         .maybeSingle();
         
-      if (error) throw error;
-      if (!data) throw new Error(`Plan ${planName} not found`);
+      if (error) {
+        console.error('Error fetching subscription plan:', error);
+        throw error;
+      }
+      
+      if (!data) {
+        console.error(`Plan ${planName} not found`);
+        throw new Error(`Plan ${planName} not found`);
+      }
       
       return data;
-    }
+    },
+    staleTime: 1000 * 60 * 5, // 5 minutes
+    retry: 2,
   });
 }

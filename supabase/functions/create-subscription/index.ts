@@ -41,7 +41,7 @@ serve(async (req) => {
     const { data: planData, error: planError } = await supabase
       .from('subscription_plans')
       .select('*')
-      .eq('name', 'PRO')
+      .eq('name', 'PRO Plan')
       .single()
       
     if (planError || !planData) {
@@ -62,11 +62,37 @@ serve(async (req) => {
     
     // Calculate amount in paise/cents (Razorpay expects amount in smallest currency unit)
     const amountInPaise = Math.round(planData.price * 100)
+    const currency = 'INR' // Currency can be configurable based on user's location
     
-    console.log(`Creating Razorpay subscription with amount: ${amountInPaise}`)
+    console.log(`Creating Razorpay subscription with amount: ${amountInPaise} ${currency}`)
+
+    // Check if user already has a subscription
+    const { data: existingSubscription, error: subError } = await supabase
+      .from('user_subscriptions')
+      .select('*')
+      .eq('user_id', user_id)
+      .maybeSingle();
+      
+    if (subError) {
+      console.error('Error checking existing subscription:', subError)
+    }
+
+    // If no subscription exists, create one
+    if (!existingSubscription) {
+      const { error: insertError } = await supabase
+        .from('user_subscriptions')
+        .insert({
+          user_id: user_id,
+          status: 'trial',
+          active_till: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString(), // 7-day trial
+        });
+        
+      if (insertError) {
+        console.error('Error creating subscription record:', insertError);
+      }
+    }
     
-    // Instead of using plan_id directly which might not exist yet, 
-    // create a one-time order for the subscription payment
+    // Create a one-time order for the subscription payment
     const response = await fetch('https://api.razorpay.com/v1/orders', {
       method: 'POST',
       headers: {
@@ -75,10 +101,12 @@ serve(async (req) => {
       },
       body: JSON.stringify({
         amount: amountInPaise,
-        currency: 'INR',
+        currency: currency,
         receipt: `order_rcpt_${user_id.substring(0, 8)}`,
         notes: {
-          user_id: user_id
+          user_id: user_id,
+          plan_name: planData.name,
+          plan_id: planData.id
         }
       })
     })
@@ -92,8 +120,9 @@ serve(async (req) => {
     const orderData = await response.json()
     console.log('Order created:', orderData.id)
 
-    // Add key_id to the response so frontend can use it
+    // Add key_id and currency to the response so frontend can use it
     orderData.key_id = RAZORPAY_KEY_ID
+    orderData.currency = currency
 
     return new Response(
       JSON.stringify(orderData),

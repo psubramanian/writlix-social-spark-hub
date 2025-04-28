@@ -6,10 +6,20 @@ import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { AlertCircle, Info, Loader2 } from "lucide-react";
 
 const Subscription = () => {
-  const { subscription, loading, error, handleUpgrade, getDaysLeft } = useSubscription();
+  const { 
+    subscription, 
+    loading, 
+    error, 
+    handleUpgrade,
+    cancelSubscription,
+    getDaysLeft,
+    isTrialActive,
+    isSubscriptionActive,
+    isSubscriptionExpired,
+    isSubscriptionCanceled,
+    isRazorpayLoaded
+  } = useSubscription();
 
-  const isTrialActive = subscription?.status === 'trial';
-  const isPro = subscription?.status === 'active';
   const daysLeft = getDaysLeft();
 
   if (loading) {
@@ -41,10 +51,8 @@ const Subscription = () => {
         
         <div className="flex justify-center items-center min-h-[400px]">
           <SubscriptionCard
-            isCurrentPlan={false}
             onUpgrade={handleUpgrade}
-            trial={false}
-            daysLeft={0}
+            isRazorpayLoaded={isRazorpayLoaded}
           />
         </div>
       </div>
@@ -67,13 +75,36 @@ const Subscription = () => {
           </AlertDescription>
         </Alert>
       )}
+      
+      {isSubscriptionExpired && (
+        <Alert variant="destructive" className="mb-6">
+          <AlertCircle className="h-4 w-4" />
+          <AlertTitle>Subscription Expired</AlertTitle>
+          <AlertDescription>
+            Your subscription has expired. Renew now to regain access to all premium features.
+          </AlertDescription>
+        </Alert>
+      )}
+      
+      {isSubscriptionCanceled && (
+        <Alert className="mb-6 border-amber-500">
+          <Info className="h-4 w-4" />
+          <AlertTitle>Subscription Canceled</AlertTitle>
+          <AlertDescription>
+            Your subscription has been canceled. You will have access until the end of the current billing period.
+          </AlertDescription>
+        </Alert>
+      )}
 
       <div className="flex justify-center items-center min-h-[400px]">
         <SubscriptionCard
-          isCurrentPlan={isPro}
+          isCurrentPlan={isTrialActive || isSubscriptionActive || isSubscriptionExpired || isSubscriptionCanceled}
           onUpgrade={handleUpgrade}
+          onCancel={cancelSubscription}
           trial={isTrialActive}
           daysLeft={daysLeft}
+          status={subscription?.status}
+          isRazorpayLoaded={isRazorpayLoaded}
         />
       </div>
     </div>

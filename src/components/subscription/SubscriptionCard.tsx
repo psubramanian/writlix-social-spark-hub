@@ -4,15 +4,27 @@ import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle }
 import { Button } from "@/components/ui/button";
 import { Check, Loader2 } from "lucide-react";
 import { useSubscriptionPlan } from "@/hooks/useSubscriptionPlan";
+import { Badge } from "@/components/ui/badge";
 
 interface SubscriptionCardProps {
   isCurrentPlan?: boolean;
   onUpgrade?: () => void;
+  onCancel?: () => void;
   trial?: boolean;
   daysLeft?: number;
+  status?: string;
+  isRazorpayLoaded?: boolean;
 }
 
-export const SubscriptionCard = ({ isCurrentPlan, onUpgrade, trial, daysLeft }: SubscriptionCardProps) => {
+export const SubscriptionCard = ({ 
+  isCurrentPlan, 
+  onUpgrade, 
+  onCancel, 
+  trial, 
+  daysLeft, 
+  status,
+  isRazorpayLoaded = true
+}: SubscriptionCardProps) => {
   const { data: plan, isLoading, error } = useSubscriptionPlan('PRO Plan');
   
   const features = [
@@ -47,14 +59,108 @@ export const SubscriptionCard = ({ isCurrentPlan, onUpgrade, trial, daysLeft }: 
     );
   }
 
+  // Handle different subscription statuses
+  let statusBadge = null;
+  let actionButton = null;
+
+  if (isCurrentPlan && trial && daysLeft && daysLeft > 0) {
+    // Trial active
+    statusBadge = <Badge variant="outline" className="mb-2">Trial - {daysLeft} days left</Badge>;
+    actionButton = (
+      <Button 
+        className="w-full" 
+        onClick={onUpgrade}
+        disabled={!isRazorpayLoaded}
+      >
+        {!isRazorpayLoaded ? (
+          <>
+            <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+            Loading...
+          </>
+        ) : (
+          'Upgrade Now'
+        )}
+      </Button>
+    );
+  } else if (isCurrentPlan && status === 'active') {
+    // Active subscription
+    statusBadge = <Badge className="mb-2 bg-green-500 hover:bg-green-600">Active</Badge>;
+    actionButton = (
+      <Button 
+        className="w-full" 
+        variant="outline"
+        onClick={onCancel}
+      >
+        Cancel Subscription
+      </Button>
+    );
+  } else if (status === 'expired' || (trial && daysLeft === 0)) {
+    // Expired subscription
+    statusBadge = <Badge variant="destructive" className="mb-2">Expired</Badge>;
+    actionButton = (
+      <Button 
+        className="w-full" 
+        onClick={onUpgrade}
+        disabled={!isRazorpayLoaded}
+      >
+        {!isRazorpayLoaded ? (
+          <>
+            <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+            Loading...
+          </>
+        ) : (
+          'Renew Subscription'
+        )}
+      </Button>
+    );
+  } else if (status === 'canceled') {
+    // Canceled subscription
+    statusBadge = <Badge variant="outline" className="mb-2 bg-amber-500 hover:bg-amber-600 text-white">Canceled</Badge>;
+    actionButton = (
+      <Button 
+        className="w-full" 
+        onClick={onUpgrade}
+        disabled={!isRazorpayLoaded}
+      >
+        {!isRazorpayLoaded ? (
+          <>
+            <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+            Loading...
+          </>
+        ) : (
+          'Resubscribe'
+        )}
+      </Button>
+    );
+  } else {
+    // Default state for new users
+    actionButton = (
+      <Button 
+        className="w-full" 
+        onClick={onUpgrade}
+        disabled={!isRazorpayLoaded}
+      >
+        {!isRazorpayLoaded ? (
+          <>
+            <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+            Loading...
+          </>
+        ) : (
+          'Upgrade Now'
+        )}
+      </Button>
+    );
+  }
+
   return (
     <Card className={`w-[300px] ${isCurrentPlan ? 'border-primary' : ''}`}>
       <CardHeader>
-        <CardTitle>{plan.name}</CardTitle>
+        <div className="flex justify-between items-start">
+          <CardTitle>{plan.name}</CardTitle>
+          {statusBadge}
+        </div>
         <CardDescription>
-          {trial 
-            ? `${daysLeft} days left in trial`
-            : plan.description}
+          {plan.description}
         </CardDescription>
       </CardHeader>
       <CardContent>
@@ -72,19 +178,7 @@ export const SubscriptionCard = ({ isCurrentPlan, onUpgrade, trial, daysLeft }: 
         </ul>
       </CardContent>
       <CardFooter>
-        {!isCurrentPlan && (
-          <Button 
-            className="w-full" 
-            onClick={onUpgrade}
-          >
-            Upgrade Now
-          </Button>
-        )}
-        {isCurrentPlan && (
-          <Button className="w-full" disabled>
-            Current Plan
-          </Button>
-        )}
+        {actionButton}
       </CardFooter>
     </Card>
   );
