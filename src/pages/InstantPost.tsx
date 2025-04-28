@@ -1,4 +1,3 @@
-
 import React, { useState, useRef } from 'react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
@@ -137,9 +136,9 @@ const InstantPost = () => {
           <CardContent>
             <div className="mb-4">
               <RichTextEditor
-                value={content}
+                content={content}
                 onChange={setContent}
-                placeholder="Write your LinkedIn post here..."
+                readOnly={false}
               />
             </div>
           </CardContent>
@@ -223,8 +222,9 @@ const InstantPost = () => {
             </CardHeader>
             <CardContent>
               <RichTextEditor
-                value={generatedContent}
+                content={generatedContent}
                 onChange={setGeneratedContent}
+                readOnly={false}
               />
             </CardContent>
           </Card>
