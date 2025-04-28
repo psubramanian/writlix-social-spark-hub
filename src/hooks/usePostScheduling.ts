@@ -22,7 +22,7 @@ export function usePostScheduling() {
       console.log(`Scheduling content idea with ID: ${contentId} for user: ${user.id}`);
 
       // Get user's default schedule settings
-      const { data: userSettings, error: settingsError } = await supabase
+      let { data: userSettings, error: settingsError } = await supabase
         .from('schedule_settings')
         .select('*')
         .eq('user_id', user.id)
