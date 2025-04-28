@@ -1,6 +1,11 @@
+
 import { useContentFetch } from './useContentFetch';
 import { useContentGenerate } from './useContentGenerate';
 import { useContentOperations } from './useContentOperations';
+import { useNavigate } from 'react-router-dom';
+import { useToast } from '@/components/ui/use-toast';
+import { supabase } from '@/integrations/supabase/client';
+import type { ContentItem } from '@/types/content';
 
 export const useContentGeneration = () => {
   const { 
@@ -20,6 +25,9 @@ export const useContentGeneration = () => {
     updateContent,
     deleteContent
   } = useContentOperations(setGeneratedContent);
+
+  const { toast } = useToast();
+  const navigate = useNavigate();
 
   const importFromCsv = async (data: any[]) => {
     try {
@@ -88,6 +96,19 @@ export const useContentGeneration = () => {
     }
   };
 
+  // Add a toggleStatus function since it's being used in DataSeed.tsx
+  const toggleStatus = (id: string) => {
+    // Find the content item
+    const item = generatedContent.find(content => content.id === id);
+    if (!item) return;
+    
+    // Toggle between Review and Scheduled
+    const newStatus = item.status === 'Review' ? 'Scheduled' : 'Review';
+    
+    // Call updateContent to update the status
+    updateContent(id, item.content, newStatus);
+  };
+
   return {
     generating,
     loading,
@@ -98,5 +119,6 @@ export const useContentGeneration = () => {
     importFromCsv,
     updateContent,
     fetchAllContent,
+    toggleStatus, // Export the new function
   };
 };

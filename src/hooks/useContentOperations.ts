@@ -1,4 +1,5 @@
 
+import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useToast } from '@/components/ui/use-toast';
 import { supabase } from '@/integrations/supabase/client';
@@ -23,6 +24,17 @@ export const useContentOperations = (setGeneratedContent: React.Dispatch<React.S
         return;
       }
 
+      // Fetch the current state to ensure we have the latest data
+      let currentContentItem: ContentItem | undefined;
+      setGeneratedContent(prevContent => {
+        currentContentItem = prevContent.find(content => content.id === id);
+        return prevContent;
+      });
+      
+      if (!currentContentItem || !currentContentItem.db_id) {
+        throw new Error('Could not find content item to update');
+      }
+
       const { data: generationData, error: generationError } = await supabase.functions.invoke('generate-content', {
         body: {
           topic: title,
@@ -39,11 +51,6 @@ export const useContentOperations = (setGeneratedContent: React.Dispatch<React.S
       if (!newContent) {
         throw new Error('No content was generated');
       }
-      
-      const item = generatedContent.find(content => content.id === id);
-      if (!item || !item.db_id) {
-        throw new Error('Could not find content item to update');
-      }
 
       const { error: dbError } = await supabase
         .from('content_ideas')
@@ -51,7 +58,7 @@ export const useContentOperations = (setGeneratedContent: React.Dispatch<React.S
           content: newContent.content,
           title: newContent.title,
         })
-        .eq('id', item.db_id);
+        .eq('id', currentContentItem.db_id);
 
       if (dbError) {
         console.error('Database update error:', dbError);
@@ -85,7 +92,7 @@ export const useContentOperations = (setGeneratedContent: React.Dispatch<React.S
     }
   };
 
-  const updateContent = async (id: string, content: string) => {
+  const updateContent = async (id: string, content: string, newStatus?: 'Review' | 'Scheduled' | 'Published') => {
     try {
       const { data: { user }, error: authError } = await supabase.auth.getUser();
       
@@ -100,14 +107,25 @@ export const useContentOperations = (setGeneratedContent: React.Dispatch<React.S
         return;
       }
       
-      const item = generatedContent.find(item => item.id === id);
-      if (!item) return;
+      // Fetch the current state to ensure we have the latest data
+      let currentItem: ContentItem | undefined;
+      setGeneratedContent(prevContent => {
+        currentItem = prevContent.find(item => item.id === id);
+        return prevContent;
+      });
+      
+      if (!currentItem) return;
 
-      if (item.db_id) {
+      const updateData: Record<string, any> = { content };
+      if (newStatus) {
+        updateData.status = newStatus;
+      }
+
+      if (currentItem.db_id) {
         const { error: updateError } = await supabase
           .from('content_ideas')
-          .update({ content })
-          .eq('id', item.db_id);
+          .update(updateData)
+          .eq('id', currentItem.db_id);
 
         if (updateError) {
           console.error('Content update error:', updateError);
@@ -117,13 +135,18 @@ export const useContentOperations = (setGeneratedContent: React.Dispatch<React.S
 
       setGeneratedContent(prev =>
         prev.map(item =>
-          item.id === id ? { ...item, content, preview: content.substring(0, 100) + '...' } : item
+          item.id === id ? { 
+            ...item, 
+            content, 
+            preview: content.substring(0, 100) + '...',
+            ...(newStatus ? { status: newStatus } : {})
+          } : item
         )
       );
 
       toast({
-        title: "Content Updated",
-        description: "Your changes have been saved",
+        title: newStatus ? "Status Updated" : "Content Updated",
+        description: newStatus ? `Item status changed to ${newStatus}` : "Your changes have been saved",
       });
     } catch (error: any) {
       console.error('Content update error:', error);
@@ -151,15 +174,21 @@ export const useContentOperations = (setGeneratedContent: React.Dispatch<React.S
         return;
       }
       
-      const item = generatedContent.find(content => content.id === id);
-      if (!item) {
+      // Fetch the current state to ensure we have the latest data
+      let itemToDelete: ContentItem | undefined;
+      setGeneratedContent(prevContent => {
+        itemToDelete = prevContent.find(content => content.id === id);
+        return prevContent;
+      });
+      
+      if (!itemToDelete) {
         console.error('Item not found in local state:', id);
         return;
       }
       
-      console.log('Found item to delete:', item);
+      console.log('Found item to delete:', itemToDelete);
       
-      if (item.status === 'Published') {
+      if (itemToDelete.status === 'Published') {
         toast({
           title: "Cannot Delete",
           description: "Published content cannot be deleted",
@@ -168,13 +197,13 @@ export const useContentOperations = (setGeneratedContent: React.Dispatch<React.S
         return;
       }
       
-      if (item.db_id) {
-        if (item.status === 'Scheduled') {
-          console.log('Removing scheduled post for content_id:', item.db_id);
+      if (itemToDelete.db_id) {
+        if (itemToDelete.status === 'Scheduled') {
+          console.log('Removing scheduled post for content_id:', itemToDelete.db_id);
           const { data: scheduledPost, error: findError } = await supabase
             .from('scheduled_posts')
             .select('id')
-            .eq('content_id', item.db_id)
+            .eq('content_id', itemToDelete.db_id)
             .maybeSingle();
             
           if (findError && findError.code !== 'PGRST116') {
@@ -202,11 +231,11 @@ export const useContentOperations = (setGeneratedContent: React.Dispatch<React.S
           }
         }
         
-        console.log('Deleting content with db_id:', item.db_id);
+        console.log('Deleting content with db_id:', itemToDelete.db_id);
         const { error: deleteError } = await supabase
           .from('content_ideas')
           .delete()
-          .eq('id', item.db_id);
+          .eq('id', itemToDelete.db_id);
           
         if (deleteError) {
           console.error('Error deleting from database:', deleteError);

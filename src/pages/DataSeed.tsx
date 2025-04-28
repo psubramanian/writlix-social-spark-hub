@@ -5,14 +5,7 @@ import ContentTable from '../components/data-seed/ContentTable';
 import ContentDialog from '../components/data-seed/ContentDialog';
 import { useContentGeneration } from '@/hooks/useContentGeneration';
 import { Loader } from 'lucide-react';
-
-interface ContentItem {
-  id: string;
-  title: string;
-  preview: string;
-  content: string;
-  status: 'Review' | 'Scheduled' | 'Published';
-}
+import type { ContentItem, GenerationOptions } from '@/types/content';
 
 const DataSeed = () => {
   const {
@@ -40,6 +33,12 @@ const DataSeed = () => {
     }
   };
 
+  // Adapter function to bridge the API change from (seed: string, quantity: number) 
+  // to ({ topic, quantity }: GenerationOptions)
+  const handleGenerate = (seed: string, quantity: number) => {
+    return generateContent({ topic: seed, quantity });
+  };
+
   return (
     <div className="p-6 relative">
       {generating && (
@@ -58,7 +57,7 @@ const DataSeed = () => {
       
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
         <GenerationForm 
-          onGenerate={generateContent}
+          onGenerate={handleGenerate}
           onCsvImport={importFromCsv}
           isGenerating={generating}
         />
