@@ -5,7 +5,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { useToast } from '@/components/ui/use-toast';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 import { Loader2, Upload, AlertCircle } from 'lucide-react';
-import { RichTextEditor } from '@/components/RichTextEditor';
+import RichTextEditor from '@/components/RichTextEditor';
 import { useInstantPost } from '@/hooks/useInstantPost';
 
 const InstantPost = () => {
