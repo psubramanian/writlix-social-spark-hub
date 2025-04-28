@@ -1,8 +1,8 @@
-
 import { useState, useEffect } from 'react';
 import { useAuth } from '@/contexts/AuthContext';
 import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/components/ui/use-toast';
+import { format } from 'date-fns';
 
 interface SubscriptionData {
   status: string;
@@ -17,48 +17,24 @@ export function useSubscription() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
-  useEffect(() => {
-    if (user) {
-      fetchSubscription();
-    } else {
-      // Reset subscription when user logs out
-      setSubscription(null);
-      setLoading(false);
-    }
-  }, [user]);
-
   const fetchSubscription = async () => {
     if (!user?.id) return;
     
     try {
       setLoading(true);
       setError(null);
-      console.log(`Fetching subscription for user: ${user.id}`);
       
       const { data, error } = await supabase
         .from('user_subscriptions')
         .select('*')
         .eq('user_id', user.id)
-        .maybeSingle(); // Changed from .single() to .maybeSingle()
+        .maybeSingle();
 
-      if (error) {
-        console.error('Error fetching subscription:', error);
-        setError(error.message);
-        throw error;
-      }
+      if (error) throw error;
       
-      console.log('Subscription data:', data);
-      
-      // If no subscription found, create a trial subscription
-      if (!data) {
-        console.log('No subscription found, creating trial subscription');
-        await createTrialSubscription(user.id);
-      } else {
-        setSubscription(data);
-      }
+      setSubscription(data);
     } catch (error: any) {
-      console.error('Error in subscription process:', error);
-      // Don't show error toast to users, just log it
+      console.error('Error fetching subscription:', error);
       setError(error.message);
     } finally {
       setLoading(false);
@@ -67,32 +43,53 @@ export function useSubscription() {
 
   const createTrialSubscription = async (userId: string) => {
     try {
-      console.log('Creating trial subscription for user:', userId);
-      const trialEndDate = new Date();
-      trialEndDate.setDate(trialEndDate.getDate() + 7); // 7-day trial
+      const now = new Date();
+      const trialEndDate = new Date(now.getTime() + 7 * 24 * 60 * 60 * 1000);
       
       const { data, error } = await supabase
         .from('user_subscriptions')
-        .insert({
+        .upsert({
           user_id: userId,
           status: 'trial',
-          active_till: trialEndDate.toISOString(),
-          first_login_at: new Date().toISOString()
+          first_login_at: now.toISOString(),
+          active_till: trialEndDate.toISOString()
         })
-        .select('*')
-        .maybeSingle(); // Use maybeSingle() here too
+        .select()
+        .maybeSingle();
       
-      if (error) {
-        console.error('Error creating trial subscription:', error);
-        throw error;
-      }
+      if (error) throw error;
       
-      console.log('Trial subscription created:', data);
       setSubscription(data);
     } catch (error: any) {
       console.error('Error creating trial subscription:', error);
       setError(error.message);
     }
+  };
+
+  useEffect(() => {
+    if (user?.id) {
+      fetchSubscription();
+    } else {
+      setSubscription(null);
+      setLoading(false);
+    }
+  }, [user]);
+
+  const formatSubscriptionStatus = () => {
+    if (!subscription) return '';
+
+    if (subscription.status === 'trial') {
+      const endDate = new Date(subscription.active_till);
+      const daysLeft = Math.ceil((endDate.getTime() - Date.now()) / (1000 * 60 * 60 * 24));
+      return `Trial ends ${format(endDate, 'MMM dd, yyyy')} (${daysLeft} days left)`;
+    }
+
+    if (subscription.status === 'active') {
+      const renewalDate = new Date(subscription.active_till);
+      return `PRO - Renews ${format(renewalDate, 'MMM dd, yyyy')}`;
+    }
+
+    return `Subscription status: ${subscription.status}`;
   };
 
   const handleUpgrade = async () => {
@@ -191,5 +188,6 @@ export function useSubscription() {
     handleUpgrade,
     getDaysLeft,
     fetchSubscription,
+    formatSubscriptionStatus
   };
 }

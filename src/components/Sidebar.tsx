@@ -1,4 +1,3 @@
-
 import React from 'react';
 import { Link, useLocation } from "react-router-dom";
 import { useAuth } from '../contexts/AuthContext';
@@ -18,7 +17,7 @@ import {
 const Sidebar = () => {
   const location = useLocation();
   const { logout } = useAuth();
-  const { subscription, loading } = useSubscription();
+  const { subscription, loading, formatSubscriptionStatus } = useSubscription();
   
   const menuItems = [
     { icon: BarChart, label: 'Dashboard', path: '/dashboard' },
@@ -28,18 +27,6 @@ const Sidebar = () => {
     { icon: CreditCard, label: 'Subscription', path: '/subscription' },
   ];
   
-  const getSubscriptionStatus = () => {
-    if (loading) return "Loading subscription...";
-    if (!subscription) return "Starting 7-day trial...";
-    if (subscription.status === 'trial') {
-      return `Trial ends ${format(new Date(subscription.active_till), 'MMM dd, yyyy')}`;
-    }
-    if (subscription.status === 'active') {
-      return `PRO - Renews ${format(new Date(subscription.active_till), 'MMM dd, yyyy')}`;
-    }
-    return `Subscription status: ${subscription.status}`;
-  };
-
   return (
     <ShadcnSidebar>
       <SidebarHeader className="p-4">
@@ -72,7 +59,7 @@ const Sidebar = () => {
       
       <SidebarFooter className="p-4 border-t">
         <div className="text-xs text-sidebar-foreground/70 mb-2">
-          {getSubscriptionStatus()}
+          {loading ? "Loading subscription..." : formatSubscriptionStatus()}
         </div>
         <SidebarMenuButton
           onClick={() => logout()}

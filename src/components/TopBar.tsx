@@ -1,58 +1,16 @@
+
 import React from 'react';
 import { useAuth } from '../contexts/AuthContext';
 import { Button } from '@/components/ui/button';
 import { Avatar, AvatarImage, AvatarFallback } from '@/components/ui/avatar';
 import { Bell, Menu } from 'lucide-react';
 import { useSubscription } from '@/hooks/useSubscription';
-import { format } from 'date-fns';
 import { useSidebar } from '@/components/ui/sidebar';
 
 const TopBar = () => {
   const { user } = useAuth();
-  const { subscription, loading } = useSubscription();
+  const { subscription, loading, formatSubscriptionStatus } = useSubscription();
   const { toggleSidebar } = useSidebar();
-  
-  const getSubscriptionBadge = () => {
-    if (loading) {
-      return (
-        <p className="text-xs text-muted-foreground mt-1">
-          Loading subscription...
-        </p>
-      );
-    }
-    
-    if (!subscription) {
-      return (
-        <p className="text-xs text-muted-foreground mt-1">
-          Starting 7-day trial...
-        </p>
-      );
-    }
-    
-    if (subscription.status === 'trial') {
-      const trialEnd = new Date(subscription.active_till);
-      return (
-        <p className="text-xs text-muted-foreground mt-1">
-          Trial ends {format(trialEnd, 'MMM dd, yyyy')}
-        </p>
-      );
-    }
-    
-    if (subscription.status === 'active') {
-      const renewalDate = new Date(subscription.active_till);
-      return (
-        <p className="text-xs text-muted-foreground mt-1">
-          PRO - Renews {format(renewalDate, 'MMM dd, yyyy')}
-        </p>
-      );
-    }
-    
-    return (
-      <p className="text-xs text-muted-foreground mt-1">
-        Subscription status: {subscription.status}
-      </p>
-    );
-  };
   
   return (
     <div className="h-16 border-b bg-white flex items-center justify-between px-6">
@@ -77,7 +35,9 @@ const TopBar = () => {
           <div>
             <p className="text-sm font-medium">{user?.name || 'Guest'}</p>
             <p className="text-xs text-muted-foreground">{user?.email || ''}</p>
-            {getSubscriptionBadge()}
+            <p className="text-xs text-muted-foreground">
+              {loading ? 'Loading subscription...' : formatSubscriptionStatus()}
+            </p>
           </div>
         </div>
       </div>
