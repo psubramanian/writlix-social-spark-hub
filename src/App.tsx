@@ -15,6 +15,7 @@ import Settings from "./pages/Settings";
 import NotFound from "./pages/NotFound";
 import PublishedContent from "./pages/PublishedContent";
 import Subscription from "./pages/Subscription";
+import InstantPost from "./pages/InstantPost";
 import AppLayout from "./components/layout/AppLayout";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { AlertCircle, Loader2 } from "lucide-react";
@@ -102,6 +103,12 @@ const AppRoutes = () => {
       <Route path="/subscription" element={
         <ProtectedRoute>
           <Subscription />
+        </ProtectedRoute>
+      } />
+      
+      <Route path="/instant-post" element={
+        <ProtectedRoute>
+          <InstantPost />
         </ProtectedRoute>
       } />
       

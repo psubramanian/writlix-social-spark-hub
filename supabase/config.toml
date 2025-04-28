@@ -12,6 +12,7 @@ port = 54322
 [studio]
 enabled = true
 port = 54323
+api_url = "http://localhost"
 
 [inbucket]
 enabled = true
@@ -22,13 +23,40 @@ enabled = true
 
 [auth]
 enabled = true
-site_url = "http://localhost:3000"
+port = 54325
 
 [realtime]
 enabled = true
 
+[analytics]
+enabled = true
+port = 54327
+
+[vector]
+enabled = true
+port = 54328
+
+[functions]
+enabled = true
+port = 54326
+
 [functions.update-user-schedule-settings]
 verify_jwt = true
 
+[functions.create-subscription]
+verify_jwt = true
+
+[functions.linkedin-oauth]
+verify_jwt = true
+
+[functions.post-to-linkedin]
+verify_jwt = true
+
 [functions.generate-content]
+verify_jwt = true
+
+[functions.generate-content-from-image]
+verify_jwt = true
+
+[functions.post-to-linkedin-direct]
 verify_jwt = true

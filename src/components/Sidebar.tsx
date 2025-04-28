@@ -4,7 +4,7 @@ import { Link, useLocation } from "react-router-dom";
 import { useAuth } from '../contexts/AuthContext';
 import { useSubscription } from '../hooks/useSubscription';
 import { format } from 'date-fns';
-import { BarChart, Settings, LogOut, FileText, Calendar, CreditCard } from 'lucide-react';
+import { BarChart, Settings, LogOut, FileText, Calendar, CreditCard, Send } from 'lucide-react';
 import {
   Sidebar as ShadcnSidebar,
   SidebarContent,
@@ -24,6 +24,7 @@ const Sidebar = () => {
     { icon: BarChart, label: 'Dashboard', path: '/dashboard' },
     { icon: FileText, label: 'Data Seed', path: '/data-seed' },
     { icon: Calendar, label: 'Schedule', path: '/schedule' },
+    { icon: Send, label: 'Instant Post', path: '/instant-post' },
     { icon: Settings, label: 'Settings', path: '/settings' },
     { icon: CreditCard, label: 'Subscription', path: '/subscription' },
   ];
