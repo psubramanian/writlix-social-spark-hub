@@ -1,16 +1,16 @@
-
 import React from 'react';
 import { useAuth } from '../contexts/AuthContext';
 import { Button } from '@/components/ui/button';
 import { Avatar, AvatarImage, AvatarFallback } from '@/components/ui/avatar';
-import { Bell } from 'lucide-react';
+import { Bell, Menu } from 'lucide-react';
 import { useSubscription } from '@/hooks/useSubscription';
 import { format } from 'date-fns';
-import { Badge } from '@/components/ui/badge';
+import { useSidebar } from '@/components/ui/sidebar';
 
 const TopBar = () => {
   const { user } = useAuth();
   const { subscription, loading } = useSubscription();
+  const { toggleSidebar } = useSidebar();
   
   const getSubscriptionBadge = () => {
     if (loading) {
@@ -56,7 +56,11 @@ const TopBar = () => {
   
   return (
     <div className="h-16 border-b bg-white flex items-center justify-between px-6">
-      <div>
+      <div className="flex items-center gap-4">
+        <Button variant="ghost" size="icon" onClick={toggleSidebar}>
+          <Menu className="h-5 w-5" />
+          <span className="sr-only">Toggle sidebar</span>
+        </Button>
         <h1 className="text-xl font-semibold">Welcome, {user?.name || 'User'}</h1>
       </div>
       

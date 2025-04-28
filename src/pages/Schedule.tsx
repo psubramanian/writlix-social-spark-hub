@@ -1,8 +1,5 @@
-
 import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
-import Sidebar from '../components/Sidebar';
-import TopBar from '../components/TopBar';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import SchedulePostForm from '../components/SchedulePostForm';
 import { useScheduledPosts } from '../hooks/useScheduledPosts';
@@ -52,7 +49,6 @@ const Schedule = () => {
     checkLinkedInConnection();
   }, [user]);
 
-  // Filter out posts that are already published
   const scheduledPosts = posts.filter(post => post.content_ideas?.status !== 'Published');
 
   const { updateUserSettings } = useScheduleSettings();
@@ -60,7 +56,7 @@ const Schedule = () => {
   const handleScheduleSubmit = async (settings: any) => {
     const success = await updateUserSettings(settings);
     if (success) {
-      await fetchPosts(); // Refresh the posts list after updating schedule
+      await fetchPosts();
     }
   };
 
@@ -77,7 +73,6 @@ const Schedule = () => {
     try {
       setPostingId(postId);
       
-      // Clear previous toast notifications
       toast({
         title: "Posting to LinkedIn",
         description: "Sending your content to LinkedIn...",
@@ -94,7 +89,6 @@ const Schedule = () => {
     } catch (error: any) {
       console.error("Error in post handler:", error);
       
-      // Show more specific error message
       const errorMessage = error.message || "There was an error posting to LinkedIn";
       
       toast({
