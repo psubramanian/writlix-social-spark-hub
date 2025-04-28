@@ -1,3 +1,4 @@
+
 import { useState } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/components/ui/use-toast';
@@ -26,7 +27,6 @@ export function useScheduleSettings() {
         .from('schedule_settings')
         .select('*')
         .eq('user_id', user.id)
-        .is('post_id', null)
         .maybeSingle();
 
       if (error) throw error;
@@ -37,36 +37,45 @@ export function useScheduleSettings() {
           timeOfDay: data.time_of_day,
           dayOfWeek: data.day_of_week ?? undefined,
           dayOfMonth: data.day_of_month ?? undefined,
-          timezone: data.timezone || 'Asia/Kolkata'
+          timezone: data.timezone || 'UTC'
         } as ScheduleSettings;
         
         setUserSettings(settings);
         return settings;
       } else {
-        const nextRunAt = calculateNextRunTime(DEFAULT_SCHEDULE_SETTINGS);
-        
-        const { data: newSettings, error: insertError } = await supabase
-          .from('schedule_settings')
-          .insert({
-            user_id: user.id,
-            post_id: null,
-            frequency: DEFAULT_SCHEDULE_SETTINGS.frequency,
-            time_of_day: DEFAULT_SCHEDULE_SETTINGS.timeOfDay,
-            day_of_week: DEFAULT_SCHEDULE_SETTINGS.dayOfWeek,
-            day_of_month: DEFAULT_SCHEDULE_SETTINGS.dayOfMonth,
-            next_run_at: nextRunAt.toISOString(),
-            timezone: DEFAULT_SCHEDULE_SETTINGS.timezone
-          })
-          .select()
-          .single();
-          
-        if (insertError) throw insertError;
-        
-        setUserSettings(DEFAULT_SCHEDULE_SETTINGS);
-        return DEFAULT_SCHEDULE_SETTINGS;
+        // Create default settings if none exist
+        return await createDefaultSettings(user.id);
       }
     } catch (error) {
       console.error("Error fetching user settings:", error);
+      return DEFAULT_SCHEDULE_SETTINGS;
+    }
+  };
+
+  const createDefaultSettings = async (userId: string) => {
+    const nextRunAt = calculateNextRunTime(DEFAULT_SCHEDULE_SETTINGS);
+    
+    try {
+      const { data, error } = await supabase
+        .from('schedule_settings')
+        .insert({
+          user_id: userId,
+          frequency: DEFAULT_SCHEDULE_SETTINGS.frequency,
+          time_of_day: DEFAULT_SCHEDULE_SETTINGS.timeOfDay,
+          day_of_week: DEFAULT_SCHEDULE_SETTINGS.dayOfWeek,
+          day_of_month: DEFAULT_SCHEDULE_SETTINGS.dayOfMonth,
+          next_run_at: nextRunAt.toISOString(),
+          timezone: DEFAULT_SCHEDULE_SETTINGS.timezone
+        })
+        .select()
+        .single();
+
+      if (error) throw error;
+      
+      setUserSettings(DEFAULT_SCHEDULE_SETTINGS);
+      return DEFAULT_SCHEDULE_SETTINGS;
+    } catch (error) {
+      console.error("Error creating default settings:", error);
       return DEFAULT_SCHEDULE_SETTINGS;
     }
   };
@@ -77,56 +86,23 @@ export function useScheduleSettings() {
       const user = await getCurrentUser();
       if (!user) throw new Error("User not authenticated");
 
-      const nextRunAt = calculateNextRunTime(settings);
+      // Begin a single transaction for all updates
+      const { data: updatedSettings, error: settingsError } = await supabase
+        .rpc('update_user_schedule_settings', {
+          p_user_id: user.id,
+          p_frequency: settings.frequency,
+          p_time_of_day: settings.timeOfDay,
+          p_day_of_week: settings.dayOfWeek,
+          p_day_of_month: settings.dayOfMonth,
+          p_timezone: settings.timezone
+        });
 
-      // Step 1: Update the main settings record
-      const { error } = await supabase
-        .from('schedule_settings')
-        .update({
-          frequency: settings.frequency,
-          time_of_day: settings.timeOfDay,
-          day_of_week: settings.dayOfWeek,
-          day_of_month: settings.dayOfMonth,
-          next_run_at: nextRunAt.toISOString(),
-          timezone: settings.timezone
-        })
-        .eq('user_id', user.id)
-        .is('post_id', null);
-
-      if (error) throw error;
-
-      // Step 2: Get all pending scheduled posts
-      const { data: scheduledPosts, error: postsError } = await supabase
-        .from('scheduled_posts')
-        .select('id')
-        .eq('user_id', user.id)
-        .eq('status', 'pending')
-        .order('created_at', { ascending: true });
-
-      if (postsError) throw postsError;
-
-      // Step 3: Update each post's next_run_at sequentially
-      for (let i = 0; i < (scheduledPosts?.length || 0); i++) {
-        const postId = scheduledPosts[i].id;
-        const postNextRunAt = calculateNextRunTime(settings, i);
-
-        const { error: updateError } = await supabase
-          .from('scheduled_posts')
-          .update({
-            next_run_at: postNextRunAt.toISOString(),
-            timezone: settings.timezone
-          })
-          .eq('id', postId);
-
-        if (updateError) {
-          console.error(`Error updating post ${postId}:`, updateError);
-        }
-      }
+      if (settingsError) throw settingsError;
 
       setUserSettings(settings);
       toast({
         title: "Schedule Updated",
-        description: "Your posting schedule has been updated successfully for all scheduled posts.",
+        description: "Your posting schedule has been updated successfully.",
       });
 
       return true;

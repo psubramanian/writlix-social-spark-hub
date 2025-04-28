@@ -160,7 +160,7 @@ export type Database = {
           content_id: number | null
           created_at: string
           id: string
-          next_run_at: string | null
+          next_run_at: string
           status: string
           timezone: string | null
           updated_at: string
@@ -170,7 +170,7 @@ export type Database = {
           content_id?: number | null
           created_at?: string
           id?: string
-          next_run_at?: string | null
+          next_run_at: string
           status?: string
           timezone?: string | null
           updated_at?: string
@@ -180,7 +180,7 @@ export type Database = {
           content_id?: number | null
           created_at?: string
           id?: string
-          next_run_at?: string | null
+          next_run_at?: string
           status?: string
           timezone?: string | null
           updated_at?: string
