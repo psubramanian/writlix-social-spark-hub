@@ -1,3 +1,4 @@
+
 import React, { createContext, useContext, useState, useEffect } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { Session, User as SupabaseUser } from "@supabase/supabase-js";
@@ -27,9 +28,13 @@ export const AuthProvider: React.FC<{children: React.ReactNode}> = ({ children }
   const { toast } = useToast();
 
   const processUserData = async (session: Session | null) => {
-    if (!session?.user) return null;
+    if (!session?.user) {
+      console.log("No session or user found in processUserData");
+      return null;
+    }
     
     try {
+      console.log("Fetching profile for user:", session.user.id);
       const { data: profile, error: profileError } = await supabase
         .from('profiles')
         .select('*')
@@ -40,30 +45,27 @@ export const AuthProvider: React.FC<{children: React.ReactNode}> = ({ children }
         console.error('Error fetching profile:', profileError);
         toast({
           title: "Profile Error",
-          description: "There was an error loading your profile. Please try again.",
+          description: "Unable to load your profile. Please try logging in again.",
           variant: "destructive",
         });
         return null;
       }
 
-      const userData = session.user as ExtendedUser;
+      if (!profile) {
+        console.error('No profile found for user:', session.user.id);
+        return null;
+      }
+
+      console.log("Profile found:", profile);
       
-      userData.name = profile?.full_name || 
-                     userData.user_metadata?.full_name || 
-                     userData.user_metadata?.name || 
-                     'User';
-                     
-      userData.avatar = profile?.avatar_url || 
-                       userData.user_metadata?.avatar_url || 
-                       userData.user_metadata?.picture || 
-                       null;
-                       
-      userData.linkedInConnected = userData.app_metadata?.provider === 'linkedin_oidc' ||
-                                  Boolean(userData.user_metadata?.linkedin_connected);
-                                
+      const userData = session.user as ExtendedUser;
+      userData.name = profile.full_name || 'User';
+      userData.avatar = profile.avatar_url || null;
+      userData.linkedInConnected = profile.provider === 'linkedin_oidc';
+      
       return userData;
     } catch (error) {
-      console.error('Error in processUserData:', error);
+      console.error('Unexpected error in processUserData:', error);
       return null;
     }
   };
