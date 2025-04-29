@@ -70,6 +70,7 @@ export type Database = {
           id: string
           last_name: string | null
           mobile_number: string | null
+          profile_completed: boolean | null
           provider: string | null
           provider_id: string | null
         }
@@ -85,6 +86,7 @@ export type Database = {
           id: string
           last_name?: string | null
           mobile_number?: string | null
+          profile_completed?: boolean | null
           provider?: string | null
           provider_id?: string | null
         }
@@ -100,6 +102,7 @@ export type Database = {
           id?: string
           last_name?: string | null
           mobile_number?: string | null
+          profile_completed?: boolean | null
           provider?: string | null
           provider_id?: string | null
         }
