@@ -9,6 +9,7 @@ export interface ExtendedUser extends SupabaseUser {
   name?: string;
   avatar?: string;
   linkedInConnected?: boolean;
+  profileComplete?: boolean; // Track if profile is complete
 }
 
 interface AuthContextType {
@@ -33,60 +34,72 @@ export const AuthProvider: React.FC<{children: React.ReactNode}> = ({ children }
 
   const fetchUserProfile = async (userId: string, sessionUser: SupabaseUser) => {
     try {
-      console.log("Fetching profile for user:", userId);
-      const { data: profile, error: profileError } = await supabase
-        .from('profiles')
-        .select('*')
-        .eq('id', userId)
-        .maybeSingle();
+      console.log("[AUTH] Fetching profile for user:", userId);
+      // Always attempt to create/get profile
+      const profile = await ensureProfileExists(userId, sessionUser);
       
-      if (profileError) {
-        console.error('Error fetching profile:', profileError);
-        return null;
-      }
-
       if (!profile) {
-        // Try creating a profile if it doesn't exist
-        console.log("No profile found, creating one...");
-        const createdProfile = await ensureProfileExists(userId, sessionUser);
-        if (!createdProfile) {
-          console.error('Failed to create profile for user:', userId);
-          return null;
-        }
-        return createdProfile;
+        console.error('[AUTH] Failed to get or create profile for user:', userId);
+        // Return a minimal fallback profile to prevent auth loops
+        return {
+          id: userId,
+          full_name: sessionUser.email?.split('@')[0] || `User-${userId.substring(0, 6)}`,
+          email: sessionUser.email,
+          _fallback: true
+        };
       }
 
-      console.log("Profile found:", profile);
+      // Check if this is a fallback profile
+      if (profile._fallback) {
+        console.warn('[AUTH] Using fallback profile due to database errors');
+        toast({
+          title: "Profile Issue",
+          description: "We're having trouble saving your profile. Some features may be limited.",
+          variant: "destructive",
+        });
+      } else {
+        console.log("[AUTH] Profile found or created:", profile.full_name);
+      }
+      
       return profile;
     } catch (error) {
-      console.error('Unexpected error in fetchUserProfile:', error);
-      return null;
+      console.error('[AUTH] Unexpected error in fetchUserProfile:', error);
+      // Always return something to prevent auth loops
+      return {
+        id: userId,
+        full_name: sessionUser.email?.split('@')[0] || `User-${userId.substring(0, 6)}`,
+        email: sessionUser.email,
+        _fallback: true
+      };
     }
   };
 
   const processUserData = async (sessionData: Session | null) => {
     if (!sessionData?.user) {
-      console.log("No session or user found in processUserData");
+      console.log("[AUTH] No session or user found in processUserData");
       return null;
     }
     
     try {
       const profile = await fetchUserProfile(sessionData.user.id, sessionData.user);
       
-      if (!profile) {
-        console.error('No profile found or created for user:', sessionData.user.id);
-        return null;
-      }
-      
+      // We'll always have at least a fallback profile now
       const userData = sessionData.user as ExtendedUser;
+      
+      // Set user data from profile
       userData.name = profile.full_name || 'User';
       userData.avatar = profile.avatar_url || null;
       userData.linkedInConnected = profile.provider === 'linkedin_oidc';
+      userData.profileComplete = !profile._fallback; // Track if this is a complete profile
       
       return userData;
     } catch (error) {
-      console.error('Unexpected error in processUserData:', error);
-      return null;
+      console.error('[AUTH] Unexpected error in processUserData:', error);
+      // Create minimal user to prevent auth loops
+      const userData = sessionData.user as ExtendedUser;
+      userData.name = sessionData.user.email?.split('@')[0] || 'User';
+      userData.profileComplete = false;
+      return userData;
     }
   };
 
@@ -195,6 +208,14 @@ export const AuthProvider: React.FC<{children: React.ReactNode}> = ({ children }
         });
       } catch (error) {
         console.error("[AUTH] Error processing user data:", error);
+        // Create a minimal user to prevent auth loops
+        if (session?.user) {
+          setUser({
+            ...session.user,
+            name: session.user.email?.split('@')[0] || 'User',
+            profileComplete: false
+          } as ExtendedUser);
+        }
       } finally {
         // Always finish loading
         setIsLoading(false);

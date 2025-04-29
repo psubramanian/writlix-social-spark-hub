@@ -20,6 +20,7 @@ import AppLayout from "./components/layout/AppLayout";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { AlertCircle, Loader2 } from "lucide-react";
 import { useEffect, useState, memo } from "react";
+import ProfileComplete from "./pages/ProfileComplete";
 
 // Create QueryClient outside of component to ensure it's only created once
 const queryClient = new QueryClient({
@@ -44,7 +45,7 @@ LoadingScreen.displayName = 'LoadingScreen';
 
 // Using memo to prevent unnecessary re-renders
 const ProtectedRoute = memo(({ children }: { children: React.ReactNode }) => {
-  const { isAuthenticated, isLoading } = useAuth();
+  const { isAuthenticated, isLoading, user } = useAuth();
   
   // Show loading screen while checking auth
   if (isLoading) {
@@ -55,6 +56,13 @@ const ProtectedRoute = memo(({ children }: { children: React.ReactNode }) => {
   if (!isAuthenticated) {
     console.log("[ROUTER] User not authenticated, redirecting to login");
     return <Navigate to="/login" replace />;
+  }
+  
+  // If user profile isn't complete and route isn't the profile completion page,
+  // redirect to profile completion
+  if (user && user.profileComplete === false && window.location.pathname !== '/profile-complete') {
+    console.log("[ROUTER] User profile incomplete, redirecting to profile completion");
+    return <Navigate to="/profile-complete" replace />;
   }
   
   // User is authenticated, render the protected content
@@ -68,6 +76,9 @@ const AppRoutes = memo(() => {
     <Routes>
       <Route path="/" element={<Index />} />
       <Route path="/login" element={<Login />} />
+      <Route path="/profile-complete" element={
+        <ProfileComplete />
+      } />
       
       <Route path="/dashboard" element={
         <ProtectedRoute>
