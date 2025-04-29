@@ -1,5 +1,5 @@
 
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useAuth } from '../contexts/AuthContext';
 import { useNavigate } from 'react-router-dom';
 import { Button } from '@/components/ui/button';
@@ -8,7 +8,8 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { useToast } from '@/components/ui/use-toast';
 import { supabase } from '@/integrations/supabase/client';
-import { Loader2 } from 'lucide-react';
+import { Loader2, AlertCircle } from 'lucide-react';
+import { Alert, AlertDescription } from '@/components/ui/alert';
 
 const ProfileComplete = () => {
   const { user, isLoading: authLoading } = useAuth();
@@ -16,10 +17,29 @@ const ProfileComplete = () => {
   const { toast } = useToast();
   const [isLoading, setIsLoading] = useState(false);
   const [fullName, setFullName] = useState(user?.name || '');
+  const [error, setError] = useState<string | null>(null);
+  const [skipAttempted, setSkipAttempted] = useState(false);
+  
+  // Check if user has attempted to complete profile before
+  useEffect(() => {
+    const hasSkippedBefore = localStorage.getItem('profile_skip_attempted') === 'true';
+    if (hasSkippedBefore) {
+      setSkipAttempted(true);
+    }
+  }, []);
+
+  // If user already skipped once and has a name, auto-redirect to dashboard
+  useEffect(() => {
+    if (skipAttempted && user?.name) {
+      console.log("[PROFILE] User previously skipped profile completion and has a name, auto-redirecting");
+      navigate('/dashboard', { replace: true });
+    }
+  }, [skipAttempted, user, navigate]);
   
   // Handle form submission
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+    setError(null);
     
     if (!user?.id) {
       toast({
@@ -30,22 +50,52 @@ const ProfileComplete = () => {
       return;
     }
     
+    // Basic validation
+    if (!fullName.trim()) {
+      setError("Please enter your name");
+      return;
+    }
+    
     try {
       setIsLoading(true);
       
-      // Update user profile in the database
-      const { error } = await supabase
-        .from('profiles')
-        .upsert({
-          id: user.id,
-          full_name: fullName,
-          email: user.email,
-          avatar_url: user.avatar,
-          updated_at: new Date().toISOString()
-        });
+      // Make multiple attempts to update the profile
+      let attempts = 0;
+      let success = false;
+      const maxAttempts = 3;
       
-      if (error) {
-        throw error;
+      while (attempts < maxAttempts && !success) {
+        attempts++;
+        console.log(`[PROFILE] Attempt ${attempts} to update profile`);
+        
+        try {
+          // Update user profile in the database
+          const { error } = await supabase
+            .from('profiles')
+            .upsert({
+              id: user.id,
+              full_name: fullName,
+              email: user.email,
+              avatar_url: user.avatar,
+              updated_at: new Date().toISOString()
+            });
+          
+          if (error) {
+            throw error;
+          }
+          
+          success = true;
+          
+        } catch (attemptError) {
+          console.warn(`[PROFILE] Profile update attempt ${attempts} failed:`, attemptError);
+          
+          if (attempts >= maxAttempts) {
+            throw attemptError;
+          }
+          
+          // Wait a bit before trying again
+          await new Promise(resolve => setTimeout(resolve, 500));
+        }
       }
       
       toast({
@@ -53,10 +103,15 @@ const ProfileComplete = () => {
         description: "Your profile has been successfully completed.",
       });
       
-      // Reload the page to refresh auth context with new profile data
-      window.location.href = '/dashboard';
+      // Set local flag to indicate profile has been completed
+      localStorage.setItem('profile_completed', 'true');
+      
+      // Redirect to dashboard
+      navigate('/dashboard', { replace: true });
+      
     } catch (error: any) {
       console.error('Profile update error:', error);
+      setError(error.message || "There was a problem updating your profile.");
       toast({
         title: "Profile Update Failed",
         description: error.message || "There was a problem updating your profile.",
@@ -67,8 +122,20 @@ const ProfileComplete = () => {
     }
   };
   
+  // Handle skip for now
+  const handleSkip = () => {
+    console.log("[PROFILE] User chose to skip profile completion");
+    localStorage.setItem('profile_skip_attempted', 'true');
+    toast({
+      title: "Profile Completion Skipped",
+      description: "You can complete your profile later from the settings page.",
+    });
+    navigate('/dashboard', { replace: true });
+  };
+  
   // If user is fully authenticated and has complete profile, redirect to dashboard
   if (!authLoading && user?.profileComplete) {
+    console.log("[PROFILE] User has completed profile, redirecting to dashboard");
     navigate('/dashboard', { replace: true });
     return null;
   }
@@ -108,6 +175,13 @@ const ProfileComplete = () => {
           
           <form onSubmit={handleSubmit}>
             <CardContent className="space-y-4">
+              {error && (
+                <Alert variant="destructive">
+                  <AlertCircle className="h-4 w-4" />
+                  <AlertDescription>{error}</AlertDescription>
+                </Alert>
+              )}
+              
               <div className="space-y-2">
                 <Label htmlFor="fullName">Full Name</Label>
                 <Input 
@@ -124,7 +198,7 @@ const ProfileComplete = () => {
               </div>
             </CardContent>
             
-            <CardFooter>
+            <CardFooter className="flex flex-col space-y-2">
               <Button 
                 type="submit" 
                 className="w-full"
@@ -138,6 +212,16 @@ const ProfileComplete = () => {
                 ) : (
                   'Complete Profile'
                 )}
+              </Button>
+              
+              <Button 
+                type="button" 
+                variant="ghost" 
+                className="text-muted-foreground"
+                onClick={handleSkip}
+                disabled={isLoading}
+              >
+                Skip for now
               </Button>
             </CardFooter>
           </form>

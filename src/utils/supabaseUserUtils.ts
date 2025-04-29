@@ -1,3 +1,4 @@
+
 import { supabase } from '@/integrations/supabase/client';
 import { useNavigate } from 'react-router-dom';
 import { useCallback } from 'react';
@@ -33,20 +34,49 @@ export async function ensureProfileExists(userId: string, userData: any) {
   try {
     console.log("[PROFILE] Checking for existing profile for user:", userId);
     
-    // First check if profile already exists
-    const { data: existingProfile, error: fetchError } = await supabase
-      .from('profiles')
-      .select('*')
-      .eq('id', userId)
-      .maybeSingle();
+    // Add retry logic for better reliability when fetching profiles
+    let attempts = 0;
+    let existingProfile = null;
+    const maxAttempts = 3;
     
-    if (fetchError) {
-      console.error("[PROFILE] Error checking for profile:", fetchError);
+    while (attempts < maxAttempts && !existingProfile) {
+      attempts++;
+      
+      try {
+        // First check if profile already exists
+        const { data, error } = await supabase
+          .from('profiles')
+          .select('*')
+          .eq('id', userId)
+          .maybeSingle();
+        
+        if (error) {
+          console.warn(`[PROFILE] Error checking for profile (attempt ${attempts}):`, error);
+          
+          if (attempts >= maxAttempts) {
+            throw error;
+          }
+        } else if (data) {
+          existingProfile = data;
+          console.log(`[PROFILE] Existing profile found after ${attempts} attempt(s)`);
+          break;
+        }
+      } catch (fetchError) {
+        console.error(`[PROFILE] Fetch attempt ${attempts} failed:`, fetchError);
+        
+        if (attempts >= maxAttempts) {
+          throw fetchError;
+        }
+      }
+      
+      // Wait a bit before trying again
+      if (!existingProfile && attempts < maxAttempts) {
+        await new Promise(resolve => setTimeout(resolve, 500));
+      }
     }
     
     // Return existing profile if found
     if (existingProfile) {
-      console.log("[PROFILE] Existing profile found");
       return existingProfile;
     }
     
@@ -66,37 +96,71 @@ export async function ensureProfileExists(userId: string, userData: any) {
     const email = userData.email;
     const provider = userData.app_metadata?.provider || 'email';
     
-    // Insert new profile
-    const { data: newProfile, error: insertError } = await supabase
-      .from('profiles')
-      .insert({
-        id: userId,
-        full_name: fullName,
-        avatar_url: avatarUrl,
-        email: email,
-        provider: provider,
-        created_at: new Date().toISOString()
-      })
-      .select('*')
-      .single();
+    // Add retry logic for inserts too
+    attempts = 0;
+    let newProfile = null;
     
-    if (insertError) {
-      console.error("[PROFILE] Error creating profile:", insertError);
+    while (attempts < maxAttempts && !newProfile) {
+      attempts++;
       
-      // Return a minimal profile even if DB insertion failed
-      // This prevents authentication loops where users get stuck
-      return {
-        id: userId,
-        full_name: fullName,
-        avatar_url: avatarUrl,
-        email: email,
-        provider: provider,
-        _fallback: true // Indicate this is a fallback profile
-      };
+      try {
+        // Insert new profile
+        const { data, error } = await supabase
+          .from('profiles')
+          .upsert({
+            id: userId,
+            full_name: fullName,
+            avatar_url: avatarUrl,
+            email: email,
+            provider: provider,
+            created_at: new Date().toISOString()
+          })
+          .select('*')
+          .single();
+        
+        if (error) {
+          console.warn(`[PROFILE] Error creating profile (attempt ${attempts}):`, error);
+          
+          if (attempts >= maxAttempts) {
+            throw error;
+          }
+        } else if (data) {
+          newProfile = data;
+          console.log(`[PROFILE] New profile created successfully after ${attempts} attempt(s)`);
+          break;
+        }
+      } catch (insertError) {
+        console.error(`[PROFILE] Insert attempt ${attempts} failed:`, insertError);
+        
+        if (attempts >= maxAttempts) {
+          throw insertError;
+        }
+      }
+      
+      // Wait a bit before trying again
+      if (!newProfile && attempts < maxAttempts) {
+        await new Promise(resolve => setTimeout(resolve, 1000));
+      }
     }
     
-    console.log("[PROFILE] New profile created successfully");
-    return newProfile;
+    if (newProfile) {
+      return newProfile;
+    }
+    
+    // If we got here, all insert attempts failed
+    console.error("[PROFILE] All profile creation attempts failed");
+    
+    // Return a minimal profile even if DB insertion failed
+    // This prevents authentication loops where users get stuck
+    return {
+      id: userId,
+      full_name: fullName,
+      avatar_url: avatarUrl,
+      email: email,
+      provider: provider,
+      _fallback: true // Indicate this is a fallback profile
+    };
+    
   } catch (error) {
     console.error("[PROFILE] Unexpected error in ensureProfileExists:", error);
     

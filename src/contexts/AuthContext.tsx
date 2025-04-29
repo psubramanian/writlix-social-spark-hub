@@ -20,6 +20,7 @@ interface AuthContextType {
   login: (provider: 'google' | 'linkedin_oidc') => Promise<void>;
   logout: () => Promise<void>;
   isAuthenticated: boolean;
+  refreshUserProfile: () => Promise<void>;
 }
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
@@ -32,15 +33,25 @@ export const AuthProvider: React.FC<{children: React.ReactNode}> = ({ children }
   const { toast } = useToast();
   const authStateChangeCount = useRef(0);
   const sessionCheckCount = useRef(0);
+  const debugMode = useRef(true); // Set to true to enable extra debug logs
+
+  // Helper for debug logging
+  const logDebug = (message: string, ...args: any[]) => {
+    if (debugMode.current) {
+      console.log(`[AUTH DEBUG] ${message}`, ...args);
+    }
+  };
 
   const fetchUserProfile = async (userId: string, sessionUser: SupabaseUser) => {
     try {
-      console.log("[AUTH] Fetching profile for user:", userId);
+      logDebug(`Fetching profile for user: ${userId}`);
+      
       // Always attempt to create/get profile
       const profile = await ensureProfileExists(userId, sessionUser);
       
       if (!profile) {
         console.error('[AUTH] Failed to get or create profile for user:', userId);
+        
         // Return a minimal fallback profile to prevent auth loops
         return {
           id: userId,
@@ -62,12 +73,13 @@ export const AuthProvider: React.FC<{children: React.ReactNode}> = ({ children }
           variant: "destructive",
         });
       } else {
-        console.log("[AUTH] Profile found or created:", profile.full_name);
+        logDebug(`Profile found or created: ${profile.full_name}`);
       }
       
       return profile as UserProfile;
     } catch (error) {
       console.error('[AUTH] Unexpected error in fetchUserProfile:', error);
+      
       // Always return something to prevent auth loops
       return {
         id: userId,
@@ -80,7 +92,7 @@ export const AuthProvider: React.FC<{children: React.ReactNode}> = ({ children }
 
   const processUserData = async (sessionData: Session | null) => {
     if (!sessionData?.user) {
-      console.log("[AUTH] No session or user found in processUserData");
+      logDebug("No session or user found in processUserData");
       return null;
     }
     
@@ -97,16 +109,52 @@ export const AuthProvider: React.FC<{children: React.ReactNode}> = ({ children }
       
       // Cast to UserProfile to access the _fallback property
       const isFallbackProfile = (profile as UserProfile)._fallback === true;
-      userData.profileComplete = !isFallbackProfile;
+      
+      // Check if user has skipped profile completion
+      const hasSkippedProfileCompletion = localStorage.getItem('profile_skip_attempted') === 'true';
+      const hasCompletedProfile = localStorage.getItem('profile_completed') === 'true';
+      
+      // If the user has skipped or completed profile, don't mark as incomplete profile
+      if (hasSkippedProfileCompletion || hasCompletedProfile) {
+        userData.profileComplete = true;
+      } else {
+        userData.profileComplete = !isFallbackProfile;
+      }
       
       return userData;
     } catch (error) {
       console.error('[AUTH] Unexpected error in processUserData:', error);
+      
       // Create minimal user to prevent auth loops
       const userData = sessionData.user as ExtendedUser;
       userData.name = sessionData.user.email?.split('@')[0] || 'User';
       userData.profileComplete = false;
       return userData;
+    }
+  };
+  
+  // Function to allow explicit refresh of user profile from other components
+  const refreshUserProfile = async () => {
+    if (!session?.user) {
+      console.warn('[AUTH] Cannot refresh profile - no active session');
+      return;
+    }
+    
+    logDebug("Manually refreshing user profile");
+    
+    try {
+      const processedUser = await processUserData(session);
+      
+      // Only update if different to prevent unnecessary rerenders
+      setUser(prevUser => {
+        if (JSON.stringify(prevUser) !== JSON.stringify(processedUser)) {
+          logDebug("Updated user profile data");
+          return processedUser;
+        }
+        return prevUser;
+      });
+    } catch (error) {
+      console.error("[AUTH] Error refreshing user profile:", error);
     }
   };
 
@@ -130,7 +178,7 @@ export const AuthProvider: React.FC<{children: React.ReactNode}> = ({ children }
         // Update session synchronously
         setSession(prevSession => {
           if (JSON.stringify(prevSession) !== JSON.stringify(newSession)) {
-            console.log(`[AUTH ${count}] Session updated`);
+            logDebug(`Session updated on auth state change`);
             return newSession;
           }
           return prevSession;
@@ -165,7 +213,7 @@ export const AuthProvider: React.FC<{children: React.ReactNode}> = ({ children }
         // Only update if different to prevent loops
         setSession(prevSession => {
           if (JSON.stringify(prevSession) !== JSON.stringify(data.session)) {
-            console.log(`[AUTH ${count}] Initial session updated`);
+            logDebug(`Initial session updated`);
             return data.session;
           }
           return prevSession;
@@ -202,9 +250,32 @@ export const AuthProvider: React.FC<{children: React.ReactNode}> = ({ children }
 
     const loadUserProfile = async () => {
       try {
-        const processedUser = await processUserData(session);
+        // Add retry logic for better reliability
+        let attempts = 0;
+        let processedUser = null;
+        const maxAttempts = 3;
         
-        console.log(`[AUTH] User profile processed:`, processedUser?.email || 'Failed to process');
+        while (attempts < maxAttempts && !processedUser) {
+          attempts++;
+          
+          try {
+            processedUser = await processUserData(session);
+            
+            if (processedUser) {
+              logDebug(`User profile processed after ${attempts} attempt(s)`);
+              break;
+            }
+          } catch (attemptError) {
+            console.warn(`[AUTH] Profile processing attempt ${attempts} failed:`, attemptError);
+            
+            if (attempts >= maxAttempts) {
+              throw attemptError;
+            }
+            
+            // Wait a bit before trying again
+            await new Promise(resolve => setTimeout(resolve, 500));
+          }
+        }
         
         // Only update if different to prevent loops
         setUser(prevUser => {
@@ -215,6 +286,7 @@ export const AuthProvider: React.FC<{children: React.ReactNode}> = ({ children }
         });
       } catch (error) {
         console.error("[AUTH] Error processing user data:", error);
+        
         // Create a minimal user to prevent auth loops
         if (session?.user) {
           setUser({
@@ -260,7 +332,13 @@ export const AuthProvider: React.FC<{children: React.ReactNode}> = ({ children }
       }
       
       if (data?.url) {
-        console.log(`[AUTH] Redirecting to ${provider} auth URL:`, data.url);
+        logDebug(`Redirecting to ${provider} auth URL: ${data.url}`);
+        
+        // Store auth info in session storage for debugging
+        sessionStorage.setItem('auth_flow_started', 'true');
+        sessionStorage.setItem('auth_provider', provider);
+        sessionStorage.setItem('auth_redirect_url', redirectTo);
+        
         window.location.href = data.url;
       } else {
         console.error(`[AUTH] No redirect URL returned from ${provider} auth`);
@@ -278,6 +356,11 @@ export const AuthProvider: React.FC<{children: React.ReactNode}> = ({ children }
     try {
       setIsLoading(true);
       console.log("[AUTH] Logging out user");
+      
+      // Clear any profile-related localStorage flags
+      localStorage.removeItem('profile_skip_attempted');
+      localStorage.removeItem('profile_completed');
+      
       const { error } = await supabase.auth.signOut();
       
       if (error) {
@@ -308,6 +391,7 @@ export const AuthProvider: React.FC<{children: React.ReactNode}> = ({ children }
     login,
     logout,
     isAuthenticated: !!session,
+    refreshUserProfile  // Export this function to allow components to refresh user data
   };
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;

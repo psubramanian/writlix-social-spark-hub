@@ -46,9 +46,22 @@ LoadingScreen.displayName = 'LoadingScreen';
 // Using memo to prevent unnecessary re-renders
 const ProtectedRoute = memo(({ children }: { children: React.ReactNode }) => {
   const { isAuthenticated, isLoading, user } = useAuth();
+  const [shouldBypassProfileCheck, setShouldBypassProfileCheck] = useState(false);
+  
+  // Check for profile bypass flags
+  useEffect(() => {
+    const hasSkippedProfileCompletion = localStorage.getItem('profile_skip_attempted') === 'true';
+    const hasCompletedProfile = localStorage.getItem('profile_completed') === 'true';
+    
+    // If user has either skipped or completed their profile previously, don't force profile completion
+    if (hasSkippedProfileCompletion || hasCompletedProfile) {
+      setShouldBypassProfileCheck(true);
+    }
+  }, []);
   
   // Show loading screen while checking auth
   if (isLoading) {
+    console.log("[ROUTER] Auth is still loading");
     return <LoadingScreen />;
   }
   
@@ -59,13 +72,17 @@ const ProtectedRoute = memo(({ children }: { children: React.ReactNode }) => {
   }
   
   // If user profile isn't complete and route isn't the profile completion page,
-  // redirect to profile completion
-  if (user && user.profileComplete === false && window.location.pathname !== '/profile-complete') {
+  // and we haven't set the bypass flag, redirect to profile completion
+  if (user && 
+      user.profileComplete === false && 
+      window.location.pathname !== '/profile-complete' && 
+      !shouldBypassProfileCheck) {
     console.log("[ROUTER] User profile incomplete, redirecting to profile completion");
     return <Navigate to="/profile-complete" replace />;
   }
   
   // User is authenticated, render the protected content
+  console.log("[ROUTER] User authenticated, rendering protected content");
   return <AppLayout>{children}</AppLayout>;
 });
 ProtectedRoute.displayName = 'ProtectedRoute';
