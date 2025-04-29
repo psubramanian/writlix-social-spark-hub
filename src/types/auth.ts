@@ -9,7 +9,7 @@ export interface UserProfile {
   provider?: string | null;
   created_at?: string | null;
   updated_at?: string | null;
-  _fallback?: boolean; // Indicates a fallback profile created client-side
+  _fallback?: boolean; // Added this property to indicate a fallback profile created client-side
 }
 
 export interface ExtendedUser extends User {
