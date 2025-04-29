@@ -1,4 +1,7 @@
+
 import { supabase } from '@/integrations/supabase/client';
+import { useNavigate } from 'react-router-dom';
+import { useCallback } from 'react';
 
 export async function getCurrentUser() {
   try {
@@ -77,4 +80,21 @@ export async function ensureProfileExists(userId: string, userData: any) {
     console.error("Error in ensureProfileExists:", error);
     return null;
   }
+}
+
+// Add the missing useAuthRedirect hook
+export function useAuthRedirect() {
+  const navigate = useNavigate();
+  
+  const redirectToLogin = useCallback(() => {
+    console.log("Redirecting to login page");
+    navigate('/login');
+  }, [navigate]);
+  
+  const redirectToDashboard = useCallback(() => {
+    console.log("Redirecting to dashboard");
+    navigate('/dashboard');
+  }, [navigate]);
+  
+  return { redirectToLogin, redirectToDashboard };
 }

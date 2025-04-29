@@ -1,9 +1,7 @@
-
 import { useState } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/components/ui/use-toast';
-import { getCurrentUser } from '@/utils/supabaseUserUtils';
-import { useAuthRedirect } from '@/utils/supabaseUserUtils';
+import { getCurrentUser, useAuthRedirect } from '@/utils/supabaseUserUtils';
 import { calculateNextRunTime } from '@/utils/scheduleUtils';
 import type { ScheduleSettings } from './useScheduleSettings';
 

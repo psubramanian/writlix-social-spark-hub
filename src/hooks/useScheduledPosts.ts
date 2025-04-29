@@ -1,9 +1,7 @@
-
 import { useState, useEffect } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/components/ui/use-toast';
-import { getCurrentUser } from '@/utils/supabaseUserUtils';
-import { useAuthRedirect } from '@/utils/supabaseUserUtils';
+import { getCurrentUser, useAuthRedirect } from '@/utils/supabaseUserUtils';
 import { useScheduleSettings } from './useScheduleSettings';
 import { usePostOperations } from './usePostOperations';
 import { usePostScheduling } from './usePostScheduling';
