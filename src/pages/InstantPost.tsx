@@ -1,223 +1,260 @@
 
-import { useEffect, useState } from 'react';
-import RichTextEditor from '@/components/RichTextEditor';
+import React, { useState, useRef } from 'react';
 import { Button } from '@/components/ui/button';
-import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from '@/components/ui/card';
-import { Separator } from '@/components/ui/separator';
-import { Send, Upload, Sparkles, Loader2 } from 'lucide-react';
-import { useInstantPost } from '@/hooks/useInstantPost';
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { useToast } from '@/components/ui/use-toast';
+import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
+import { Loader2, Upload, AlertCircle } from 'lucide-react';
+import { RichTextEditor } from '@/components/RichTextEditor';
+import { useInstantPost } from '@/hooks/useInstantPost';
 
 const InstantPost = () => {
-  const [userContent, setUserContent] = useState('<p>Write your LinkedIn post here...</p>');
+  const [content, setContent] = useState('');
   const [generatedContent, setGeneratedContent] = useState('');
-  const [selectedImage, setSelectedImage] = useState<File | null>(null);
-  const [previewUrl, setPreviewUrl] = useState<string | null>(null);
+  const [imageFile, setImageFile] = useState<File | null>(null);
+  const [imagePreview, setImagePreview] = useState<string | null>(null);
+  const fileInputRef = useRef<HTMLInputElement>(null);
   const { toast } = useToast();
-  
-  const { 
-    generateContentFromImage, 
-    postToLinkedIn, 
-    isGenerating, 
-    isPosting 
-  } = useInstantPost();
+  const { generateContentFromImage, postToLinkedIn, isGenerating, isPosting } = useInstantPost();
 
-  // Handle image selection
   const handleImageChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    if (e.target.files && e.target.files[0]) {
-      const file = e.target.files[0];
-      setSelectedImage(file);
-      
-      // Create preview URL
-      const fileReader = new FileReader();
-      fileReader.onload = () => {
-        setPreviewUrl(fileReader.result as string);
-      };
-      fileReader.readAsDataURL(file);
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    // Check file size (max 5MB)
+    if (file.size > 5 * 1024 * 1024) {
+      toast({
+        title: "File too large",
+        description: "The image must be less than 5MB.",
+        variant: "destructive",
+      });
+      return;
     }
+
+    // Check file type
+    if (!file.type.startsWith('image/')) {
+      toast({
+        title: "Invalid file type",
+        description: "Please upload an image file.",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    setImageFile(file);
+    
+    // Create a preview
+    const reader = new FileReader();
+    reader.onload = (e) => {
+      setImagePreview(e.target?.result as string);
+    };
+    reader.readAsDataURL(file);
   };
 
-  // Generate content from image
   const handleGenerateContent = async () => {
-    if (!selectedImage) {
+    if (!imageFile) {
       toast({
         title: "No image selected",
-        description: "Please upload an image to generate content",
-        variant: "destructive"
+        description: "Please upload an image first.",
+        variant: "destructive",
       });
       return;
     }
 
     try {
-      const content = await generateContentFromImage(selectedImage);
-      setGeneratedContent(content);
-    } catch (error) {
-      console.error('Error generating content:', error);
+      const generated = await generateContentFromImage(imageFile);
+      setGeneratedContent(generated);
       toast({
-        title: "Error",
-        description: "Failed to generate content from image",
-        variant: "destructive"
+        title: "Content generated",
+        description: "Your LinkedIn post has been created based on the image.",
+      });
+    } catch (error: any) {
+      toast({
+        title: "Generation failed",
+        description: error.message || "Failed to generate content from image.",
+        variant: "destructive",
       });
     }
   };
 
-  // Post content to LinkedIn
-  const handlePostToLinkedIn = async () => {
-    const finalContent = generatedContent || userContent;
-    if (!finalContent || finalContent === '<p>Write your LinkedIn post here...</p>') {
+  const handlePostNow = async () => {
+    const contentToPost = generatedContent || content;
+    
+    if (!contentToPost.trim()) {
       toast({
-        title: "Empty content",
-        description: "Please write or generate content before posting",
-        variant: "destructive"
+        title: "No content to post",
+        description: "Please write or generate some content first.",
+        variant: "destructive",
       });
       return;
     }
 
     try {
-      await postToLinkedIn(finalContent);
+      await postToLinkedIn(contentToPost);
       toast({
-        title: "Success!",
-        description: "Your post has been shared to LinkedIn",
+        title: "Posted successfully",
+        description: "Your content has been posted to LinkedIn.",
       });
-      
-      // Reset form after successful posting
-      setUserContent('<p>Write your LinkedIn post here...</p>');
+      // Clear form after successful post
+      setContent('');
       setGeneratedContent('');
-      setSelectedImage(null);
-      setPreviewUrl(null);
+      setImageFile(null);
+      setImagePreview(null);
+      if (fileInputRef.current) {
+        fileInputRef.current.value = '';
+      }
     } catch (error: any) {
-      console.error('Error posting to LinkedIn:', error);
       toast({
-        title: "Error",
-        description: error.message || "Failed to post to LinkedIn",
-        variant: "destructive"
+        title: "Posting failed",
+        description: error.message || "Failed to post to LinkedIn.",
+        variant: "destructive",
       });
+    }
+  };
+
+  const handleClickUpload = () => {
+    if (fileInputRef.current) {
+      fileInputRef.current.click();
     }
   };
 
   return (
-    <div className="container max-w-4xl py-6">
-      <h1 className="text-3xl font-bold mb-2">Instant Post</h1>
+    <div className="container max-w-4xl mx-auto py-8">
+      <h1 className="text-3xl font-bold mb-6">Instant LinkedIn Post</h1>
       <p className="text-muted-foreground mb-6">
-        Create and publish LinkedIn content instantly
+        Create and post content to LinkedIn instantly. Write your own content or generate it from an image.
       </p>
-
-      <div className="grid gap-8">
-        {/* Content Creation Section */}
+      
+      <div className="grid gap-6">
+        {/* Write your own content */}
         <Card>
           <CardHeader>
-            <CardTitle>Create Your Content</CardTitle>
-            <CardDescription>Write your post or upload an image to generate content</CardDescription>
+            <CardTitle>Compose Your Content</CardTitle>
+            <CardDescription>
+              Write your LinkedIn post or upload an image to generate content
+            </CardDescription>
           </CardHeader>
           <CardContent>
-            <RichTextEditor 
-              content={userContent} 
-              onChange={setUserContent} 
-            />
+            <div className="mb-4">
+              <RichTextEditor
+                value={content}
+                onChange={setContent}
+                placeholder="Write your LinkedIn post here..."
+              />
+            </div>
           </CardContent>
         </Card>
-
-        {/* Image Upload Section */}
+        
+        {/* Image upload */}
         <Card>
           <CardHeader>
-            <CardTitle>Image Upload</CardTitle>
-            <CardDescription>Upload an image to generate content ideas</CardDescription>
+            <CardTitle>Image to Content</CardTitle>
+            <CardDescription>Upload an image to generate a LinkedIn post</CardDescription>
           </CardHeader>
           <CardContent>
-            <div className="grid gap-4">
-              <div className="flex items-center gap-4">
-                <Button variant="outline" onClick={() => document.getElementById('image-upload')?.click()}>
-                  <Upload className="mr-2 h-4 w-4" />
-                  Upload Image
-                </Button>
-                <input
-                  id="image-upload"
-                  type="file"
-                  accept="image/*"
-                  className="hidden"
-                  onChange={handleImageChange}
-                />
-                <Button 
-                  onClick={handleGenerateContent} 
-                  disabled={!selectedImage || isGenerating}
-                  className="ml-auto"
-                >
-                  {isGenerating ? (
-                    <>
-                      <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                      Generating...
-                    </>
-                  ) : (
-                    <>
-                      <Sparkles className="mr-2 h-4 w-4" />
-                      Generate Content
-                    </>
-                  )}
-                </Button>
-              </div>
-
-              {previewUrl && (
-                <div className="mt-4 border rounded-md p-2">
-                  <p className="text-sm text-muted-foreground mb-2">Image Preview:</p>
-                  <img
-                    src={previewUrl}
-                    alt="Preview"
-                    className="max-h-64 object-contain rounded-md mx-auto"
+            <div className="flex flex-col items-center justify-center border-2 border-dashed border-gray-300 rounded-lg p-6 mb-4">
+              <input
+                type="file"
+                accept="image/*"
+                className="hidden"
+                onChange={handleImageChange}
+                ref={fileInputRef}
+              />
+              
+              {imagePreview ? (
+                <div className="relative w-full max-w-md mb-4">
+                  <img 
+                    src={imagePreview} 
+                    alt="Preview" 
+                    className="w-full h-auto rounded-md object-cover"
                   />
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    className="absolute top-2 right-2"
+                    onClick={() => {
+                      setImageFile(null);
+                      setImagePreview(null);
+                      if (fileInputRef.current) fileInputRef.current.value = '';
+                    }}
+                  >
+                    Remove
+                  </Button>
+                </div>
+              ) : (
+                <div className="text-center">
+                  <Upload className="mx-auto h-12 w-12 text-gray-400 mb-2" />
+                  <p className="text-sm text-gray-500 mb-2">Click to upload an image</p>
+                  <p className="text-xs text-gray-400">JPG, PNG, GIF up to 5MB</p>
                 </div>
               )}
+              
+              <div className="mt-4">
+                {!imagePreview ? (
+                  <Button onClick={handleClickUpload} variant="outline">
+                    Select Image
+                  </Button>
+                ) : (
+                  <Button 
+                    onClick={handleGenerateContent} 
+                    disabled={isGenerating || !imageFile}
+                  >
+                    {isGenerating ? (
+                      <>
+                        <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                        Generating...
+                      </>
+                    ) : (
+                      'Generate Content from Image'
+                    )}
+                  </Button>
+                )}
+              </div>
             </div>
           </CardContent>
         </Card>
 
-        {/* Generated Content Section, only shown when content is generated */}
+        {/* Generated content area */}
         {generatedContent && (
           <Card>
             <CardHeader>
-              <CardTitle>AI Generated Content</CardTitle>
-              <CardDescription>Edit this content before posting if needed</CardDescription>
+              <CardTitle>Generated Content</CardTitle>
+              <CardDescription>Edit before posting if needed</CardDescription>
             </CardHeader>
             <CardContent>
               <RichTextEditor
-                content={generatedContent}
+                value={generatedContent}
                 onChange={setGeneratedContent}
               />
             </CardContent>
           </Card>
         )}
-
-        {/* Post to LinkedIn Button */}
-        <Card>
-          <CardHeader>
-            <CardTitle>Ready to Share</CardTitle>
-            <CardDescription>
-              Post your content directly to LinkedIn
-            </CardDescription>
-          </CardHeader>
-          <CardContent>
-            <Button 
-              onClick={handlePostToLinkedIn} 
-              disabled={isPosting} 
-              className="w-full"
-              size="lg"
-            >
-              {isPosting ? (
-                <>
-                  <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                  Posting...
-                </>
-              ) : (
-                <>
-                  <Send className="mr-2 h-4 w-4" />
-                  Post to LinkedIn Now
-                </>
-              )}
-            </Button>
-          </CardContent>
-          <CardFooter className="text-xs text-muted-foreground">
-            Your content will be published immediately to your LinkedIn profile
-          </CardFooter>
-        </Card>
+        
+        {/* LinkedIn connection warning */}
+        <Alert>
+          <AlertCircle className="h-4 w-4" />
+          <AlertTitle>Before posting</AlertTitle>
+          <AlertDescription>
+            Make sure your LinkedIn account is connected in Settings. Your post will be published immediately.
+          </AlertDescription>
+        </Alert>
+        
+        {/* Post now button */}
+        <Button 
+          onClick={handlePostNow} 
+          disabled={isPosting || (!content && !generatedContent)}
+          className="w-full"
+          size="lg"
+        >
+          {isPosting ? (
+            <>
+              <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+              Posting...
+            </>
+          ) : (
+            'Post to LinkedIn Now'
+          )}
+        </Button>
       </div>
     </div>
   );
