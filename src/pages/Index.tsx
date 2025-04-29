@@ -8,6 +8,7 @@ import Features from '../components/landing/Features';
 import CTASection from '../components/landing/CTASection';
 import Footer from '../components/landing/Footer';
 import { NewsletterPopup } from '../components/NewsletterPopup';
+import { Button } from '@/components/ui/button';
 
 const Index = () => {
   const { isAuthenticated } = useAuth();
@@ -35,10 +36,25 @@ const Index = () => {
     }
   }, []);
   
+  const handleGetStarted = () => {
+    if (isAuthenticated) {
+      navigate('/dashboard');
+    } else {
+      navigate('/login');
+    }
+  };
+  
   return (
     <div className="min-h-screen bg-white">
       <Header />
       <Hero />
+      <div className="max-w-7xl mx-auto px-4 py-8 text-center">
+        <h2 className="text-2xl font-bold mb-4">Ready to create engaging LinkedIn content?</h2>
+        <p className="mb-6">Log in to access the Instant Post feature and all other tools</p>
+        <Button size="lg" onClick={handleGetStarted}>
+          {isAuthenticated ? 'Go to Dashboard' : 'Login or Sign Up'}
+        </Button>
+      </div>
       <Features />
       <CTASection />
       <Footer />
