@@ -16,20 +16,22 @@ const Login = () => {
   const [provider, setProvider] = useState<string | null>(null);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
   
+  // Check authentication status only once when component mounts or auth state changes
   useEffect(() => {
-    const checkAuthAndRedirect = () => {
-      // Clear any previous error messages
-      setErrorMessage(null);
-      
-      // Only redirect if auth has finished loading and user is authenticated
-      if (!authLoading && isAuthenticated) {
-        console.log("User is authenticated, redirecting to dashboard");
-        navigate('/dashboard');
-      }
-    };
+    // Don't do anything if still loading
+    if (authLoading) {
+      return;
+    }
     
-    checkAuthAndRedirect();
-    
+    // If authenticated, redirect to dashboard
+    if (isAuthenticated) {
+      console.log("User is authenticated, redirecting to dashboard");
+      navigate('/dashboard');
+    }
+  }, [isAuthenticated, authLoading, navigate]);
+  
+  // Handle URL error parameters separately from auth state
+  useEffect(() => {
     // Check for auth errors in URL
     const url = new URL(window.location.href);
     const error = url.searchParams.get('error');
@@ -48,7 +50,7 @@ const Login = () => {
       // Clean URL
       window.history.replaceState({}, document.title, window.location.pathname);
     }
-  }, [isAuthenticated, authLoading, navigate, toast]);
+  }, [toast]);
 
   // Handle login with selected provider
   const handleLogin = async (providerName: 'google' | 'linkedin_oidc') => {

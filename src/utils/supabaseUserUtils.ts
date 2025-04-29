@@ -91,11 +91,11 @@ export function useAuthRedirect() {
   const navigate = useNavigate();
   
   const redirectToLogin = () => {
-    navigate('/login');
+    navigate('/login', { replace: true });
   };
   
   const redirectToDashboard = () => {
-    navigate('/dashboard');
+    navigate('/dashboard', { replace: true });
   };
   
   return { redirectToLogin, redirectToDashboard };

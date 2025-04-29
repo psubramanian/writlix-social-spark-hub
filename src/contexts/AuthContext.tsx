@@ -26,7 +26,7 @@ export const AuthProvider: React.FC<{children: React.ReactNode}> = ({ children }
   const [user, setUser] = useState<ExtendedUser | null>(null);
   const [session, setSession] = useState<Session | null>(null);
   const [isLoading, setIsLoading] = useState(true);
-  const authChecked = useRef(false);
+  const authInitialized = useRef(false);
   const { toast } = useToast();
 
   const fetchUserProfile = async (userId: string, sessionUser: SupabaseUser) => {
@@ -88,10 +88,17 @@ export const AuthProvider: React.FC<{children: React.ReactNode}> = ({ children }
     }
   };
 
-  // Set up auth state listener
+  // Initialize auth once with combined effect to prevent race conditions
   useEffect(() => {
-    console.log("Setting up auth state change listener");
+    // Skip if already initialized
+    if (authInitialized.current) {
+      return;
+    }
+
+    console.log("Initializing auth context");
+    authInitialized.current = true;
     
+    // Set up auth state listener first
     const { data: { subscription } } = supabase.auth.onAuthStateChange(
       (event, newSession) => {
         console.log("Auth state changed:", event, newSession?.user?.email);
@@ -105,26 +112,11 @@ export const AuthProvider: React.FC<{children: React.ReactNode}> = ({ children }
           setIsLoading(false);
           return;
         }
-        
-        // For other events like SIGNED_IN, handle the profile fetch asynchronously
-        if (newSession?.user) {
-          // Note: Don't directly call processUserData here which might trigger infinite loops
-          // We'll handle this in a separate effect
-        }
       }
     );
 
-    return () => {
-      console.log("Cleaning up auth state listener");
-      subscription.unsubscribe();
-    };
-  }, []);
-
-  // Initial session check - only runs once
-  useEffect(() => {
+    // Get initial session
     const checkSession = async () => {
-      if (authChecked.current) return;
-      
       try {
         console.log("Checking for existing session");
         const { data, error } = await supabase.auth.getSession();
@@ -132,49 +124,53 @@ export const AuthProvider: React.FC<{children: React.ReactNode}> = ({ children }
         if (error) {
           console.error("Error getting session:", error);
           setIsLoading(false);
-          authChecked.current = true;
           return;
         }
         
         setSession(data.session);
         
+        // Only set loading to false if there's no session
+        // For sessions with users, we'll handle loading state in separate effect
         if (!data.session) {
           setIsLoading(false);
-          authChecked.current = true;
         }
       } catch (error) {
         console.error("Unexpected error checking session:", error);
         setIsLoading(false);
-        authChecked.current = true;
       }
     };
     
     checkSession();
-  }, []);
+
+    return () => {
+      console.log("Cleaning up auth state listener");
+      subscription.unsubscribe();
+    };
+  }, []); // Empty dependency array to run once
 
   // Process user data when session changes
   useEffect(() => {
     if (!session) {
-      if (authChecked.current) {
-        setIsLoading(false);
-      }
+      // If no session, make sure loading is false
+      setIsLoading(false);
       return;
     }
     
     const loadUserProfile = async () => {
       try {
+        console.log("Processing user data for session:", session.user.email);
         const processedUser = await processUserData(session);
         setUser(processedUser);
       } catch (error) {
         console.error("Error processing user data:", error);
       } finally {
+        // Always finish loading regardless of success/failure
         setIsLoading(false);
-        authChecked.current = true;
       }
     };
     
     loadUserProfile();
-  }, [session]);
+  }, [session]); // Only run when session changes
 
   const login = async (provider: 'google' | 'linkedin_oidc') => {
     try {
