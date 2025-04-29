@@ -1,3 +1,4 @@
+
 import React, { createContext, useContext, useState, useEffect, useRef } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { Session, User as SupabaseUser } from "@supabase/supabase-js";
@@ -27,6 +28,8 @@ export const AuthProvider: React.FC<{children: React.ReactNode}> = ({ children }
   const [isLoading, setIsLoading] = useState(true);
   const authInitialized = useRef(false);
   const { toast } = useToast();
+  const authStateChangeCount = useRef(0);
+  const sessionCheckCount = useRef(0);
 
   const fetchUserProfile = async (userId: string, sessionUser: SupabaseUser) => {
     try {
@@ -87,29 +90,37 @@ export const AuthProvider: React.FC<{children: React.ReactNode}> = ({ children }
     }
   };
 
-  // Initialize auth once with combined effect to prevent race conditions
+  // Only run once on component mount to initialize auth
   useEffect(() => {
-    // Skip if already initialized
+    // Prevent multiple initializations
     if (authInitialized.current) {
       return;
     }
 
-    console.log("Initializing auth context");
+    console.log("[AUTH] Initializing auth context - ONCE ONLY");
     authInitialized.current = true;
     
     // Set up auth state listener first
     const { data: { subscription } } = supabase.auth.onAuthStateChange(
       (event, newSession) => {
-        console.log("Auth state changed:", event, newSession?.user?.email);
+        authStateChangeCount.current += 1;
+        const count = authStateChangeCount.current;
+        console.log(`[AUTH ${count}] Auth state changed: ${event}`, newSession?.user?.email || 'No user');
         
-        // First synchronously update the session
-        setSession(newSession);
+        // Update session synchronously
+        setSession(prevSession => {
+          if (JSON.stringify(prevSession) !== JSON.stringify(newSession)) {
+            console.log(`[AUTH ${count}] Session updated`);
+            return newSession;
+          }
+          return prevSession;
+        });
         
         // If signed out, clear user state immediately
         if (event === 'SIGNED_OUT') {
+          console.log(`[AUTH ${count}] User signed out, clearing state`);
           setUser(null);
           setIsLoading(false);
-          return;
         }
       }
     );
@@ -117,24 +128,35 @@ export const AuthProvider: React.FC<{children: React.ReactNode}> = ({ children }
     // Get initial session
     const checkSession = async () => {
       try {
-        console.log("Checking for existing session");
+        sessionCheckCount.current += 1;
+        const count = sessionCheckCount.current;
+        console.log(`[AUTH ${count}] Checking for initial session`);
+        
         const { data, error } = await supabase.auth.getSession();
         
         if (error) {
-          console.error("Error getting session:", error);
+          console.error(`[AUTH ${count}] Error getting session:`, error);
           setIsLoading(false);
           return;
         }
         
-        setSession(data.session);
+        console.log(`[AUTH ${count}] Initial session check:`, data.session?.user?.email || 'No active session');
         
-        // Only set loading to false if there's no session
-        // For sessions with users, we'll handle loading state in separate effect
+        // Only update if different to prevent loops
+        setSession(prevSession => {
+          if (JSON.stringify(prevSession) !== JSON.stringify(data.session)) {
+            console.log(`[AUTH ${count}] Initial session updated`);
+            return data.session;
+          }
+          return prevSession;
+        });
+        
+        // If no session, finish loading
         if (!data.session) {
           setIsLoading(false);
         }
       } catch (error) {
-        console.error("Unexpected error checking session:", error);
+        console.error("[AUTH] Unexpected error checking session:", error);
         setIsLoading(false);
       }
     };
@@ -142,28 +164,39 @@ export const AuthProvider: React.FC<{children: React.ReactNode}> = ({ children }
     checkSession();
 
     return () => {
-      console.log("Cleaning up auth state listener");
+      console.log("[AUTH] Cleaning up auth state listener");
       subscription.unsubscribe();
     };
-  }, []); // Empty dependency array to run once
+  }, []); // Empty dependency array ensures this runs once only
 
   // Process user data when session changes
   useEffect(() => {
+    // Skip processing if there's no session or if we're already not loading
     if (!session) {
-      // If no session, make sure loading is false
       setIsLoading(false);
       return;
     }
     
+    const sessionEmail = session.user?.email;
+    console.log(`[AUTH] Processing user data for session:`, sessionEmail || 'No email');
+
     const loadUserProfile = async () => {
       try {
-        console.log("Processing user data for session:", session.user.email);
         const processedUser = await processUserData(session);
-        setUser(processedUser);
+        
+        console.log(`[AUTH] User profile processed:`, processedUser?.email || 'Failed to process');
+        
+        // Only update if different to prevent loops
+        setUser(prevUser => {
+          if (JSON.stringify(prevUser) !== JSON.stringify(processedUser)) {
+            return processedUser;
+          }
+          return prevUser;
+        });
       } catch (error) {
-        console.error("Error processing user data:", error);
+        console.error("[AUTH] Error processing user data:", error);
       } finally {
-        // Always finish loading regardless of success/failure
+        // Always finish loading
         setIsLoading(false);
       }
     };
@@ -178,7 +211,7 @@ export const AuthProvider: React.FC<{children: React.ReactNode}> = ({ children }
       const currentOrigin = window.location.origin;
       const redirectTo = `${currentOrigin}/dashboard`;
       
-      console.log(`Starting ${provider} login, will redirect to:`, redirectTo);
+      console.log(`[AUTH] Starting ${provider} login, will redirect to:`, redirectTo);
       
       const { data, error } = await supabase.auth.signInWithOAuth({
         provider,
@@ -194,20 +227,20 @@ export const AuthProvider: React.FC<{children: React.ReactNode}> = ({ children }
       });
 
       if (error) {
-        console.error(`${provider} login error:`, error);
+        console.error(`[AUTH] ${provider} login error:`, error);
         throw error;
       }
       
       if (data?.url) {
-        console.log(`Redirecting to ${provider} auth URL:`, data.url);
+        console.log(`[AUTH] Redirecting to ${provider} auth URL:`, data.url);
         window.location.href = data.url;
       } else {
-        console.error(`No redirect URL returned from ${provider} auth`);
+        console.error(`[AUTH] No redirect URL returned from ${provider} auth`);
         throw new Error(`Authentication with ${provider} failed. No redirect URL returned.`);
       }
       
     } catch (error: any) {
-      console.error('Login error:', error);
+      console.error('[AUTH] Login error:', error);
       setIsLoading(false);
       throw error;
     }
@@ -215,18 +248,28 @@ export const AuthProvider: React.FC<{children: React.ReactNode}> = ({ children }
   
   const logout = async () => {
     try {
+      setIsLoading(true);
+      console.log("[AUTH] Logging out user");
       const { error } = await supabase.auth.signOut();
-      if (error) throw error;
+      
+      if (error) {
+        console.error("[AUTH] Logout error:", error);
+        throw error;
+      }
+      
+      // Clear state immediately to prevent UI flashing old data
       setUser(null);
       setSession(null);
-      console.log("User logged out successfully");
+      console.log("[AUTH] User logged out successfully");
     } catch (error: any) {
-      console.error('Logout error:', error);
+      console.error('[AUTH] Logout error:', error);
       toast({
         title: "Logout Failed",
         description: error.message,
         variant: "destructive",
       });
+    } finally {
+      setIsLoading(false);
     }
   };
 

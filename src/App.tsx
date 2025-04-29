@@ -21,6 +21,7 @@ import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { AlertCircle, Loader2 } from "lucide-react";
 import { useEffect, useState, memo } from "react";
 
+// Create QueryClient outside of component to ensure it's only created once
 const queryClient = new QueryClient({
   defaultOptions: {
     queries: {
@@ -39,6 +40,7 @@ const LoadingScreen = memo(() => (
     </div>
   </div>
 ));
+LoadingScreen.displayName = 'LoadingScreen';
 
 // Using memo to prevent unnecessary re-renders
 const ProtectedRoute = memo(({ children }: { children: React.ReactNode }) => {
@@ -51,13 +53,14 @@ const ProtectedRoute = memo(({ children }: { children: React.ReactNode }) => {
   
   // Redirect to login if not authenticated
   if (!isAuthenticated) {
-    console.log("User not authenticated, redirecting to login");
+    console.log("[ROUTER] User not authenticated, redirecting to login");
     return <Navigate to="/login" replace />;
   }
   
   // User is authenticated, render the protected content
   return <AppLayout>{children}</AppLayout>;
 });
+ProtectedRoute.displayName = 'ProtectedRoute';
 
 // Memoize routes to prevent unnecessary re-renders
 const AppRoutes = memo(() => {
@@ -112,9 +115,9 @@ const AppRoutes = memo(() => {
     </Routes>
   );
 });
+AppRoutes.displayName = 'AppRoutes';
 
 const App = () => {
-  // This direct render approach prevents unnecessary re-renders
   return (
     <BrowserRouter>
       <QueryClientProvider client={queryClient}>

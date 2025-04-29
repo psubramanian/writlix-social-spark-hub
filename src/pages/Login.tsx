@@ -18,17 +18,19 @@ const Login = () => {
   
   // Check for URL errors on mount (once)
   useEffect(() => {
+    console.log("[LOGIN] Checking URL for error parameters");
     const url = new URL(window.location.href);
     const error = url.searchParams.get('error');
     const errorDescription = url.searchParams.get('error_description');
     
     if (error) {
-      setErrorMessage(errorDescription || "There was an error during authentication");
-      console.error("Auth error from URL:", error, errorDescription);
+      const errorMsg = errorDescription || "There was an error during authentication";
+      console.error("[LOGIN] Auth error from URL:", error, errorDescription);
+      setErrorMessage(errorMsg);
       
       toast({
         title: "Authentication Error",
-        description: errorDescription || "There was an error during authentication",
+        description: errorMsg,
         variant: "destructive",
       });
       
@@ -40,7 +42,7 @@ const Login = () => {
   // Check authentication status
   useEffect(() => {
     if (!authLoading && isAuthenticated) {
-      console.log("User is authenticated, redirecting to dashboard");
+      console.log("[LOGIN] User is authenticated, redirecting to dashboard");
       navigate('/dashboard', { replace: true });
     }
   }, [isAuthenticated, authLoading, navigate]);
@@ -51,10 +53,10 @@ const Login = () => {
       setErrorMessage(null);
       setIsLoading(true);
       setProvider(providerName);
-      console.log(`Attempting to login with ${providerName}...`);
+      console.log(`[LOGIN] Attempting to login with ${providerName}...`);
       await login(providerName);
     } catch (error: any) {
-      console.error('Login error:', error);
+      console.error('[LOGIN] Login error:', error);
       setErrorMessage(error.message || "There was an error logging in. Please try again.");
       toast({
         title: "Login Failed",

@@ -10,30 +10,51 @@ import Footer from '../components/landing/Footer';
 import { NewsletterPopup } from '../components/NewsletterPopup';
 
 const Index = () => {
-  const { isAuthenticated } = useAuth();
+  const { isAuthenticated, isLoading } = useAuth();
   const navigate = useNavigate();
   const [isNewsletterPopupOpen, setIsNewsletterPopupOpen] = useState(false);
   
-  React.useEffect(() => {
-    if (isAuthenticated) {
+  // Redirect authenticated users to dashboard after auth check is complete
+  useEffect(() => {
+    if (!isLoading && isAuthenticated) {
+      console.log("[INDEX] User is authenticated, redirecting to dashboard");
       navigate('/dashboard');
     }
-  }, [isAuthenticated, navigate]);
+  }, [isAuthenticated, isLoading, navigate]);
   
+  // Show newsletter popup after a delay if not seen before
   useEffect(() => {
+    // Skip newsletter if user is authenticated or auth is still loading
+    if (isLoading || isAuthenticated) {
+      return;
+    }
+    
     // Check if the user has already seen the popup in this session
     const hasSeenPopup = sessionStorage.getItem('newsletterPopupSeen');
     
     if (!hasSeenPopup) {
       // Open popup after 3 seconds
       const timer = setTimeout(() => {
+        console.log("[INDEX] Showing newsletter popup");
         setIsNewsletterPopupOpen(true);
         sessionStorage.setItem('newsletterPopupSeen', 'true');
       }, 3000);
 
       return () => clearTimeout(timer);
     }
-  }, []);
+  }, [isLoading, isAuthenticated]);
+  
+  // Show loading screen while checking authentication
+  if (isLoading) {
+    return (
+      <div className="flex items-center justify-center h-screen bg-white">
+        <div className="flex flex-col items-center space-y-4">
+          <div className="h-12 w-12 border-4 border-primary border-t-transparent rounded-full animate-spin" />
+          <p className="text-sm text-muted-foreground">Loading...</p>
+        </div>
+      </div>
+    );
+  }
   
   return (
     <div className="min-h-screen bg-white">
