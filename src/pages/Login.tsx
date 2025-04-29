@@ -9,7 +9,7 @@ import { Loader2, AlertCircle } from 'lucide-react';
 import { Alert, AlertDescription } from '@/components/ui/alert';
 
 const Login = () => {
-  const { login, isAuthenticated } = useAuth();
+  const { login, isAuthenticated, isLoading: authLoading } = useAuth();
   const navigate = useNavigate();
   const { toast } = useToast();
   const [isLoading, setIsLoading] = useState(false);
@@ -17,12 +17,18 @@ const Login = () => {
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
   
   useEffect(() => {
-    // Clear any previous error messages
-    setErrorMessage(null);
+    const checkAuthAndRedirect = () => {
+      // Clear any previous error messages
+      setErrorMessage(null);
+      
+      // Only redirect if auth has finished loading and user is authenticated
+      if (!authLoading && isAuthenticated) {
+        console.log("User is authenticated, redirecting to dashboard");
+        navigate('/dashboard');
+      }
+    };
     
-    if (isAuthenticated) {
-      navigate('/dashboard');
-    }
+    checkAuthAndRedirect();
     
     // Check for auth errors in URL
     const url = new URL(window.location.href);
@@ -42,7 +48,7 @@ const Login = () => {
       // Clean URL
       window.history.replaceState({}, document.title, window.location.pathname);
     }
-  }, [isAuthenticated, navigate, toast]);
+  }, [isAuthenticated, authLoading, navigate, toast]);
 
   // Handle login with selected provider
   const handleLogin = async (providerName: 'google' | 'linkedin_oidc') => {
@@ -65,6 +71,18 @@ const Login = () => {
       setProvider(null);
     }
   };
+  
+  // Show loading state while checking authentication
+  if (authLoading) {
+    return (
+      <div className="min-h-screen flex items-center justify-center bg-writlix-lightblue bg-opacity-30">
+        <div className="flex flex-col items-center space-y-4">
+          <Loader2 className="h-12 w-12 animate-spin text-primary" />
+          <p className="text-sm text-muted-foreground">Checking authentication...</p>
+        </div>
+      </div>
+    );
+  }
   
   return (
     <div className="min-h-screen flex items-center justify-center bg-writlix-lightblue bg-opacity-30">

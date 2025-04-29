@@ -1,8 +1,9 @@
 
-import React, { createContext, useContext, useState, useEffect } from "react";
+import React, { createContext, useContext, useState, useEffect, useRef } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { Session, User as SupabaseUser } from "@supabase/supabase-js";
 import { useToast } from "@/components/ui/use-toast";
+import { ensureProfileExists } from "@/utils/supabaseUserUtils";
 
 export interface ExtendedUser extends SupabaseUser {
   name?: string;
@@ -25,40 +26,57 @@ export const AuthProvider: React.FC<{children: React.ReactNode}> = ({ children }
   const [user, setUser] = useState<ExtendedUser | null>(null);
   const [session, setSession] = useState<Session | null>(null);
   const [isLoading, setIsLoading] = useState(true);
+  const authChecked = useRef(false);
   const { toast } = useToast();
 
-  const processUserData = async (session: Session | null) => {
-    if (!session?.user) {
+  const fetchUserProfile = async (userId: string, sessionUser: SupabaseUser) => {
+    try {
+      console.log("Fetching profile for user:", userId);
+      const { data: profile, error: profileError } = await supabase
+        .from('profiles')
+        .select('*')
+        .eq('id', userId)
+        .maybeSingle();
+      
+      if (profileError) {
+        console.error('Error fetching profile:', profileError);
+        return null;
+      }
+
+      if (!profile) {
+        // Try creating a profile if it doesn't exist
+        console.log("No profile found, creating one...");
+        const createdProfile = await ensureProfileExists(userId, sessionUser);
+        if (!createdProfile) {
+          console.error('Failed to create profile for user:', userId);
+          return null;
+        }
+        return createdProfile;
+      }
+
+      console.log("Profile found:", profile);
+      return profile;
+    } catch (error) {
+      console.error('Unexpected error in fetchUserProfile:', error);
+      return null;
+    }
+  };
+
+  const processUserData = async (sessionData: Session | null) => {
+    if (!sessionData?.user) {
       console.log("No session or user found in processUserData");
       return null;
     }
     
     try {
-      console.log("Fetching profile for user:", session.user.id);
-      const { data: profile, error: profileError } = await supabase
-        .from('profiles')
-        .select('*')
-        .eq('id', session.user.id)
-        .single();
+      const profile = await fetchUserProfile(sessionData.user.id, sessionData.user);
       
-      if (profileError) {
-        console.error('Error fetching profile:', profileError);
-        toast({
-          title: "Profile Error",
-          description: "Unable to load your profile. Please try logging in again.",
-          variant: "destructive",
-        });
-        return null;
-      }
-
       if (!profile) {
-        console.error('No profile found for user:', session.user.id);
+        console.error('No profile found or created for user:', sessionData.user.id);
         return null;
       }
-
-      console.log("Profile found:", profile);
       
-      const userData = session.user as ExtendedUser;
+      const userData = sessionData.user as ExtendedUser;
       userData.name = profile.full_name || 'User';
       userData.avatar = profile.avatar_url || null;
       userData.linkedInConnected = profile.provider === 'linkedin_oidc';
@@ -70,36 +88,93 @@ export const AuthProvider: React.FC<{children: React.ReactNode}> = ({ children }
     }
   };
 
+  // Set up auth state listener
   useEffect(() => {
+    console.log("Setting up auth state change listener");
+    
     const { data: { subscription } } = supabase.auth.onAuthStateChange(
-      async (event, session) => {
-        console.log("Auth state changed:", event, session?.user?.email);
+      (event, newSession) => {
+        console.log("Auth state changed:", event, newSession?.user?.email);
         
-        if (event === 'SIGNED_IN') {
-          const processedUser = await processUserData(session);
-          setUser(processedUser);
-          setSession(session);
-        } else if (event === 'SIGNED_OUT') {
+        // First synchronously update the session
+        setSession(newSession);
+        
+        // If signed out, clear user state immediately
+        if (event === 'SIGNED_OUT') {
           setUser(null);
-          setSession(null);
+          setIsLoading(false);
+          return;
         }
         
-        setIsLoading(false);
+        // For other events like SIGNED_IN, handle the profile fetch asynchronously
+        if (newSession?.user) {
+          // Note: Don't directly call processUserData here which might trigger infinite loops
+          // We'll handle this in a separate effect
+        }
       }
     );
 
-    supabase.auth.getSession().then(async ({ data: { session } }) => {
-      console.log("Initial session check:", session?.user?.email);
-      
-      const processedUser = await processUserData(session);
-      setUser(processedUser);
-      setSession(session);
-      
-      setIsLoading(false);
-    });
-
-    return () => subscription.unsubscribe();
+    return () => {
+      console.log("Cleaning up auth state listener");
+      subscription.unsubscribe();
+    };
   }, []);
+
+  // Initial session check - only runs once
+  useEffect(() => {
+    const checkSession = async () => {
+      if (authChecked.current) return;
+      
+      try {
+        console.log("Checking for existing session");
+        const { data, error } = await supabase.auth.getSession();
+        
+        if (error) {
+          console.error("Error getting session:", error);
+          setIsLoading(false);
+          authChecked.current = true;
+          return;
+        }
+        
+        setSession(data.session);
+        
+        if (!data.session) {
+          setIsLoading(false);
+          authChecked.current = true;
+        }
+      } catch (error) {
+        console.error("Unexpected error checking session:", error);
+        setIsLoading(false);
+        authChecked.current = true;
+      }
+    };
+    
+    checkSession();
+  }, []);
+
+  // Process user data when session changes
+  useEffect(() => {
+    if (!session) {
+      if (authChecked.current) {
+        setIsLoading(false);
+      }
+      return;
+    }
+    
+    const loadUserProfile = async () => {
+      try {
+        const processedUser = await processUserData(session);
+        setUser(processedUser);
+      } catch (error) {
+        console.error("Error processing user data:", error);
+      } finally {
+        setIsLoading(false);
+        authChecked.current = true;
+      }
+    };
+    
+    loadUserProfile();
+  }, [session]);
 
   const login = async (provider: 'google' | 'linkedin_oidc') => {
     try {

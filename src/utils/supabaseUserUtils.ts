@@ -1,3 +1,4 @@
+
 import { supabase } from '@/integrations/supabase/client';
 import { useNavigate } from 'react-router-dom';
 
@@ -43,19 +44,32 @@ export async function ensureProfileExists(userId: string, userData: any) {
     
     // If profile already exists, return it
     if (existingProfile) {
+      console.log("Existing profile found:", existingProfile);
       return existingProfile;
     }
     
     // Otherwise, create a new profile
     console.log("Creating new profile for user:", userId);
+    
+    // Extract profile data from user metadata
+    const fullName = userData.user_metadata?.full_name || 
+                     userData.user_metadata?.name || 
+                     `User-${userId.substring(0, 6)}`;
+                     
+    const avatarUrl = userData.user_metadata?.avatar_url || 
+                      userData.user_metadata?.picture;
+                      
+    const email = userData.email;
+    const provider = userData.app_metadata?.provider || 'email';
+    
     const { data: newProfile, error: insertError } = await supabase
       .from('profiles')
       .insert({
         id: userId,
-        full_name: userData.user_metadata?.full_name || userData.user_metadata?.name,
-        avatar_url: userData.user_metadata?.avatar_url || userData.user_metadata?.picture,
-        email: userData.email,
-        provider: userData.app_metadata?.provider
+        full_name: fullName,
+        avatar_url: avatarUrl,
+        email: email,
+        provider: provider
       })
       .select('*')
       .single();

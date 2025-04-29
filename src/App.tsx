@@ -1,4 +1,3 @@
-
 import { Toaster } from "@/components/ui/toaster";
 import { Toaster as Sonner } from "@/components/ui/sonner";
 import { TooltipProvider } from "@/components/ui/tooltip";
@@ -32,20 +31,8 @@ const queryClient = new QueryClient({
 
 const ProtectedRoute = ({ children }: { children: React.ReactNode }) => {
   const { isAuthenticated, isLoading } = useAuth();
-  const [authCheckComplete, setAuthCheckComplete] = useState(false);
   
-  useEffect(() => {
-    if (!isLoading) {
-      const timer = setTimeout(() => {
-        setAuthCheckComplete(true);
-      }, 100);
-      
-      return () => clearTimeout(timer);
-    }
-    return undefined;
-  }, [isLoading]);
-  
-  if (isLoading || !authCheckComplete) {
+  if (isLoading) {
     return (
       <div className="flex items-center justify-center h-screen bg-background">
         <div className="flex flex-col items-center space-y-4">
