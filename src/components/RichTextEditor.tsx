@@ -9,9 +9,10 @@ interface RichTextEditorProps {
   content: string;
   onChange: (content: string) => void;
   readOnly?: boolean;
+  placeholder?: string;
 }
 
-const RichTextEditor = ({ content, onChange, readOnly = false }: RichTextEditorProps) => {
+const RichTextEditor = ({ content, onChange, readOnly = false, placeholder }: RichTextEditorProps) => {
   const [showToolbar, setShowToolbar] = useState(true);
 
   const handleCommand = (command: string, value: string | null = null) => {
@@ -105,13 +106,25 @@ const RichTextEditor = ({ content, onChange, readOnly = false }: RichTextEditorP
             "w-full p-4 focus:outline-none min-h-[320px]",
             "prose prose-sm max-w-none",
             "focus:ring-0",
-            readOnly ? "bg-muted/10 cursor-default" : ""
+            readOnly ? "bg-muted/10 cursor-default" : "",
+            "relative"
           )}
           contentEditable={!readOnly}
           dangerouslySetInnerHTML={{ __html: content }}
           onBlur={(e) => !readOnly && onChange(e.currentTarget.innerHTML)}
           suppressContentEditableWarning
+          data-placeholder={placeholder}
+          style={{
+            ...(!content && placeholder ? {
+              position: 'relative',
+            } : {})
+          }}
         />
+        {!content && placeholder && (
+          <div className="absolute top-4 left-4 pointer-events-none text-gray-400">
+            {placeholder}
+          </div>
+        )}
       </ScrollArea>
     </div>
   );
