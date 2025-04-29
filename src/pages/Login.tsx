@@ -37,6 +37,30 @@ const Login = () => {
       // Clean URL
       window.history.replaceState({}, document.title, window.location.pathname);
     }
+    
+    // Try to restore localStorage flags that might have been lost during redirect
+    try {
+      const savedFlags = sessionStorage.getItem('auth_local_flags');
+      if (savedFlags) {
+        const flags = JSON.parse(savedFlags);
+        
+        // Only restore if current flags are missing
+        if (flags.profile_completed && !localStorage.getItem('profile_completed')) {
+          localStorage.setItem('profile_completed', flags.profile_completed);
+          console.log("[LOGIN] Restored profile_completed flag from session storage");
+        }
+        
+        if (flags.profile_skip_attempted && !localStorage.getItem('profile_skip_attempted')) {
+          localStorage.setItem('profile_skip_attempted', flags.profile_skip_attempted);
+          console.log("[LOGIN] Restored profile_skip_attempted flag from session storage");
+        }
+        
+        // Clear after restoring
+        sessionStorage.removeItem('auth_local_flags');
+      }
+    } catch (e) {
+      console.warn("[LOGIN] Error restoring auth flags:", e);
+    }
   }, []); // Empty deps to run once
   
   // Check authentication status
@@ -54,6 +78,10 @@ const Login = () => {
       setIsLoading(true);
       setProvider(providerName);
       console.log(`[LOGIN] Attempting to login with ${providerName}...`);
+      
+      // Before initiating login, make sure to reset any stale profile bypass attempts
+      localStorage.removeItem('profile_bypass_attempts');
+      
       await login(providerName);
     } catch (error: any) {
       console.error('[LOGIN] Login error:', error);
@@ -154,6 +182,30 @@ const Login = () => {
             Having trouble logging in? <a href="mailto:support@writlix.com" className="text-writlix-blue hover:underline">Contact Support</a>
           </p>
         </div>
+        
+        {/* Show debug panel in development mode */}
+        {process.env.NODE_ENV === 'development' && (
+          <div className="mt-4 p-2 bg-black/80 text-xs text-white rounded">
+            <p>Debug Tools:</p>
+            <button 
+              onClick={() => {
+                localStorage.clear();
+                sessionStorage.clear();
+                toast({ title: "Storage Cleared", description: "All localStorage and sessionStorage data has been cleared." });
+              }}
+              className="text-red-400 underline"
+            >
+              Clear All Storage
+            </button>
+            <div className="mt-2">
+              <strong>localStorage:</strong>
+              <div>profile_completed: {localStorage.getItem('profile_completed') || 'null'}</div>
+              <div>profile_skip_attempted: {localStorage.getItem('profile_skip_attempted') || 'null'}</div>
+              <div>profile_bypass_attempts: {localStorage.getItem('profile_bypass_attempts') || 'null'}</div>
+              <div>auth_active: {localStorage.getItem('auth_active') || 'null'}</div>
+            </div>
+          </div>
+        )}
       </div>
     </div>
   );

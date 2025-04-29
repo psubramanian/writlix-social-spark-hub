@@ -21,6 +21,7 @@ import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { AlertCircle, Loader2 } from "lucide-react";
 import { useEffect, useState, memo } from "react";
 import ProfileComplete from "./pages/ProfileComplete";
+import { isProfileComplete } from "./utils/supabaseUserUtils";
 
 // Create QueryClient outside of component to ensure it's only created once
 const queryClient = new QueryClient({
@@ -43,21 +44,72 @@ const LoadingScreen = memo(() => (
 ));
 LoadingScreen.displayName = 'LoadingScreen';
 
+// Auth Debug Component - only shown in development
+const AuthDebug = ({ user }: { user: any }) => {
+  if (process.env.NODE_ENV !== 'development') return null;
+  
+  return (
+    <div className="fixed bottom-0 right-0 bg-black/80 text-white p-2 text-xs max-w-[300px] z-50 rounded-tl-md">
+      <div>Auth Status: {user ? 'Logged In' : 'Logged Out'}</div>
+      <div>Profile: {user?.profileComplete ? 'Complete' : 'Incomplete'}</div>
+      <div>Name: {user?.name || 'N/A'}</div>
+      <div>LS-Skip: {localStorage.getItem('profile_skip_attempted') || 'false'}</div>
+      <div>LS-Complete: {localStorage.getItem('profile_completed') || 'false'}</div>
+    </div>
+  );
+};
+
 // Using memo to prevent unnecessary re-renders
 const ProtectedRoute = memo(({ children }: { children: React.ReactNode }) => {
   const { isAuthenticated, isLoading, user } = useAuth();
   const [shouldBypassProfileCheck, setShouldBypassProfileCheck] = useState(false);
   
-  // Check for profile bypass flags
+  // Enhanced logging for protected route decisions
   useEffect(() => {
+    console.log("[ROUTER] Protected route accessed, auth status:", 
+      isAuthenticated ? "Authenticated" : "Not authenticated", 
+      "Loading:", isLoading,
+      "User:", user?.email || "No email",
+      "Profile complete flag:", user?.profileComplete ? "Complete" : "Incomplete"
+    );
+    
+    // Log localStorage state for debugging
+    console.log("[ROUTER] LocalStorage state:", {
+      profile_skip_attempted: localStorage.getItem('profile_skip_attempted'),
+      profile_completed: localStorage.getItem('profile_completed'),
+      auth_active: localStorage.getItem('auth_active')
+    });
+  }, [isAuthenticated, isLoading, user]);
+  
+  // Check for profile bypass flags with enhanced recovery
+  useEffect(() => {
+    // Check multiple sources to determine if we should bypass profile completion
     const hasSkippedProfileCompletion = localStorage.getItem('profile_skip_attempted') === 'true';
     const hasCompletedProfile = localStorage.getItem('profile_completed') === 'true';
+    const databaseProfileComplete = user?.profileComplete === true;
     
-    // If user has either skipped or completed their profile previously, don't force profile completion
-    if (hasSkippedProfileCompletion || hasCompletedProfile) {
+    // Force bypass after multiple attempts to prevent endless loops
+    const bypassAttemptCount = parseInt(localStorage.getItem('profile_bypass_attempts') || '0', 10);
+    if (bypassAttemptCount > 3) {
+      console.warn("[ROUTER] Forcing profile bypass after multiple attempts");
+      localStorage.setItem('profile_skip_attempted', 'true');
       setShouldBypassProfileCheck(true);
+      return;
     }
-  }, []);
+    
+    // If any of these conditions are met, bypass profile check
+    if (hasSkippedProfileCompletion || hasCompletedProfile || databaseProfileComplete) {
+      console.log("[ROUTER] Bypassing profile check due to:", {
+        hasSkippedProfileCompletion,
+        hasCompletedProfile,
+        databaseProfileComplete
+      });
+      setShouldBypassProfileCheck(true);
+    } else {
+      // Increment bypass attempt counter to prevent infinite loops
+      localStorage.setItem('profile_bypass_attempts', String(bypassAttemptCount + 1));
+    }
+  }, [user]);
   
   // Show loading screen while checking auth
   if (isLoading) {
@@ -71,6 +123,9 @@ const ProtectedRoute = memo(({ children }: { children: React.ReactNode }) => {
     return <Navigate to="/login" replace />;
   }
   
+  // Add debug component in development mode
+  const authDebug = process.env.NODE_ENV === 'development' ? <AuthDebug user={user} /> : null;
+  
   // If user profile isn't complete and route isn't the profile completion page,
   // and we haven't set the bypass flag, redirect to profile completion
   if (user && 
@@ -78,12 +133,22 @@ const ProtectedRoute = memo(({ children }: { children: React.ReactNode }) => {
       window.location.pathname !== '/profile-complete' && 
       !shouldBypassProfileCheck) {
     console.log("[ROUTER] User profile incomplete, redirecting to profile completion");
-    return <Navigate to="/profile-complete" replace />;
+    return (
+      <>
+        {authDebug}
+        <Navigate to="/profile-complete" replace />
+      </>
+    );
   }
   
   // User is authenticated, render the protected content
   console.log("[ROUTER] User authenticated, rendering protected content");
-  return <AppLayout>{children}</AppLayout>;
+  return (
+    <>
+      {authDebug}
+      <AppLayout>{children}</AppLayout>
+    </>
+  );
 });
 ProtectedRoute.displayName = 'ProtectedRoute';
 

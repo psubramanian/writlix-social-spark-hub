@@ -3,7 +3,7 @@ import React, { createContext, useContext, useState, useEffect, useRef } from "r
 import { supabase } from "@/integrations/supabase/client";
 import { Session, User as SupabaseUser } from "@supabase/supabase-js";
 import { useToast } from "@/components/ui/use-toast";
-import { ensureProfileExists } from "@/utils/supabaseUserUtils";
+import { ensureProfileExists, isProfileComplete } from "@/utils/supabaseUserUtils";
 import { UserProfile } from "@/types/auth";
 
 export interface ExtendedUser extends SupabaseUser {
@@ -57,12 +57,12 @@ export const AuthProvider: React.FC<{children: React.ReactNode}> = ({ children }
           id: userId,
           full_name: sessionUser.email?.split('@')[0] || `User-${userId.substring(0, 6)}`,
           email: sessionUser.email,
+          profile_completed: true, // Mark as complete to prevent loops
           _fallback: true
         } as UserProfile;
       }
 
-      // Check if this is a fallback profile by checking the _fallback property
-      // The as operator is used to tell TypeScript that we know this property exists
+      // Check if this is a fallback profile
       const isFallbackProfile = (profile as UserProfile)._fallback === true;
       
       if (isFallbackProfile) {
@@ -85,6 +85,7 @@ export const AuthProvider: React.FC<{children: React.ReactNode}> = ({ children }
         id: userId,
         full_name: sessionUser.email?.split('@')[0] || `User-${userId.substring(0, 6)}`,
         email: sessionUser.email,
+        profile_completed: true, // Mark as complete to prevent loops
         _fallback: true
       } as UserProfile;
     }
@@ -97,6 +98,7 @@ export const AuthProvider: React.FC<{children: React.ReactNode}> = ({ children }
     }
     
     try {
+      // When processing user data, always try to ensure profile exists
       const profile = await fetchUserProfile(sessionData.user.id, sessionData.user);
       
       // We'll always have at least a fallback profile now
@@ -107,19 +109,16 @@ export const AuthProvider: React.FC<{children: React.ReactNode}> = ({ children }
       userData.avatar = profile.avatar_url || null;
       userData.linkedInConnected = profile.provider === 'linkedin_oidc';
       
-      // Cast to UserProfile to access the _fallback property
-      const isFallbackProfile = (profile as UserProfile)._fallback === true;
+      // Check if profile is considered complete
+      userData.profileComplete = isProfileComplete(profile);
       
-      // Check if user has skipped profile completion
-      const hasSkippedProfileCompletion = localStorage.getItem('profile_skip_attempted') === 'true';
-      const hasCompletedProfile = localStorage.getItem('profile_completed') === 'true';
-      
-      // If the user has skipped or completed profile, don't mark as incomplete profile
-      if (hasSkippedProfileCompletion || hasCompletedProfile) {
-        userData.profileComplete = true;
-      } else {
-        userData.profileComplete = !isFallbackProfile;
-      }
+      // Log profile completion status sources
+      logDebug(`Profile completion status:`, {
+        databaseFlag: profile.profile_completed, 
+        localStorageFlag1: localStorage.getItem('profile_completed') === 'true',
+        localStorageFlag2: localStorage.getItem('profile_skip_attempted') === 'true',
+        finalDecision: userData.profileComplete
+      });
       
       return userData;
     } catch (error) {
@@ -128,7 +127,7 @@ export const AuthProvider: React.FC<{children: React.ReactNode}> = ({ children }
       // Create minimal user to prevent auth loops
       const userData = sessionData.user as ExtendedUser;
       userData.name = sessionData.user.email?.split('@')[0] || 'User';
-      userData.profileComplete = false;
+      userData.profileComplete = true; // Default to true to prevent loops
       return userData;
     }
   };
@@ -292,7 +291,7 @@ export const AuthProvider: React.FC<{children: React.ReactNode}> = ({ children }
           setUser({
             ...session.user,
             name: session.user.email?.split('@')[0] || 'User',
-            profileComplete: false
+            profileComplete: true // Default to true to prevent loops
           } as ExtendedUser);
         }
       } finally {
@@ -312,6 +311,9 @@ export const AuthProvider: React.FC<{children: React.ReactNode}> = ({ children }
       const redirectTo = `${currentOrigin}/dashboard`;
       
       console.log(`[AUTH] Starting ${provider} login, will redirect to:`, redirectTo);
+      
+      // Clear old profile status in local storage before starting new auth
+      localStorage.removeItem('profile_bypass_attempts');
       
       const { data, error } = await supabase.auth.signInWithOAuth({
         provider,
@@ -339,6 +341,13 @@ export const AuthProvider: React.FC<{children: React.ReactNode}> = ({ children }
         sessionStorage.setItem('auth_provider', provider);
         sessionStorage.setItem('auth_redirect_url', redirectTo);
         
+        // Remember localStorage flags before redirect
+        const currentFlags = {
+          profile_completed: localStorage.getItem('profile_completed'),
+          profile_skip_attempted: localStorage.getItem('profile_skip_attempted')
+        };
+        sessionStorage.setItem('auth_local_flags', JSON.stringify(currentFlags));
+        
         window.location.href = data.url;
       } else {
         console.error(`[AUTH] No redirect URL returned from ${provider} auth`);
@@ -360,6 +369,9 @@ export const AuthProvider: React.FC<{children: React.ReactNode}> = ({ children }
       // Clear any profile-related localStorage flags
       localStorage.removeItem('profile_skip_attempted');
       localStorage.removeItem('profile_completed');
+      localStorage.removeItem('profile_bypass_attempts');
+      localStorage.removeItem('auth_active');
+      localStorage.removeItem('auth_timestamp');
       
       const { error } = await supabase.auth.signOut();
       
@@ -384,6 +396,24 @@ export const AuthProvider: React.FC<{children: React.ReactNode}> = ({ children }
     }
   };
 
+  // Check for sessions in UI - for debugging purposes
+  useEffect(() => {
+    if (window.location.search.includes('auth_debug=true')) {
+      console.log("[AUTH DEBUG] Auth state:", { 
+        user, 
+        session, 
+        isLoading, 
+        isAuthenticated: !!session,
+        localStorage: {
+          profile_completed: localStorage.getItem('profile_completed'),
+          profile_skip_attempted: localStorage.getItem('profile_skip_attempted'),
+          profile_bypass_attempts: localStorage.getItem('profile_bypass_attempts'),
+          auth_active: localStorage.getItem('auth_active')
+        }
+      });
+    }
+  }, [user, session, isLoading]);
+
   const value = {
     user,
     session,
@@ -391,7 +421,7 @@ export const AuthProvider: React.FC<{children: React.ReactNode}> = ({ children }
     login,
     logout,
     isAuthenticated: !!session,
-    refreshUserProfile  // Export this function to allow components to refresh user data
+    refreshUserProfile
   };
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;

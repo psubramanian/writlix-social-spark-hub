@@ -12,7 +12,7 @@ import { Loader2, AlertCircle } from 'lucide-react';
 import { Alert, AlertDescription } from '@/components/ui/alert';
 
 const ProfileComplete = () => {
-  const { user, isLoading: authLoading } = useAuth();
+  const { user, isLoading: authLoading, refreshUserProfile } = useAuth();
   const navigate = useNavigate();
   const { toast } = useToast();
   const [isLoading, setIsLoading] = useState(false);
@@ -20,13 +20,23 @@ const ProfileComplete = () => {
   const [error, setError] = useState<string | null>(null);
   const [skipAttempted, setSkipAttempted] = useState(false);
   
+  // On component mount, clear the bypass attempts counter
+  useEffect(() => {
+    localStorage.removeItem('profile_bypass_attempts');
+  }, []);
+  
   // Check if user has attempted to complete profile before
   useEffect(() => {
     const hasSkippedBefore = localStorage.getItem('profile_skip_attempted') === 'true';
     if (hasSkippedBefore) {
       setSkipAttempted(true);
     }
-  }, []);
+    
+    // Initialize with user name if available
+    if (user?.name && !fullName) {
+      setFullName(user.name);
+    }
+  }, [user, fullName]);
 
   // If user already skipped once and has a name, auto-redirect to dashboard
   useEffect(() => {
@@ -77,6 +87,7 @@ const ProfileComplete = () => {
               full_name: fullName,
               email: user.email,
               avatar_url: user.avatar,
+              profile_completed: true, // Explicitly mark as complete
               updated_at: new Date().toISOString()
             });
           
@@ -98,13 +109,18 @@ const ProfileComplete = () => {
         }
       }
       
+      // Set local flag to indicate profile has been completed
+      localStorage.setItem('profile_completed', 'true');
+      localStorage.removeItem('profile_skip_attempted');
+      localStorage.removeItem('profile_bypass_attempts');
+      
+      // Refresh user profile to reflect changes
+      await refreshUserProfile();
+      
       toast({
         title: "Profile Updated",
         description: "Your profile has been successfully completed.",
       });
-      
-      // Set local flag to indicate profile has been completed
-      localStorage.setItem('profile_completed', 'true');
       
       // Redirect to dashboard
       navigate('/dashboard', { replace: true });
@@ -112,11 +128,22 @@ const ProfileComplete = () => {
     } catch (error: any) {
       console.error('Profile update error:', error);
       setError(error.message || "There was a problem updating your profile.");
+      
+      // Even if we couldn't update the profile, set the local flag
+      // to prevent infinite profile completion loops
+      localStorage.setItem('profile_completed', 'true');
+      localStorage.removeItem('profile_skip_attempted');
+      
       toast({
         title: "Profile Update Failed",
-        description: error.message || "There was a problem updating your profile.",
+        description: "We couldn't update your profile, but you can continue using the app.",
         variant: "destructive",
       });
+      
+      // Redirect to dashboard anyway after showing error
+      setTimeout(() => {
+        navigate('/dashboard', { replace: true });
+      }, 2000);
     } finally {
       setIsLoading(false);
     }
@@ -126,11 +153,35 @@ const ProfileComplete = () => {
   const handleSkip = () => {
     console.log("[PROFILE] User chose to skip profile completion");
     localStorage.setItem('profile_skip_attempted', 'true');
+    localStorage.removeItem('profile_bypass_attempts');
+    
+    // Even if skipping, try to update the profile with profile_completed=true
+    if (user?.id) {
+      supabase
+        .from('profiles')
+        .update({ 
+          profile_completed: true,
+          updated_at: new Date().toISOString() 
+        })
+        .eq('id', user.id)
+        .then(({ error }) => {
+          if (error) {
+            console.warn("[PROFILE] Failed to mark profile as complete on skip:", error);
+          } else {
+            console.log("[PROFILE] Successfully marked profile as complete on skip");
+          }
+        });
+    }
+    
     toast({
       title: "Profile Completion Skipped",
       description: "You can complete your profile later from the settings page.",
     });
-    navigate('/dashboard', { replace: true });
+    
+    // Refresh user profile to reflect changes
+    refreshUserProfile().then(() => {
+      navigate('/dashboard', { replace: true });
+    });
   };
   
   // If user is fully authenticated and has complete profile, redirect to dashboard
@@ -226,6 +277,16 @@ const ProfileComplete = () => {
             </CardFooter>
           </form>
         </Card>
+        
+        {/* Debug info in development */}
+        {process.env.NODE_ENV === 'development' && (
+          <div className="mt-4 p-2 bg-black/80 text-xs text-white rounded">
+            <div>Auth ID: {user?.id || 'None'}</div>
+            <div>Profile state: {user?.profileComplete ? 'Complete' : 'Incomplete'}</div>
+            <div>LS Skip: {localStorage.getItem('profile_skip_attempted') || 'false'}</div>
+            <div>LS Complete: {localStorage.getItem('profile_completed') || 'false'}</div>
+          </div>
+        )}
       </div>
     </div>
   );

@@ -11,13 +11,13 @@ export async function getCurrentUser() {
     const { data, error } = await supabase.auth.getUser();
     
     if (error) {
-      console.error("Authentication error:", error);
+      console.error("[AUTH] Authentication error:", error);
       return null;
     }
     
     return data?.user || null;
   } catch (error) {
-    console.error("Error getting current user:", error);
+    console.error("[AUTH] Error getting current user:", error);
     return null;
   }
 }
@@ -27,7 +27,7 @@ export async function getCurrentUser() {
  */
 export async function ensureProfileExists(userId: string, userData: any) {
   if (!userId) {
-    console.error("Cannot ensure profile: missing user ID");
+    console.error("[PROFILE] Cannot ensure profile: missing user ID");
     return null;
   }
   
@@ -59,6 +59,28 @@ export async function ensureProfileExists(userId: string, userData: any) {
         } else if (data) {
           existingProfile = data;
           console.log(`[PROFILE] Existing profile found after ${attempts} attempt(s)`);
+          
+          // Mark profile as complete in database if it exists but isn't marked
+          if (!data.profile_completed) {
+            try {
+              await supabase
+                .from('profiles')
+                .update({ profile_completed: true, updated_at: new Date().toISOString() })
+                .eq('id', userId);
+              
+              console.log("[PROFILE] Marked existing profile as complete");
+              
+              // Update our local profile object
+              existingProfile.profile_completed = true;
+              
+              // Also set local storage flag for backup
+              localStorage.setItem('profile_completed', 'true');
+            } catch (updateError) {
+              console.warn("[PROFILE] Failed to mark profile as complete:", updateError);
+              // Continue anyway, we'll just use local flags as backup
+            }
+          }
+          
           break;
         }
       } catch (fetchError) {
@@ -104,7 +126,7 @@ export async function ensureProfileExists(userId: string, userData: any) {
       attempts++;
       
       try {
-        // Insert new profile
+        // Insert new profile - now with profile_completed flag set to true by default
         const { data, error } = await supabase
           .from('profiles')
           .upsert({
@@ -113,6 +135,7 @@ export async function ensureProfileExists(userId: string, userData: any) {
             avatar_url: avatarUrl,
             email: email,
             provider: provider,
+            profile_completed: true, // Set to true by default
             created_at: new Date().toISOString()
           })
           .select('*')
@@ -127,6 +150,9 @@ export async function ensureProfileExists(userId: string, userData: any) {
         } else if (data) {
           newProfile = data;
           console.log(`[PROFILE] New profile created successfully after ${attempts} attempt(s)`);
+          
+          // Set local storage flag for backup
+          localStorage.setItem('profile_completed', 'true');
           break;
         }
       } catch (insertError) {
@@ -158,6 +184,7 @@ export async function ensureProfileExists(userId: string, userData: any) {
       avatar_url: avatarUrl,
       email: email,
       provider: provider,
+      profile_completed: true, // Mark as complete to prevent loops
       _fallback: true // Indicate this is a fallback profile
     };
     
@@ -169,6 +196,7 @@ export async function ensureProfileExists(userId: string, userData: any) {
       id: userId,
       full_name: userData.email?.split('@')[0] || `User-${userId.substring(0, 6)}`,
       email: userData.email,
+      profile_completed: true, // Mark as complete to prevent loops
       _fallback: true
     };
   }
@@ -191,4 +219,21 @@ export function useAuthRedirect() {
   }, [navigate]);
   
   return { redirectToLogin, redirectToDashboard };
+}
+
+/**
+ * Check if user profile is complete based on multiple data sources
+ */
+export function isProfileComplete(userProfile: any) {
+  // Check database field first if available
+  if (userProfile?.profile_completed === true) {
+    return true;
+  }
+  
+  // Fall back to localStorage flags if no database field
+  const hasSkippedProfileCompletion = localStorage.getItem('profile_skip_attempted') === 'true';
+  const hasCompletedProfile = localStorage.getItem('profile_completed') === 'true';
+  
+  // Consider a profile complete if any of these conditions are met
+  return hasSkippedProfileCompletion || hasCompletedProfile;
 }
