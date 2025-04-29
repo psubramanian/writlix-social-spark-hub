@@ -1,3 +1,4 @@
+
 import { Toaster } from "@/components/ui/toaster";
 import { Toaster as Sonner } from "@/components/ui/sonner";
 import { TooltipProvider } from "@/components/ui/tooltip";
@@ -18,7 +19,7 @@ import InstantPost from "./pages/InstantPost";
 import AppLayout from "./components/layout/AppLayout";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { AlertCircle, Loader2 } from "lucide-react";
-import { useEffect, useState } from "react";
+import { useEffect, useState, memo } from "react";
 
 const queryClient = new QueryClient({
   defaultOptions: {
@@ -29,29 +30,37 @@ const queryClient = new QueryClient({
   },
 });
 
-const ProtectedRoute = ({ children }: { children: React.ReactNode }) => {
+// Memoize loading component to prevent re-renders
+const LoadingScreen = memo(() => (
+  <div className="flex items-center justify-center h-screen bg-background">
+    <div className="flex flex-col items-center space-y-4">
+      <Loader2 className="h-12 w-12 animate-spin text-primary" />
+      <p className="text-sm text-muted-foreground">Loading authentication...</p>
+    </div>
+  </div>
+));
+
+// Using memo to prevent unnecessary re-renders
+const ProtectedRoute = memo(({ children }: { children: React.ReactNode }) => {
   const { isAuthenticated, isLoading } = useAuth();
   
+  // Show loading screen while checking auth
   if (isLoading) {
-    return (
-      <div className="flex items-center justify-center h-screen bg-background">
-        <div className="flex flex-col items-center space-y-4">
-          <Loader2 className="h-12 w-12 animate-spin text-primary" />
-          <p className="text-sm text-muted-foreground">Loading authentication...</p>
-        </div>
-      </div>
-    );
+    return <LoadingScreen />;
   }
   
+  // Redirect to login if not authenticated
   if (!isAuthenticated) {
     console.log("User not authenticated, redirecting to login");
     return <Navigate to="/login" replace />;
   }
   
+  // User is authenticated, render the protected content
   return <AppLayout>{children}</AppLayout>;
-};
+});
 
-const AppRoutes = () => {
+// Memoize routes to prevent unnecessary re-renders
+const AppRoutes = memo(() => {
   return (
     <Routes>
       <Route path="/" element={<Index />} />
@@ -62,8 +71,6 @@ const AppRoutes = () => {
           <Dashboard />
         </ProtectedRoute>
       } />
-      
-      
       
       <Route path="/data-seed" element={
         <ProtectedRoute>
@@ -104,20 +111,23 @@ const AppRoutes = () => {
       <Route path="*" element={<NotFound />} />
     </Routes>
   );
-};
+});
 
-const App = () => (
-  <BrowserRouter>
-    <QueryClientProvider client={queryClient}>
-      <AuthProvider>
-        <TooltipProvider>
-          <Toaster />
-          <Sonner />
-          <AppRoutes />
-        </TooltipProvider>
-      </AuthProvider>
-    </QueryClientProvider>
-  </BrowserRouter>
-);
+const App = () => {
+  // This direct render approach prevents unnecessary re-renders
+  return (
+    <BrowserRouter>
+      <QueryClientProvider client={queryClient}>
+        <AuthProvider>
+          <TooltipProvider>
+            <Toaster />
+            <Sonner />
+            <AppRoutes />
+          </TooltipProvider>
+        </AuthProvider>
+      </QueryClientProvider>
+    </BrowserRouter>
+  );
+};
 
 export default App;

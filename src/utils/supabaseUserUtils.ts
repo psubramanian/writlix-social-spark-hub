@@ -1,22 +1,15 @@
-
 import { supabase } from '@/integrations/supabase/client';
-import { useNavigate } from 'react-router-dom';
 
 export async function getCurrentUser() {
   try {
-    const { data: { user }, error: authError } = await supabase.auth.getUser();
+    const { data, error } = await supabase.auth.getUser();
     
-    if (authError) {
-      console.error("Authentication error:", authError);
+    if (error) {
+      console.error("Authentication error:", error);
       return null;
     }
     
-    if (!user) {
-      console.log("No user found");
-      return null;
-    }
-    
-    return user;
+    return data?.user || null;
   } catch (error) {
     console.error("Error getting current user:", error);
     return null;
@@ -24,13 +17,13 @@ export async function getCurrentUser() {
 }
 
 export async function ensureProfileExists(userId: string, userData: any) {
+  if (!userId) {
+    console.error("Cannot ensure profile: missing user ID");
+    return null;
+  }
+  
   try {
-    if (!userId) {
-      console.error("Cannot ensure profile: missing user ID");
-      return null;
-    }
-    
-    // Check if profile exists
+    // First check if profile already exists
     const { data: existingProfile, error: fetchError } = await supabase
       .from('profiles')
       .select('*')
@@ -39,19 +32,18 @@ export async function ensureProfileExists(userId: string, userData: any) {
     
     if (fetchError) {
       console.error("Error checking profile:", fetchError);
-      throw fetchError;
+      return null;
     }
     
-    // If profile already exists, return it
+    // Return existing profile if found
     if (existingProfile) {
-      console.log("Existing profile found:", existingProfile);
       return existingProfile;
     }
     
-    // Otherwise, create a new profile
+    // Otherwise create new profile
     console.log("Creating new profile for user:", userId);
     
-    // Extract profile data from user metadata
+    // Extract profile data
     const fullName = userData.user_metadata?.full_name || 
                      userData.user_metadata?.name || 
                      `User-${userId.substring(0, 6)}`;
@@ -62,6 +54,7 @@ export async function ensureProfileExists(userId: string, userData: any) {
     const email = userData.email;
     const provider = userData.app_metadata?.provider || 'email';
     
+    // Insert new profile
     const { data: newProfile, error: insertError } = await supabase
       .from('profiles')
       .insert({
@@ -76,27 +69,12 @@ export async function ensureProfileExists(userId: string, userData: any) {
     
     if (insertError) {
       console.error("Error creating profile:", insertError);
-      throw insertError;
+      return null;
     }
     
-    console.log("New profile created:", newProfile);
     return newProfile;
   } catch (error) {
     console.error("Error in ensureProfileExists:", error);
     return null;
   }
-}
-
-export function useAuthRedirect() {
-  const navigate = useNavigate();
-  
-  const redirectToLogin = () => {
-    navigate('/login', { replace: true });
-  };
-  
-  const redirectToDashboard = () => {
-    navigate('/dashboard', { replace: true });
-  };
-  
-  return { redirectToLogin, redirectToDashboard };
 }
