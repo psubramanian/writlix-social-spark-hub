@@ -137,7 +137,7 @@ const InstantPost = () => {
           <CardContent>
             <div className="mb-4">
               <RichTextEditor
-                value={content}
+                content={content}
                 onChange={setContent}
                 placeholder="Write your LinkedIn post here..."
               />
@@ -223,7 +223,7 @@ const InstantPost = () => {
             </CardHeader>
             <CardContent>
               <RichTextEditor
-                value={generatedContent}
+                content={generatedContent}
                 onChange={setGeneratedContent}
               />
             </CardContent>
