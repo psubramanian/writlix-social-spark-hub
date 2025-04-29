@@ -4,6 +4,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { Session, User as SupabaseUser } from "@supabase/supabase-js";
 import { useToast } from "@/components/ui/use-toast";
 import { ensureProfileExists } from "@/utils/supabaseUserUtils";
+import { UserProfile } from "@/types/auth";
 
 export interface ExtendedUser extends SupabaseUser {
   name?: string;
@@ -46,11 +47,14 @@ export const AuthProvider: React.FC<{children: React.ReactNode}> = ({ children }
           full_name: sessionUser.email?.split('@')[0] || `User-${userId.substring(0, 6)}`,
           email: sessionUser.email,
           _fallback: true
-        };
+        } as UserProfile;
       }
 
-      // Check if this is a fallback profile
-      if (profile._fallback) {
+      // Check if this is a fallback profile by checking the _fallback property
+      // The as operator is used to tell TypeScript that we know this property exists
+      const isFallbackProfile = (profile as UserProfile)._fallback === true;
+      
+      if (isFallbackProfile) {
         console.warn('[AUTH] Using fallback profile due to database errors');
         toast({
           title: "Profile Issue",
@@ -61,7 +65,7 @@ export const AuthProvider: React.FC<{children: React.ReactNode}> = ({ children }
         console.log("[AUTH] Profile found or created:", profile.full_name);
       }
       
-      return profile;
+      return profile as UserProfile;
     } catch (error) {
       console.error('[AUTH] Unexpected error in fetchUserProfile:', error);
       // Always return something to prevent auth loops
@@ -70,7 +74,7 @@ export const AuthProvider: React.FC<{children: React.ReactNode}> = ({ children }
         full_name: sessionUser.email?.split('@')[0] || `User-${userId.substring(0, 6)}`,
         email: sessionUser.email,
         _fallback: true
-      };
+      } as UserProfile;
     }
   };
 
@@ -90,7 +94,10 @@ export const AuthProvider: React.FC<{children: React.ReactNode}> = ({ children }
       userData.name = profile.full_name || 'User';
       userData.avatar = profile.avatar_url || null;
       userData.linkedInConnected = profile.provider === 'linkedin_oidc';
-      userData.profileComplete = !profile._fallback; // Track if this is a complete profile
+      
+      // Cast to UserProfile to access the _fallback property
+      const isFallbackProfile = (profile as UserProfile)._fallback === true;
+      userData.profileComplete = !isFallbackProfile;
       
       return userData;
     } catch (error) {
