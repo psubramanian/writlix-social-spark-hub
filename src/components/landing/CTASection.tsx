@@ -8,12 +8,12 @@ const CTASection = () => {
   const navigate = useNavigate();
   
   return (
-    <section className="py-32 px-6 bg-gradient-to-b from-primary/5 to-background">
+    <section className="py-32 px-6 bg-gradient-to-b from-primary/5 to-background dark:from-primary/10 dark:to-background-dark">
       <div className="container mx-auto max-w-4xl text-center space-y-8">
         <h2 className="text-4xl font-bold bg-gradient-to-r from-primary via-secondary to-primary bg-clip-text text-transparent">
           Ready to Transform Your LinkedIn Presence?
         </h2>
-        <p className="text-xl text-muted-foreground max-w-2xl mx-auto">
+        <p className="text-xl text-muted-foreground dark:text-muted-dark-foreground max-w-2xl mx-auto">
           Join thousands of professionals who use Writlix to create consistent, engaging LinkedIn content.
         </p>
         <Button 

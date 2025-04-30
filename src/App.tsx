@@ -22,6 +22,7 @@ import { AlertCircle, Loader2 } from "lucide-react";
 import { useEffect, useState, memo } from "react";
 import ProfileComplete from "./pages/ProfileComplete";
 import { isProfileComplete } from "./utils/supabaseUserUtils";
+import { ThemeProvider } from "./components/ThemeProvider";
 
 // Create QueryClient outside of component to ensure it's only created once
 const queryClient = new QueryClient({
@@ -214,13 +215,15 @@ const App = () => {
   return (
     <BrowserRouter>
       <QueryClientProvider client={queryClient}>
-        <AuthProvider>
-          <TooltipProvider>
-            <Toaster />
-            <Sonner />
-            <AppRoutes />
-          </TooltipProvider>
-        </AuthProvider>
+        <ThemeProvider defaultTheme="light" storageKey="writlix-theme">
+          <AuthProvider>
+            <TooltipProvider>
+              <Toaster />
+              <Sonner />
+              <AppRoutes />
+            </TooltipProvider>
+          </AuthProvider>
+        </ThemeProvider>
       </QueryClientProvider>
     </BrowserRouter>
   );

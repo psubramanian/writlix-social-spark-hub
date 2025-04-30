@@ -10,7 +10,7 @@ interface AppLayoutProps {
 const AppLayout = ({ children }: AppLayoutProps) => {
   return (
     <SidebarProvider>
-      <div className="flex h-screen w-full bg-background">
+      <div className="flex h-screen w-full bg-background dark:bg-background-dark">
         <Sidebar />
         <div className="flex-1 flex flex-col overflow-hidden">
           <TopBar />

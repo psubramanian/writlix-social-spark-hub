@@ -3,24 +3,24 @@ import React from 'react';
 import { motion } from 'framer-motion';
 
 const FeatureCard = ({ icon, title, description }: { icon: React.ReactNode, title: string, description: string }) => (
-  <div className="p-8 rounded-2xl bg-card hover:shadow-lg transition-all duration-200 border group hover:border-primary/20">
-    <div className="w-14 h-14 bg-primary/10 rounded-xl flex items-center justify-center mb-6 group-hover:bg-primary/20 transition-colors">
+  <div className="p-8 rounded-2xl bg-card dark:bg-card-dark hover:shadow-lg transition-all duration-200 border group hover:border-primary/20 dark:border-border-dark">
+    <div className="w-14 h-14 bg-primary/10 rounded-xl flex items-center justify-center mb-6 group-hover:bg-primary/20 transition-colors dark:bg-primary/20">
       {icon}
     </div>
-    <h3 className="text-2xl font-semibold mb-3">{title}</h3>
-    <p className="text-muted-foreground text-lg">{description}</p>
+    <h3 className="text-2xl font-semibold mb-3 dark:text-foreground-dark">{title}</h3>
+    <p className="text-muted-foreground dark:text-muted-dark-foreground text-lg">{description}</p>
   </div>
 );
 
 const Features = () => {
   return (
-    <section className="py-32 px-6 bg-gradient-to-b from-background to-primary/5">
+    <section className="py-32 px-6 bg-gradient-to-b from-background to-primary/5 dark:from-background-dark dark:to-primary/10">
       <div className="container mx-auto max-w-6xl">
         <div className="text-center mb-20">
           <h2 className="text-4xl font-bold mb-6 bg-gradient-to-r from-primary via-secondary to-primary bg-clip-text text-transparent">
             Why Choose Writlix?
           </h2>
-          <p className="text-xl text-muted-foreground max-w-2xl mx-auto">
+          <p className="text-xl text-muted-foreground dark:text-muted-dark-foreground max-w-2xl mx-auto">
             Our platform combines AI-powered content generation with smart scheduling for a consistent LinkedIn presence.
           </p>
         </div>
