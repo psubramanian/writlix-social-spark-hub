@@ -8,14 +8,14 @@ const Hero = () => {
   const navigate = useNavigate();
   
   return (
-    <section className="py-24 px-6 bg-gradient-to-b from-primary/5 to-background dark:from-primary/10 dark:to-background-dark">
+    <section className="py-24 px-6 bg-black dark:bg-black">
       <div className="container mx-auto max-w-6xl">
         <div className="flex flex-col lg:flex-row items-center gap-12">
           <div className="lg:w-1/2 space-y-8">
             <h1 className="text-5xl lg:text-6xl font-bold leading-tight bg-gradient-to-r from-primary via-secondary to-primary bg-clip-text text-transparent">
               Generate & Schedule Your LinkedIn Content with AI
             </h1>
-            <p className="text-xl text-muted-foreground dark:text-muted-dark-foreground">
+            <p className="text-xl text-gray-300 dark:text-gray-300">
               Create engaging LinkedIn posts with AI and schedule them automatically. Focus on growing your network while Writlix handles your content.
             </p>
             <div className="flex flex-col sm:flex-row gap-4 pt-4">
@@ -31,7 +31,7 @@ const Hero = () => {
                 size="lg" 
                 variant="outline" 
                 onClick={() => navigate('/login')}
-                className="text-lg dark:border-border-dark dark:text-foreground-dark"
+                className="text-lg border-gray-700 text-gray-300 hover:bg-gray-800"
               >
                 View Demo
               </Button>
@@ -40,9 +40,9 @@ const Hero = () => {
           <div className="lg:w-1/2">
             <div className="relative">
               <div className="absolute -inset-1 bg-gradient-to-r from-primary to-secondary rounded-xl blur-xl opacity-30"></div>
-              <div className="relative bg-white dark:bg-card-dark rounded-xl shadow-xl overflow-hidden border dark:border-border-dark">
+              <div className="relative bg-black dark:bg-black rounded-xl shadow-xl overflow-hidden border border-gray-800">
                 <img 
-                  src="/lovable-uploads/professional-linkedin-banner.png" 
+                  src="/lovable-uploads/55c65d07-8f86-4ad3-aad6-e02f6df74db5.png" 
                   alt="Professional Content Creation Dashboard" 
                   className="w-full object-cover"
                 />

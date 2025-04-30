@@ -8,7 +8,7 @@ const Header = () => {
   const navigate = useNavigate();
   
   return (
-    <header className="border-b bg-white/80 dark:bg-black/80 backdrop-blur-sm sticky top-0 z-50 dark:border-border-dark">
+    <header className="border-b border-gray-800 bg-black/80 dark:bg-black/80 backdrop-blur-sm sticky top-0 z-50">
       <div className="container mx-auto px-6 py-4 flex items-center justify-between">
         <div className="flex items-center gap-3">
           <div className="bg-gradient-to-r from-primary to-secondary rounded-lg p-2">
@@ -24,7 +24,7 @@ const Header = () => {
           <Button 
             variant="ghost" 
             onClick={() => navigate('/login')}
-            className="text-lg dark:text-foreground-dark dark:hover:bg-muted-dark"
+            className="text-lg text-gray-300 hover:bg-gray-800"
           >
             Log In
           </Button>
