@@ -1,8 +1,7 @@
-
 import { Session, User as SupabaseUser } from "@supabase/supabase-js";
 import { ExtendedUser } from "./types";
 import { supabase } from "@/integrations/supabase/client";
-import { ensureProfileExists } from "@/utils/supabaseUserUtils";
+import { ensureProfileExists } from "@/utils/auth/profileUtils";
 
 export const logDebug = (debugMode: boolean, message: string, ...args: any[]) => {
   if (debugMode) {

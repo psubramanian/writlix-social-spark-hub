@@ -6,7 +6,7 @@ import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle }
 import { useToast } from '@/components/ui/use-toast';
 import { Loader2, AlertCircle } from 'lucide-react';
 import { Alert, AlertDescription } from '@/components/ui/alert';
-import { restoreAuthLocalFlags } from '../contexts/auth/utils';
+import { restoreAuthLocalFlags } from '@/utils/auth/storageUtils';
 
 const Login = () => {
   const { login, isAuthenticated, isLoading: authLoading } = useAuth();
