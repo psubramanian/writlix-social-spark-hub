@@ -1,12 +1,12 @@
-
 import React, { useEffect, useState } from 'react';
-import { useAuth } from '../contexts/AuthContext';
+import { useAuth } from '../contexts/auth';
 import { useNavigate } from 'react-router-dom';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from '@/components/ui/card';
 import { useToast } from '@/components/ui/use-toast';
 import { Loader2, AlertCircle } from 'lucide-react';
 import { Alert, AlertDescription } from '@/components/ui/alert';
+import { restoreAuthLocalFlags } from '../contexts/auth/utils';
 
 const Login = () => {
   const { login, isAuthenticated, isLoading: authLoading } = useAuth();
@@ -39,28 +39,10 @@ const Login = () => {
     }
     
     // Try to restore localStorage flags that might have been lost during redirect
-    try {
-      const savedFlags = sessionStorage.getItem('auth_local_flags');
-      if (savedFlags) {
-        const flags = JSON.parse(savedFlags);
-        
-        // Only restore if current flags are missing
-        if (flags.profile_completed && !localStorage.getItem('profile_completed')) {
-          localStorage.setItem('profile_completed', flags.profile_completed);
-          console.log("[LOGIN] Restored profile_completed flag from session storage");
-        }
-        
-        if (flags.profile_skip_attempted && !localStorage.getItem('profile_skip_attempted')) {
-          localStorage.setItem('profile_skip_attempted', flags.profile_skip_attempted);
-          console.log("[LOGIN] Restored profile_skip_attempted flag from session storage");
-        }
-      }
-    } catch (e) {
-      console.warn("[LOGIN] Error restoring auth flags:", e);
-    } finally {
-      // Always reset the bypass attempts counter on login page load
-      localStorage.removeItem('profile_bypass_attempts');
-    }
+    restoreAuthLocalFlags();
+    
+    // Always reset the bypass attempts counter on login page load
+    localStorage.removeItem('profile_bypass_attempts');
   }, []); // Empty deps to run once
   
   // Check authentication status
