@@ -1,4 +1,3 @@
-
 import React, { createContext, useContext, useState, useEffect, useRef } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { Session, User as SupabaseUser } from "@supabase/supabase-js";
@@ -10,7 +9,7 @@ export interface ExtendedUser extends SupabaseUser {
   name?: string;
   avatar?: string;
   linkedInConnected?: boolean;
-  profileComplete?: boolean; // Track if profile is complete
+  profileComplete?: boolean;
 }
 
 interface AuthContextType {
@@ -32,10 +31,8 @@ export const AuthProvider: React.FC<{children: React.ReactNode}> = ({ children }
   const authInitialized = useRef(false);
   const { toast } = useToast();
   const authStateChangeCount = useRef(0);
-  const sessionCheckCount = useRef(0);
-  const debugMode = useRef(true); // Set to true to enable extra debug logs
+  const debugMode = useRef(true);
 
-  // Helper for debug logging
   const logDebug = (message: string, ...args: any[]) => {
     if (debugMode.current) {
       console.log(`[AUTH DEBUG] ${message}`, ...args);
@@ -44,50 +41,11 @@ export const AuthProvider: React.FC<{children: React.ReactNode}> = ({ children }
 
   const fetchUserProfile = async (userId: string, sessionUser: SupabaseUser) => {
     try {
-      logDebug(`Fetching profile for user: ${userId}`);
-      
-      // Always attempt to create/get profile
-      const profile = await ensureProfileExists(userId, sessionUser);
-      
-      if (!profile) {
-        console.error('[AUTH] Failed to get or create profile for user:', userId);
-        
-        // Return a minimal fallback profile to prevent auth loops
-        return {
-          id: userId,
-          full_name: sessionUser.email?.split('@')[0] || `User-${userId.substring(0, 6)}`,
-          email: sessionUser.email,
-          profile_completed: true, // Mark as complete to prevent loops
-          _fallback: true
-        } as UserProfile;
-      }
-
-      // Check if this is a fallback profile
-      const isFallbackProfile = (profile as UserProfile)._fallback === true;
-      
-      if (isFallbackProfile) {
-        console.warn('[AUTH] Using fallback profile due to database errors');
-        toast({
-          title: "Profile Issue",
-          description: "We're having trouble saving your profile. Some features may be limited.",
-          variant: "destructive",
-        });
-      } else {
-        logDebug(`Profile found or created: ${profile.full_name}`);
-      }
-      
-      return profile as UserProfile;
+      const profile = await ensureProfileExists(userId);
+      return profile;
     } catch (error) {
-      console.error('[AUTH] Unexpected error in fetchUserProfile:', error);
-      
-      // Always return something to prevent auth loops
-      return {
-        id: userId,
-        full_name: sessionUser.email?.split('@')[0] || `User-${userId.substring(0, 6)}`,
-        email: sessionUser.email,
-        profile_completed: true, // Mark as complete to prevent loops
-        _fallback: true
-      } as UserProfile;
+      console.error('[AUTH] Error fetching/creating user profile:', error);
+      return null;
     }
   };
 
@@ -98,23 +56,16 @@ export const AuthProvider: React.FC<{children: React.ReactNode}> = ({ children }
     }
     
     try {
-      // When processing user data, always try to ensure profile exists
       const profile = await fetchUserProfile(sessionData.user.id, sessionData.user);
-      
-      // We'll always have at least a fallback profile now
       const userData = sessionData.user as ExtendedUser;
       
-      // Set user data from profile
-      userData.name = profile.full_name || 'User';
-      userData.avatar = profile.avatar_url || null;
-      userData.linkedInConnected = profile.provider === 'linkedin_oidc';
+      userData.name = profile?.full_name || 'User';
+      userData.avatar = profile?.avatar_url || null;
+      userData.linkedInConnected = profile?.provider === 'linkedin_oidc';
+      userData.profileComplete = profile ? isProfileComplete(profile) : true;
       
-      // Check if profile is considered complete
-      userData.profileComplete = isProfileComplete(profile);
-      
-      // Log profile completion status sources
       logDebug(`Profile completion status:`, {
-        databaseFlag: profile.profile_completed, 
+        databaseFlag: profile?.profile_completed, 
         localStorageFlag1: localStorage.getItem('profile_completed') === 'true',
         localStorageFlag2: localStorage.getItem('profile_skip_attempted') === 'true',
         finalDecision: userData.profileComplete
@@ -123,43 +74,14 @@ export const AuthProvider: React.FC<{children: React.ReactNode}> = ({ children }
       return userData;
     } catch (error) {
       console.error('[AUTH] Unexpected error in processUserData:', error);
-      
-      // Create minimal user to prevent auth loops
       const userData = sessionData.user as ExtendedUser;
       userData.name = sessionData.user.email?.split('@')[0] || 'User';
-      userData.profileComplete = true; // Default to true to prevent loops
+      userData.profileComplete = true;
       return userData;
     }
   };
-  
-  // Function to allow explicit refresh of user profile from other components
-  const refreshUserProfile = async () => {
-    if (!session?.user) {
-      console.warn('[AUTH] Cannot refresh profile - no active session');
-      return;
-    }
-    
-    logDebug("Manually refreshing user profile");
-    
-    try {
-      const processedUser = await processUserData(session);
-      
-      // Only update if different to prevent unnecessary rerenders
-      setUser(prevUser => {
-        if (JSON.stringify(prevUser) !== JSON.stringify(processedUser)) {
-          logDebug("Updated user profile data");
-          return processedUser;
-        }
-        return prevUser;
-      });
-    } catch (error) {
-      console.error("[AUTH] Error refreshing user profile:", error);
-    }
-  };
 
-  // Only run once on component mount to initialize auth
   useEffect(() => {
-    // Prevent multiple initializations
     if (authInitialized.current) {
       return;
     }
@@ -167,14 +89,12 @@ export const AuthProvider: React.FC<{children: React.ReactNode}> = ({ children }
     console.log("[AUTH] Initializing auth context - ONCE ONLY");
     authInitialized.current = true;
     
-    // Set up auth state listener first
     const { data: { subscription } } = supabase.auth.onAuthStateChange(
-      (event, newSession) => {
+      async (event, newSession) => {
         authStateChangeCount.current += 1;
         const count = authStateChangeCount.current;
         console.log(`[AUTH ${count}] Auth state changed: ${event}`, newSession?.user?.email || 'No user');
         
-        // Update session synchronously
         setSession(prevSession => {
           if (JSON.stringify(prevSession) !== JSON.stringify(newSession)) {
             logDebug(`Session updated on auth state change`);
@@ -183,125 +103,63 @@ export const AuthProvider: React.FC<{children: React.ReactNode}> = ({ children }
           return prevSession;
         });
         
-        // If signed out, clear user state immediately
         if (event === 'SIGNED_OUT') {
           console.log(`[AUTH ${count}] User signed out, clearing state`);
           setUser(null);
           setIsLoading(false);
+          // Clear any auth flow state
+          sessionStorage.removeItem('auth_flow_started');
+          sessionStorage.removeItem('auth_provider');
+          sessionStorage.removeItem('auth_redirect_url');
+        }
+
+        // Handle successful sign in
+        if (event === 'SIGNED_IN' && newSession) {
+          const userData = await processUserData(newSession);
+          if (userData) {
+            setUser(userData);
+            // Check for auth flow and handle redirect
+            const authFlowStarted = sessionStorage.getItem('auth_flow_started');
+            const redirectUrl = sessionStorage.getItem('auth_redirect_url');
+            if (authFlowStarted && redirectUrl) {
+              // Clear auth flow state
+              sessionStorage.removeItem('auth_flow_started');
+              sessionStorage.removeItem('auth_provider');
+              sessionStorage.removeItem('auth_redirect_url');
+              // Redirect to the stored URL
+              window.location.href = redirectUrl;
+            }
+          }
         }
       }
     );
 
-    // Get initial session
-    const checkSession = async () => {
-      try {
-        sessionCheckCount.current += 1;
-        const count = sessionCheckCount.current;
-        console.log(`[AUTH ${count}] Checking for initial session`);
-        
-        const { data, error } = await supabase.auth.getSession();
-        
-        if (error) {
-          console.error(`[AUTH ${count}] Error getting session:`, error);
-          setIsLoading(false);
-          return;
-        }
-        
-        console.log(`[AUTH ${count}] Initial session check:`, data.session?.user?.email || 'No active session');
-        
-        // Only update if different to prevent loops
-        setSession(prevSession => {
-          if (JSON.stringify(prevSession) !== JSON.stringify(data.session)) {
-            logDebug(`Initial session updated`);
-            return data.session;
-          }
-          return prevSession;
-        });
-        
-        // If no session, finish loading
-        if (!data.session) {
-          setIsLoading(false);
-        }
-      } catch (error) {
-        console.error("[AUTH] Unexpected error checking session:", error);
-        setIsLoading(false);
-      }
-    };
-    
-    checkSession();
-
     return () => {
-      console.log("[AUTH] Cleaning up auth state listener");
       subscription.unsubscribe();
     };
-  }, []); // Empty dependency array ensures this runs once only
+  }, []);
 
-  // Process user data when session changes
   useEffect(() => {
-    // Skip processing if there's no session or if we're already not loading
     if (!session) {
       setIsLoading(false);
       return;
     }
-    
-    const sessionEmail = session.user?.email;
-    console.log(`[AUTH] Processing user data for session:`, sessionEmail || 'No email');
 
     const loadUserProfile = async () => {
       try {
-        // Add retry logic for better reliability
-        let attempts = 0;
-        let processedUser = null;
-        const maxAttempts = 3;
-        
-        while (attempts < maxAttempts && !processedUser) {
-          attempts++;
-          
-          try {
-            processedUser = await processUserData(session);
-            
-            if (processedUser) {
-              logDebug(`User profile processed after ${attempts} attempt(s)`);
-              break;
-            }
-          } catch (attemptError) {
-            console.warn(`[AUTH] Profile processing attempt ${attempts} failed:`, attemptError);
-            
-            if (attempts >= maxAttempts) {
-              throw attemptError;
-            }
-            
-            // Wait a bit before trying again
-            await new Promise(resolve => setTimeout(resolve, 500));
-          }
+        const userData = await processUserData(session);
+        if (userData) {
+          setUser(userData);
         }
-        
-        // Only update if different to prevent loops
-        setUser(prevUser => {
-          if (JSON.stringify(prevUser) !== JSON.stringify(processedUser)) {
-            return processedUser;
-          }
-          return prevUser;
-        });
       } catch (error) {
-        console.error("[AUTH] Error processing user data:", error);
-        
-        // Create a minimal user to prevent auth loops
-        if (session?.user) {
-          setUser({
-            ...session.user,
-            name: session.user.email?.split('@')[0] || 'User',
-            profileComplete: true // Default to true to prevent loops
-          } as ExtendedUser);
-        }
+        console.error('[AUTH] Error loading user profile:', error);
       } finally {
-        // Always finish loading
         setIsLoading(false);
       }
     };
     
     loadUserProfile();
-  }, [session]); // Only run when session changes
+  }, [session]);
 
   const login = async (provider: 'google' | 'linkedin_oidc') => {
     try {
@@ -312,8 +170,10 @@ export const AuthProvider: React.FC<{children: React.ReactNode}> = ({ children }
       
       console.log(`[AUTH] Starting ${provider} login, will redirect to:`, redirectTo);
       
-      // Clear old profile status in local storage before starting new auth
-      localStorage.removeItem('profile_bypass_attempts');
+      // Store auth flow information
+      sessionStorage.setItem('auth_flow_started', 'true');
+      sessionStorage.setItem('auth_provider', provider);
+      sessionStorage.setItem('auth_redirect_url', redirectTo);
       
       const { data, error } = await supabase.auth.signInWithOAuth({
         provider,
@@ -328,59 +188,40 @@ export const AuthProvider: React.FC<{children: React.ReactNode}> = ({ children }
         }
       });
 
-      if (error) {
-        console.error(`[AUTH] ${provider} login error:`, error);
-        throw error;
-      }
+      if (error) throw error;
       
       if (data?.url) {
         logDebug(`Redirecting to ${provider} auth URL: ${data.url}`);
-        
-        // Store auth info in session storage for debugging
-        sessionStorage.setItem('auth_flow_started', 'true');
-        sessionStorage.setItem('auth_provider', provider);
-        sessionStorage.setItem('auth_redirect_url', redirectTo);
-        
-        // Remember localStorage flags before redirect
-        const currentFlags = {
-          profile_completed: localStorage.getItem('profile_completed'),
-          profile_skip_attempted: localStorage.getItem('profile_skip_attempted')
-        };
-        sessionStorage.setItem('auth_local_flags', JSON.stringify(currentFlags));
-        
         window.location.href = data.url;
       } else {
-        console.error(`[AUTH] No redirect URL returned from ${provider} auth`);
         throw new Error(`Authentication with ${provider} failed. No redirect URL returned.`);
       }
-      
     } catch (error: any) {
       console.error('[AUTH] Login error:', error);
       setIsLoading(false);
       throw error;
     }
   };
-  
+
   const logout = async () => {
     try {
       setIsLoading(true);
       console.log("[AUTH] Logging out user");
       
-      // Clear any profile-related localStorage flags
+      // Clear all auth-related storage
       localStorage.removeItem('profile_skip_attempted');
       localStorage.removeItem('profile_completed');
       localStorage.removeItem('profile_bypass_attempts');
       localStorage.removeItem('auth_active');
       localStorage.removeItem('auth_timestamp');
+      sessionStorage.removeItem('auth_flow_started');
+      sessionStorage.removeItem('auth_provider');
+      sessionStorage.removeItem('auth_redirect_url');
       
       const { error } = await supabase.auth.signOut();
       
-      if (error) {
-        console.error("[AUTH] Logout error:", error);
-        throw error;
-      }
+      if (error) throw error;
       
-      // Clear state immediately to prevent UI flashing old data
       setUser(null);
       setSession(null);
       console.log("[AUTH] User logged out successfully");
@@ -396,7 +237,14 @@ export const AuthProvider: React.FC<{children: React.ReactNode}> = ({ children }
     }
   };
 
-  // Check for sessions in UI - for debugging purposes
+  const refreshUserProfile = async () => {
+    if (!session?.user) return;
+    const userData = await processUserData(session);
+    if (userData) {
+      setUser(userData);
+    }
+  };
+
   useEffect(() => {
     if (window.location.search.includes('auth_debug=true')) {
       console.log("[AUTH DEBUG] Auth state:", { 
@@ -409,6 +257,11 @@ export const AuthProvider: React.FC<{children: React.ReactNode}> = ({ children }
           profile_skip_attempted: localStorage.getItem('profile_skip_attempted'),
           profile_bypass_attempts: localStorage.getItem('profile_bypass_attempts'),
           auth_active: localStorage.getItem('auth_active')
+        },
+        sessionStorage: {
+          auth_flow_started: sessionStorage.getItem('auth_flow_started'),
+          auth_provider: sessionStorage.getItem('auth_provider'),
+          auth_redirect_url: sessionStorage.getItem('auth_redirect_url')
         }
       });
     }
@@ -424,7 +277,11 @@ export const AuthProvider: React.FC<{children: React.ReactNode}> = ({ children }
     refreshUserProfile
   };
 
-  return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;
+  return (
+    <AuthContext.Provider value={value}>
+      {children}
+    </AuthContext.Provider>
+  );
 };
 
 export const useAuth = () => {

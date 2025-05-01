@@ -1,4 +1,3 @@
-
 import { useState, useEffect } from 'react';
 import { Button } from '@/components/ui/button';
 import { useToast } from '@/components/ui/use-toast';
@@ -21,6 +20,7 @@ const LinkedInOAuth = () => {
   const [profileName, setProfileName] = useState('');
   const { toast } = useToast();
   const { user } = useAuth();
+  const [credentialsPresent, setCredentialsPresent] = useState(false);
   
   useEffect(() => {
     const checkConnection = async () => {
@@ -38,6 +38,8 @@ const LinkedInOAuth = () => {
           .maybeSingle();
           
         if (error) throw error;
+        
+        setCredentialsPresent(!!data?.client_id);
         
         if (data?.access_token) {
           setIsConnected(true);
@@ -83,6 +85,15 @@ const LinkedInOAuth = () => {
         toast({
           title: "LinkedIn Connection Failed",
           description: `Error: ${error}`,
+          variant: "destructive",
+        });
+        return;
+      }
+      
+      if (code && state && (!savedState || state !== savedState)) {
+        toast({
+          title: "OAuth State Mismatch",
+          description: "OAuth state mismatch. Please try connecting again.",
           variant: "destructive",
         });
         return;
@@ -292,7 +303,9 @@ const LinkedInOAuth = () => {
             After clicking the button below, you'll be redirected to LinkedIn to complete the authorization.
           </p>
           
-          <Button onClick={handleConnect}>Connect LinkedIn Account</Button>
+          <Button onClick={handleConnect} disabled={!credentialsPresent}>
+            Connect LinkedIn Account
+          </Button>
           
           <p className="text-xs text-muted-foreground mt-4">
             By connecting your LinkedIn account, you authorize Writlix to post content on your behalf.

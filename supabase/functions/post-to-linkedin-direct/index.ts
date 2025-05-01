@@ -1,4 +1,3 @@
-
 import { serve } from 'https://deno.land/std@0.168.0/http/server.ts';
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2';
 
@@ -40,6 +39,9 @@ serve(async (req) => {
     if (!userId) {
       throw new Error('User ID is required');
     }
+
+    // Enforce LinkedIn content length limit
+    const trimmedContent = content.substring(0, 3000);
     
     console.log(`Posting content to LinkedIn for user: ${userId}`);
     
@@ -63,7 +65,7 @@ serve(async (req) => {
     if (credentials.expires_at) {
       const expiresAt = new Date(credentials.expires_at);
       if (expiresAt < new Date()) {
-        // Token has expired, should refresh but for now throw error
+        // TODO: Implement LinkedIn token refresh using refresh_token
         throw new Error('LinkedIn access token has expired');
       }
     }
@@ -82,7 +84,7 @@ serve(async (req) => {
         specificContent: {
           'com.linkedin.ugc.ShareContent': {
             shareCommentary: {
-              text: content
+              text: trimmedContent
             },
             shareMediaCategory: 'NONE'
           }
@@ -106,8 +108,8 @@ serve(async (req) => {
     const { data: contentData, error: contentError } = await supabase
       .from('content_ideas')
       .insert({
-        title: content.substring(0, 50) + '...',
-        content: content,
+        title: trimmedContent.substring(0, 50) + '...',
+        content: trimmedContent,
         status: 'Published',
         user_id: userId
       })

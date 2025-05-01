@@ -1,4 +1,3 @@
-
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.39.3';
 
@@ -80,6 +79,7 @@ serve(async (req) => {
     // Check if token needs refresh (we're not implementing refresh for simplicity)
     const expiresAt = credentials.expires_at ? new Date(credentials.expires_at) : null;
     if (expiresAt && expiresAt < new Date()) {
+      // TODO: Implement LinkedIn token refresh using refresh_token
       throw new Error('LinkedIn access token has expired. Please reconnect your LinkedIn account in Settings.');
     }
 
@@ -101,11 +101,7 @@ serve(async (req) => {
     };
 
     try {
-      // For simplified implementation, we'll simulate the post
-      console.log('Simulating post to LinkedIn with content:', JSON.stringify(postContent));
-      
-      // In a real implementation, you would make an API call to LinkedIn:
-      /*
+      // Real LinkedIn API call
       const linkedinResponse = await fetch('https://api.linkedin.com/v2/ugcPosts', {
         method: 'POST',
         headers: {
@@ -115,24 +111,20 @@ serve(async (req) => {
         },
         body: JSON.stringify(postContent)
       });
-      
+
       if (!linkedinResponse.ok) {
         const errorData = await linkedinResponse.json();
         throw new Error(`LinkedIn API error: ${JSON.stringify(errorData)}`);
       }
-      
+
       const responseData = await linkedinResponse.json();
-      */
-      
-      // Simulate successful response
-      const responseData = { id: 'simulated-' + new Date().getTime() };
-      
+
       // Update the content_ideas status to reflect it's been published
       const { error: updateError } = await supabase
         .from('content_ideas')
         .update({ status: 'Published' })
         .eq('id', post.content_ideas.id);
-      
+
       if (updateError) {
         console.error('Error updating content status:', updateError);
         // We won't throw here as the post was "successful", just log the error

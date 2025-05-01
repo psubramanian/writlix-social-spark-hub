@@ -1,4 +1,3 @@
-
 import { useState, useEffect } from 'react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -77,6 +76,10 @@ const LinkedInCredentialsForm = () => {
       });
       
       setHasCredentials(true);
+      toast({
+        title: "Next Step",
+        description: "Now click 'Connect LinkedIn Account' below to authorize Writlix with LinkedIn.",
+      });
     } catch (error: any) {
       toast({
         title: "Error",
@@ -94,6 +97,17 @@ const LinkedInCredentialsForm = () => {
         <CardTitle>LinkedIn API Credentials</CardTitle>
         <CardDescription>
           Enter your LinkedIn API credentials to enable posting to your account
+          <br />
+          <span>
+            <strong>Redirect URI:</strong>
+            <code style={{ marginLeft: 8 }}>
+              {typeof window !== "undefined" ? window.location.origin + window.location.pathname : ""}
+            </code>
+            <br />
+            <span className="text-xs text-muted-foreground">
+              Copy this URI into your LinkedIn app settings under "Authorized Redirect URLs".
+            </span>
+          </span>
         </CardDescription>
       </CardHeader>
       <CardContent>
