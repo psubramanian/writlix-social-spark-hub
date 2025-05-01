@@ -20,10 +20,17 @@ const ProfileComplete = () => {
   const [error, setError] = useState<string | null>(null);
   const [skipAttempted, setSkipAttempted] = useState(false);
   
-  // On component mount, clear the bypass attempts counter
+  // On component mount, reset the bypass attempts counter to prevent loops
   useEffect(() => {
     localStorage.removeItem('profile_bypass_attempts');
   }, []);
+  
+  useEffect(() => {
+    // Initialize with user name if available and it changes
+    if (user?.name && user.name !== fullName) {
+      setFullName(user.name);
+    }
+  }, [user?.name]);
   
   // Check if user has attempted to complete profile before
   useEffect(() => {
@@ -31,20 +38,16 @@ const ProfileComplete = () => {
     if (hasSkippedBefore) {
       setSkipAttempted(true);
     }
-    
-    // Initialize with user name if available
-    if (user?.name && !fullName) {
-      setFullName(user.name);
-    }
-  }, [user, fullName]);
+  }, []);
 
-  // If user already skipped once and has a name, auto-redirect to dashboard
+  // Check if user is already redirected to dashboard when profile is complete
   useEffect(() => {
-    if (skipAttempted && user?.name) {
-      console.log("[PROFILE] User previously skipped profile completion and has a name, auto-redirecting");
+    // If user already has a complete profile, redirect to dashboard
+    if (!authLoading && user?.profileComplete) {
+      console.log("[PROFILE] User has completed profile, redirecting to dashboard");
       navigate('/dashboard', { replace: true });
     }
-  }, [skipAttempted, user, navigate]);
+  }, [user?.profileComplete, authLoading, navigate]);
   
   // Handle form submission
   const handleSubmit = async (e: React.FormEvent) => {
@@ -133,6 +136,7 @@ const ProfileComplete = () => {
       // to prevent infinite profile completion loops
       localStorage.setItem('profile_completed', 'true');
       localStorage.removeItem('profile_skip_attempted');
+      localStorage.removeItem('profile_bypass_attempts');
       
       toast({
         title: "Profile Update Failed",
@@ -183,13 +187,6 @@ const ProfileComplete = () => {
       navigate('/dashboard', { replace: true });
     });
   };
-  
-  // If user is fully authenticated and has complete profile, redirect to dashboard
-  if (!authLoading && user?.profileComplete) {
-    console.log("[PROFILE] User has completed profile, redirecting to dashboard");
-    navigate('/dashboard', { replace: true });
-    return null;
-  }
   
   // Show loading state while checking authentication
   if (authLoading) {
@@ -285,6 +282,7 @@ const ProfileComplete = () => {
             <div>Profile state: {user?.profileComplete ? 'Complete' : 'Incomplete'}</div>
             <div>LS Skip: {localStorage.getItem('profile_skip_attempted') || 'false'}</div>
             <div>LS Complete: {localStorage.getItem('profile_completed') || 'false'}</div>
+            <div>LS Bypass Attempts: {localStorage.getItem('profile_bypass_attempts') || '0'}</div>
           </div>
         )}
       </div>

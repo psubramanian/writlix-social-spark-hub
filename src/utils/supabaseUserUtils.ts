@@ -31,6 +31,11 @@ export async function ensureProfileExists(userId: string, userData: any) {
     return null;
   }
   
+  if (!userData) {
+    console.error("[PROFILE] Cannot ensure profile: missing user data");
+    return null;
+  }
+  
   try {
     console.log("[PROFILE] Checking for existing profile for user:", userId);
     

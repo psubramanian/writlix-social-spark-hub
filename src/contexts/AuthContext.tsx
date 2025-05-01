@@ -1,3 +1,4 @@
+
 import React, { createContext, useContext, useState, useEffect, useRef } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { Session, User as SupabaseUser } from "@supabase/supabase-js";
@@ -41,7 +42,8 @@ export const AuthProvider: React.FC<{children: React.ReactNode}> = ({ children }
 
   const fetchUserProfile = async (userId: string, sessionUser: SupabaseUser) => {
     try {
-      const profile = await ensureProfileExists(userId);
+      // Fixed: Pass the sessionUser parameter to ensureProfileExists
+      const profile = await ensureProfileExists(userId, sessionUser);
       return profile;
     } catch (error) {
       console.error('[AUTH] Error fetching/creating user profile:', error);
@@ -62,7 +64,12 @@ export const AuthProvider: React.FC<{children: React.ReactNode}> = ({ children }
       userData.name = profile?.full_name || 'User';
       userData.avatar = profile?.avatar_url || null;
       userData.linkedInConnected = profile?.provider === 'linkedin_oidc';
-      userData.profileComplete = profile ? isProfileComplete(profile) : true;
+      
+      // Use a more deterministic approach for profile completion status
+      // First check database flag, then localStorage flags as fallbacks
+      userData.profileComplete = profile?.profile_completed === true || 
+                                localStorage.getItem('profile_completed') === 'true' ||
+                                localStorage.getItem('profile_skip_attempted') === 'true';
       
       logDebug(`Profile completion status:`, {
         databaseFlag: profile?.profile_completed, 
@@ -111,10 +118,15 @@ export const AuthProvider: React.FC<{children: React.ReactNode}> = ({ children }
           sessionStorage.removeItem('auth_flow_started');
           sessionStorage.removeItem('auth_provider');
           sessionStorage.removeItem('auth_redirect_url');
+          // Clear profile completion flags to prevent issues on next login
+          localStorage.removeItem('profile_bypass_attempts');
         }
 
         // Handle successful sign in
         if (event === 'SIGNED_IN' && newSession) {
+          // Always reset the bypass attempts counter on sign in
+          localStorage.removeItem('profile_bypass_attempts');
+          
           const userData = await processUserData(newSession);
           if (userData) {
             setUser(userData);
@@ -175,6 +187,21 @@ export const AuthProvider: React.FC<{children: React.ReactNode}> = ({ children }
       sessionStorage.setItem('auth_provider', provider);
       sessionStorage.setItem('auth_redirect_url', redirectTo);
       
+      // Store existing profile flags in sessionStorage before redirect
+      // This helps restore them if they get lost during auth redirect
+      try {
+        const flags = {
+          profile_completed: localStorage.getItem('profile_completed'),
+          profile_skip_attempted: localStorage.getItem('profile_skip_attempted')
+        };
+        sessionStorage.setItem('auth_local_flags', JSON.stringify(flags));
+      } catch (e) {
+        console.warn('[AUTH] Error storing auth flags:', e);
+      }
+      
+      // Reset bypass attempts counter
+      localStorage.removeItem('profile_bypass_attempts');
+      
       const { data, error } = await supabase.auth.signInWithOAuth({
         provider,
         options: {
@@ -217,6 +244,7 @@ export const AuthProvider: React.FC<{children: React.ReactNode}> = ({ children }
       sessionStorage.removeItem('auth_flow_started');
       sessionStorage.removeItem('auth_provider');
       sessionStorage.removeItem('auth_redirect_url');
+      sessionStorage.removeItem('auth_local_flags');
       
       const { error } = await supabase.auth.signOut();
       
@@ -261,7 +289,8 @@ export const AuthProvider: React.FC<{children: React.ReactNode}> = ({ children }
         sessionStorage: {
           auth_flow_started: sessionStorage.getItem('auth_flow_started'),
           auth_provider: sessionStorage.getItem('auth_provider'),
-          auth_redirect_url: sessionStorage.getItem('auth_redirect_url')
+          auth_redirect_url: sessionStorage.getItem('auth_redirect_url'),
+          auth_local_flags: sessionStorage.getItem('auth_local_flags')
         }
       });
     }

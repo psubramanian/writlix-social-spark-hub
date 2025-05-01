@@ -17,11 +17,9 @@ import PublishedContent from "./pages/PublishedContent";
 import Subscription from "./pages/Subscription";
 import InstantPost from "./pages/InstantPost";
 import AppLayout from "./components/layout/AppLayout";
-import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
-import { AlertCircle, Loader2 } from "lucide-react";
+import { Loader2 } from "lucide-react";
 import { useEffect, useState, memo } from "react";
 import ProfileComplete from "./pages/ProfileComplete";
-import { isProfileComplete } from "./utils/supabaseUserUtils";
 import { ThemeProvider } from "./components/ThemeProvider";
 
 // Create QueryClient outside of component to ensure it's only created once
@@ -56,6 +54,7 @@ const AuthDebug = ({ user }: { user: any }) => {
       <div>Name: {user?.name || 'N/A'}</div>
       <div>LS-Skip: {localStorage.getItem('profile_skip_attempted') || 'false'}</div>
       <div>LS-Complete: {localStorage.getItem('profile_completed') || 'false'}</div>
+      <div>LS-Bypass: {localStorage.getItem('profile_bypass_attempts') || 'null'}</div>
     </div>
   );
 };
@@ -78,22 +77,32 @@ const ProtectedRoute = memo(({ children }: { children: React.ReactNode }) => {
     console.log("[ROUTER] LocalStorage state:", {
       profile_skip_attempted: localStorage.getItem('profile_skip_attempted'),
       profile_completed: localStorage.getItem('profile_completed'),
+      profile_bypass_attempts: localStorage.getItem('profile_bypass_attempts'),
       auth_active: localStorage.getItem('auth_active')
     });
   }, [isAuthenticated, isLoading, user]);
   
   // Check for profile bypass flags with enhanced recovery
   useEffect(() => {
+    // Reset bypass attempts if coming from profile complete page
+    if (window.location.pathname === '/profile-complete') {
+      localStorage.removeItem('profile_bypass_attempts');
+    }
+    
     // Check multiple sources to determine if we should bypass profile completion
     const hasSkippedProfileCompletion = localStorage.getItem('profile_skip_attempted') === 'true';
     const hasCompletedProfile = localStorage.getItem('profile_completed') === 'true';
     const databaseProfileComplete = user?.profileComplete === true;
     
     // Force bypass after multiple attempts to prevent endless loops
+    // But make sure to increment cautiously
     const bypassAttemptCount = parseInt(localStorage.getItem('profile_bypass_attempts') || '0', 10);
-    if (bypassAttemptCount > 3) {
+    
+    // Check if we need to force a bypass to prevent infinite loops
+    if (bypassAttemptCount >= 3) {
       console.warn("[ROUTER] Forcing profile bypass after multiple attempts");
       localStorage.setItem('profile_skip_attempted', 'true');
+      localStorage.setItem('profile_completed', 'true');
       setShouldBypassProfileCheck(true);
       return;
     }
@@ -106,11 +115,12 @@ const ProtectedRoute = memo(({ children }: { children: React.ReactNode }) => {
         databaseProfileComplete
       });
       setShouldBypassProfileCheck(true);
-    } else {
-      // Increment bypass attempt counter to prevent infinite loops
+    } else if (window.location.pathname !== '/profile-complete') {
+      // Only increment bypass attempt counter when not on profile completion page
+      // and when we're actually going to try to redirect to profile completion
       localStorage.setItem('profile_bypass_attempts', String(bypassAttemptCount + 1));
     }
-  }, [user]);
+  }, [user, window.location.pathname]);
   
   // Show loading screen while checking auth
   if (isLoading) {
@@ -121,6 +131,8 @@ const ProtectedRoute = memo(({ children }: { children: React.ReactNode }) => {
   // Redirect to login if not authenticated
   if (!isAuthenticated) {
     console.log("[ROUTER] User not authenticated, redirecting to login");
+    // Clear any bypass attempts on redirect to login
+    localStorage.removeItem('profile_bypass_attempts');
     return <Navigate to="/login" replace />;
   }
   

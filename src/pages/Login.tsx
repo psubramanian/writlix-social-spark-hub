@@ -54,12 +54,12 @@ const Login = () => {
           localStorage.setItem('profile_skip_attempted', flags.profile_skip_attempted);
           console.log("[LOGIN] Restored profile_skip_attempted flag from session storage");
         }
-        
-        // Clear after restoring
-        sessionStorage.removeItem('auth_local_flags');
       }
     } catch (e) {
       console.warn("[LOGIN] Error restoring auth flags:", e);
+    } finally {
+      // Always reset the bypass attempts counter on login page load
+      localStorage.removeItem('profile_bypass_attempts');
     }
   }, []); // Empty deps to run once
   
