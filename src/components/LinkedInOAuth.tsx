@@ -25,7 +25,7 @@ const LinkedInOAuth = () => {
   
   useEffect(() => {
     const checkConnection = async () => {
-      if (!user) {
+      if (!user?.id) {
         setLoading(false);
         return;
       }
@@ -51,7 +51,7 @@ const LinkedInOAuth = () => {
             setIsConnected(true);
             
             if (data.linkedin_profile_data) {
-              // Properly type and access the linkedin_profile_data
+              // Safely access linkedin_profile_data
               const profileData = data.linkedin_profile_data as LinkedInProfileData;
               if (profileData && typeof profileData === 'object' && profileData.localizedFirstName) {
                 setProfileName(`${profileData.localizedFirstName} ${profileData.localizedLastName || ''}`);
@@ -119,7 +119,6 @@ const LinkedInOAuth = () => {
           }
           
           // Get the exact redirect URI that was used in the authorization request
-          // This ensures it matches what LinkedIn expects
           const redirectUri = window.location.origin + window.location.pathname;
           console.log('Redirect URI for token exchange:', redirectUri);
           
@@ -219,7 +218,7 @@ const LinkedInOAuth = () => {
   
   const handleDisconnect = async () => {
     try {
-      if (!user) return;
+      if (!user?.id) return;
       
       // Update LinkedIn credentials to remove access token
       const { error } = await supabase

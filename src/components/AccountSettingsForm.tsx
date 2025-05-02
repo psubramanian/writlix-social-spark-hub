@@ -114,6 +114,7 @@ export function AccountSettingsForm() {
             }
           }
 
+          // Use null coalescence to handle potentially missing fields
           form.reset({
             first_name: profile.first_name || "",
             last_name: profile.last_name || "",
@@ -138,7 +139,7 @@ export function AccountSettingsForm() {
       const user = await getCurrentUser();
       if (!user) throw new Error('No user found');
 
-      // Properly type the update data to match what Supabase expects
+      // Properly type the update data using the TablesUpdate type
       const updateData: Partial<Tables<'profiles'>> = {
         first_name: values.first_name,
         last_name: values.last_name,
@@ -157,7 +158,7 @@ export function AccountSettingsForm() {
       if (error) throw error;
       
       toast.success('Profile updated successfully');
-    } catch (error) {
+    } catch (error: any) {
       console.error('Error updating profile:', error);
       toast.error('Failed to update profile');
     } finally {

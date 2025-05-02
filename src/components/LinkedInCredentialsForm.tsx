@@ -7,7 +7,7 @@ import { Label } from "@/components/ui/label";
 import { useToast } from "@/components/ui/use-toast";
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '../contexts/AuthContext';
-import { Tables } from '@/integrations/supabase/types';
+import { Tables, TablesInsert } from '@/integrations/supabase/types';
 
 const LinkedInCredentialsForm = () => {
   const [clientId, setClientId] = useState('');
@@ -58,33 +58,33 @@ const LinkedInCredentialsForm = () => {
         throw new Error('User not authenticated');
       }
 
-      // Properly type the credentials data to match what Supabase expects
-      const credentials: Partial<Tables<'user_linkedin_credentials'>> = {
-        user_id: user.id,
-        client_id: clientId,
-        client_secret: clientSecret,
-      };
-
-      let error;
-      
       if (hasCredentials) {
         // For update operation
+        const credentials: Partial<Tables<'user_linkedin_credentials'>> = {
+          client_id: clientId,
+          client_secret: clientSecret,
+        };
+        
         const { error: updateError } = await supabase
           .from('user_linkedin_credentials')
           .update(credentials)
           .eq('user_id', user.id);
         
-        error = updateError;
+        if (updateError) throw updateError;
       } else {
         // For insert operation
+        const credentials: TablesInsert<'user_linkedin_credentials'> = {
+          user_id: user.id,
+          client_id: clientId,
+          client_secret: clientSecret,
+        };
+        
         const { error: insertError } = await supabase
           .from('user_linkedin_credentials')
-          .insert(credentials as Tables<'user_linkedin_credentials'>);
+          .insert(credentials);
         
-        error = insertError;
+        if (insertError) throw insertError;
       }
-      
-      if (error) throw error;
 
       toast({
         title: "Success",
