@@ -139,8 +139,8 @@ export function AccountSettingsForm() {
       const user = await getCurrentUser();
       if (!user) throw new Error('No user found');
 
-      // Properly type the update data using the TablesUpdate type
-      const updateData: Partial<Tables<'profiles'>> = {
+      // First, prepare the update data as a simple object
+      const updateData = {
         first_name: values.first_name,
         last_name: values.last_name,
         gender: values.gender,
@@ -150,6 +150,7 @@ export function AccountSettingsForm() {
         mobile_number: values.mobile_number,
       };
 
+      // Then use the update method with the prepared data
       const { error } = await supabase
         .from('profiles')
         .update(updateData)

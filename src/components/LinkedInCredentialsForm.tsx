@@ -7,7 +7,6 @@ import { Label } from "@/components/ui/label";
 import { useToast } from "@/components/ui/use-toast";
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '../contexts/AuthContext';
-import { Tables, TablesInsert } from '@/integrations/supabase/types';
 
 const LinkedInCredentialsForm = () => {
   const [clientId, setClientId] = useState('');
@@ -60,28 +59,24 @@ const LinkedInCredentialsForm = () => {
 
       if (hasCredentials) {
         // For update operation
-        const credentials: Partial<Tables<'user_linkedin_credentials'>> = {
-          client_id: clientId,
-          client_secret: clientSecret,
-        };
-        
         const { error: updateError } = await supabase
           .from('user_linkedin_credentials')
-          .update(credentials)
+          .update({
+            client_id: clientId,
+            client_secret: clientSecret,
+          })
           .eq('user_id', user.id);
         
         if (updateError) throw updateError;
       } else {
         // For insert operation
-        const credentials: TablesInsert<'user_linkedin_credentials'> = {
-          user_id: user.id,
-          client_id: clientId,
-          client_secret: clientSecret,
-        };
-        
         const { error: insertError } = await supabase
           .from('user_linkedin_credentials')
-          .insert(credentials);
+          .insert({
+            user_id: user.id,
+            client_id: clientId,
+            client_secret: clientSecret,
+          });
         
         if (insertError) throw insertError;
       }
