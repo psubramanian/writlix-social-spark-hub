@@ -1,3 +1,4 @@
+
 import React, { useEffect, useState } from 'react';
 import { useAuth } from '../contexts/auth';
 import { useNavigate } from 'react-router-dom';
@@ -6,26 +7,32 @@ import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle }
 import { useToast } from '@/components/ui/use-toast';
 import { Loader2, AlertCircle } from 'lucide-react';
 import { Alert, AlertDescription } from '@/components/ui/alert';
-import { restoreAuthLocalFlags } from '@/utils/auth/storageUtils';
+import { restoreAuthLocalFlags, saveAuthLocalFlagsToSession } from '@/utils/auth/storageUtils';
+import { checkAndRecoverSession } from '@/integrations/supabase/client';
 
 const Login = () => {
-  const { login, isAuthenticated, isLoading: authLoading } = useAuth();
+  const { login, isAuthenticated, isLoading: authLoading, getAuthDebugInfo } = useAuth();
   const navigate = useNavigate();
   const { toast } = useToast();
   const [isLoading, setIsLoading] = useState(false);
   const [provider, setProvider] = useState<string | null>(null);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
+  const [recoveryAttempted, setRecoveryAttempted] = useState(false);
   
-  // Check for URL errors on mount (once)
+  // Check for URL errors and attempt session recovery on mount
   useEffect(() => {
-    console.log("[LOGIN] Checking URL for error parameters");
+    const timestamp = new Date().toISOString();
+    console.log(`[LOGIN ${timestamp}] Component mounted`);
+    
+    // First check for URL errors
     const url = new URL(window.location.href);
     const error = url.searchParams.get('error');
     const errorDescription = url.searchParams.get('error_description');
     
+    // Check for error from OAuth provider
     if (error) {
       const errorMsg = errorDescription || "There was an error during authentication";
-      console.error("[LOGIN] Auth error from URL:", error, errorDescription);
+      console.error(`[LOGIN ${timestamp}] Auth error from URL:`, error, errorDescription);
       setErrorMessage(errorMsg);
       
       toast({
@@ -43,30 +50,80 @@ const Login = () => {
     
     // Always reset the bypass attempts counter on login page load
     localStorage.removeItem('profile_bypass_attempts');
-  }, []); // Empty deps to run once
+    
+    // Attempt session recovery
+    if (!recoveryAttempted) {
+      setRecoveryAttempted(true);
+      
+      console.log(`[LOGIN ${timestamp}] Attempting session recovery`);
+      
+      // First check if we have auth flags that suggest a broken session
+      const hasAuthFlag = localStorage.getItem('auth_active') === 'true';
+      const authTimestamp = localStorage.getItem('auth_timestamp');
+      const authEmail = localStorage.getItem('auth_email');
+      
+      // If we have auth flags but not authenticated, try to recover session
+      if (hasAuthFlag && !isAuthenticated && !authLoading) {
+        console.log(`[LOGIN ${timestamp}] Possible broken session detected, attempting recovery`);
+        console.log(`[LOGIN ${timestamp}] Last auth activity: ${authTimestamp || 'unknown'}, email: ${authEmail || 'unknown'}`);
+        
+        // Try to recover the session
+        checkAndRecoverSession(true).then(recovered => {
+          if (recovered) {
+            console.log(`[LOGIN ${timestamp}] Session successfully recovered, will redirect`);
+            toast({
+              title: "Session Restored",
+              description: "Your previous session has been restored."
+            });
+            
+            // Wait a little for auth context to update
+            setTimeout(() => {
+              navigate('/dashboard', { replace: true });
+            }, 100);
+          } else {
+            console.log(`[LOGIN ${timestamp}] Session recovery failed`);
+          }
+        });
+      }
+    }
+  }, [toast, recoveryAttempted, isAuthenticated, authLoading, navigate]);
   
-  // Check authentication status
+  // Check authentication status and redirect when authenticated
   useEffect(() => {
+    const timestamp = new Date().toISOString();
+    
     if (!authLoading && isAuthenticated) {
-      console.log("[LOGIN] User is authenticated, redirecting to dashboard");
+      console.log(`[LOGIN ${timestamp}] User is authenticated, redirecting to dashboard`);
+      // Ensure we have saved flags before redirecting
+      saveAuthLocalFlagsToSession();
       navigate('/dashboard', { replace: true });
     }
   }, [isAuthenticated, authLoading, navigate]);
 
-  // Handle login with selected provider
+  // Handle login with selected provider with enhanced error handling
   const handleLogin = async (providerName: 'google' | 'linkedin_oidc') => {
+    const timestamp = new Date().toISOString();
+    
     try {
       setErrorMessage(null);
       setIsLoading(true);
       setProvider(providerName);
-      console.log(`[LOGIN] Attempting to login with ${providerName}...`);
+      console.log(`[LOGIN ${timestamp}] Attempting to login with ${providerName}...`);
       
-      // Before initiating login, make sure to reset any stale profile bypass attempts
+      // Before initiating login, save current flags to session storage
+      saveAuthLocalFlagsToSession();
+      
+      // Reset any stale profile bypass attempts
       localStorage.removeItem('profile_bypass_attempts');
+      
+      // Log debug info before login attempt
+      if (process.env.NODE_ENV === 'development') {
+        console.log(`[LOGIN ${timestamp}] Auth state before login:`, getAuthDebugInfo?.());
+      }
       
       await login(providerName);
     } catch (error: any) {
-      console.error('[LOGIN] Login error:', error);
+      console.error(`[LOGIN ${timestamp}] Login error:`, error);
       setErrorMessage(error.message || "There was an error logging in. Please try again.");
       toast({
         title: "Login Failed",
@@ -165,26 +222,60 @@ const Login = () => {
           </p>
         </div>
         
-        {/* Show debug panel in development mode */}
+        {/* Enhanced debug panel in development mode */}
         {process.env.NODE_ENV === 'development' && (
-          <div className="mt-4 p-2 bg-black/80 text-xs text-white rounded">
-            <p>Debug Tools:</p>
-            <button 
-              onClick={() => {
-                localStorage.clear();
-                sessionStorage.clear();
-                toast({ title: "Storage Cleared", description: "All localStorage and sessionStorage data has been cleared." });
-              }}
-              className="text-red-400 underline"
-            >
-              Clear All Storage
-            </button>
-            <div className="mt-2">
-              <strong>localStorage:</strong>
-              <div>profile_completed: {localStorage.getItem('profile_completed') || 'null'}</div>
-              <div>profile_skip_attempted: {localStorage.getItem('profile_skip_attempted') || 'null'}</div>
-              <div>profile_bypass_attempts: {localStorage.getItem('profile_bypass_attempts') || 'null'}</div>
-              <div>auth_active: {localStorage.getItem('auth_active') || 'null'}</div>
+          <div className="mt-8 p-3 bg-black/80 text-xs text-white rounded">
+            <div className="flex justify-between items-center mb-2">
+              <p>Debug Tools:</p>
+              <div className="space-x-2">
+                <button 
+                  onClick={() => {
+                    localStorage.clear();
+                    sessionStorage.clear();
+                    toast({ title: "Storage Cleared", description: "All localStorage and sessionStorage data has been cleared." });
+                  }}
+                  className="text-red-400 underline text-xs px-2 py-1"
+                >
+                  Clear All Storage
+                </button>
+                <button 
+                  onClick={() => {
+                    // Force session recovery
+                    checkAndRecoverSession(true).then(recovered => {
+                      toast({ 
+                        title: recovered ? "Session Recovered" : "No Session Found", 
+                        description: recovered ? "Session has been successfully recovered." : "No session available to recover." 
+                      });
+                    });
+                  }}
+                  className="text-blue-400 underline text-xs px-2 py-1"
+                >
+                  Force Session Recovery
+                </button>
+              </div>
+            </div>
+            
+            <div className="grid grid-cols-2 gap-2">
+              <div>
+                <strong className="text-gray-400">localStorage:</strong>
+                <div>profile_completed: {localStorage.getItem('profile_completed') || 'null'}</div>
+                <div>profile_skip_attempted: {localStorage.getItem('profile_skip_attempted') || 'null'}</div>
+                <div>profile_bypass_attempts: {localStorage.getItem('profile_bypass_attempts') || 'null'}</div>
+                <div>auth_active: {localStorage.getItem('auth_active') || 'null'}</div>
+                <div>auth_timestamp: {localStorage.getItem('auth_timestamp') ? new Date(localStorage.getItem('auth_timestamp') || '').toLocaleTimeString() : 'null'}</div>
+              </div>
+              <div>
+                <strong className="text-gray-400">sessionStorage:</strong>
+                <div>auth_flow_started: {sessionStorage.getItem('auth_flow_started') || 'null'}</div>
+                <div>auth_provider: {sessionStorage.getItem('auth_provider') || 'null'}</div>
+                <div>auth_local_flags: {sessionStorage.getItem('auth_local_flags') ? '(Set)' : 'null'}</div>
+              </div>
+            </div>
+            
+            <div className="mt-2 pt-2 border-t border-gray-700">
+              <div><strong className="text-gray-400">Auth Status:</strong> {isAuthenticated ? 'Logged In' : 'Logged Out'}</div>
+              <div><strong className="text-gray-400">Is Loading:</strong> {authLoading ? 'Yes' : 'No'}</div>
+              <div><strong className="text-gray-400">Recovery Attempted:</strong> {recoveryAttempted ? 'Yes' : 'No'}</div>
             </div>
           </div>
         )}

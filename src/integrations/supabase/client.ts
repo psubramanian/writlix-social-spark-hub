@@ -5,7 +5,7 @@ import type { Database } from './types';
 const SUPABASE_URL = "https://xhccvoivnelbzvzxmcoy.supabase.co";
 const SUPABASE_PUBLISHABLE_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InhoY2N2b2l2bmVsYnp2enhtY295Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NDU1MjEyNzksImV4cCI6MjA2MTA5NzI3OX0.kPScndVirju5kGDPV8AsCuWVoqC3Qek2e9bItBX86mg";
 
-// Configure Supabase client with improved session handling
+// Enhanced Supabase client with improved session handling, persistence, and recovery
 export const supabase = createClient<Database>(SUPABASE_URL, SUPABASE_PUBLISHABLE_KEY, {
   auth: {
     storage: localStorage,
@@ -13,10 +13,20 @@ export const supabase = createClient<Database>(SUPABASE_URL, SUPABASE_PUBLISHABL
     autoRefreshToken: true,
     detectSessionInUrl: true,
     flowType: 'implicit',
+    debug: process.env.NODE_ENV === 'development',
+    // Set a longer storage key to avoid conflicts with other apps
+    storageKey: 'writlix_supabase_auth',
+    // Set a reasonable cookie expiry (30 days)
+    cookieOptions: {
+      maxAge: 30 * 24 * 60 * 60,
+      sameSite: 'lax',
+      secure: window.location.protocol === 'https:',
+    }
   },
   global: {
     headers: {
-      'x-app-version': '1.1.0', // Add version to help with debugging
+      'x-app-version': '1.1.0',
+      'x-client-info': 'writlix-webapp',
     },
     // Add retries for better reliability
     fetch: (url, options) => {
@@ -41,60 +51,136 @@ export const supabase = createClient<Database>(SUPABASE_URL, SUPABASE_PUBLISHABL
   }
 });
 
-// Enhanced logging of auth events
+// Initialize session recovery mechanism
+let sessionRecoveryAttempts = 0;
+const maxSessionRecoveryAttempts = 3;
+
+// Enhanced session state handling with timestamps for debugging
+// The sessionStatus object tracks the current state of auth to help debug issues
+const sessionStatus = {
+  lastCheck: new Date().toISOString(),
+  hasActiveSession: false,
+  recoveryAttempted: false,
+  sessionError: null as Error | null,
+};
+
+// Enhanced logging of auth events with timestamps
 supabase.auth.onAuthStateChange((event, session) => {
+  const timestamp = new Date().toISOString();
   // Synchronous quick updates for immediate UI feedback
-  console.log(`[AUTH] Auth state changed: ${event}`, session?.user?.email || 'No user');
+  console.log(`[AUTH ${timestamp}] Auth state changed: ${event}`, session?.user?.email || 'No user');
   
   // Detailed event logging
   switch(event) {
     case 'SIGNED_IN':
-      console.log(`[AUTH] User signed in: ${session?.user?.email}`);
-      // Store a separate auth flag in localStorage to provide a backup
+      console.log(`[AUTH ${timestamp}] User signed in: ${session?.user?.email}`);
+      // Store multiple auth flags in localStorage to provide a backup
       localStorage.setItem('auth_active', 'true');
-      localStorage.setItem('auth_timestamp', new Date().toISOString());
+      localStorage.setItem('auth_timestamp', timestamp);
+      localStorage.setItem('auth_email', session?.user?.email || '');
+      // Reset recovery attempts on successful sign in
+      sessionRecoveryAttempts = 0;
+      sessionStatus.hasActiveSession = true;
+      sessionStatus.recoveryAttempted = false;
+      sessionStatus.sessionError = null;
       break;
+    
     case 'SIGNED_OUT':
-      console.log(`[AUTH] User signed out`);
+      console.log(`[AUTH ${timestamp}] User signed out`);
       localStorage.removeItem('auth_active');
       localStorage.removeItem('auth_timestamp');
+      localStorage.removeItem('auth_email');
+      sessionStatus.hasActiveSession = false;
       break;
+      
     case 'USER_UPDATED':
-      console.log(`[AUTH] User updated: ${session?.user?.email}`);
+      console.log(`[AUTH ${timestamp}] User updated: ${session?.user?.email}`);
       break;
+      
     case 'TOKEN_REFRESHED':
-      console.log(`[AUTH] Token refreshed for: ${session?.user?.email}`);
+      console.log(`[AUTH ${timestamp}] Token refreshed for: ${session?.user?.email}`);
+      // Update timestamp to indicate active session with valid token
+      localStorage.setItem('auth_timestamp', timestamp);
+      break;
+      
+    case 'PASSWORD_RECOVERY':
+      console.log(`[AUTH ${timestamp}] Password recovery initiated`);
       break;
   }
 });
 
-// Add a helper function to detect and recover from broken auth states
-export const checkAndRecoverSession = async () => {
+// Enhanced session recovery with retry mechanism
+export const checkAndRecoverSession = async (forceCheck = false): Promise<boolean> => {
+  const timestamp = new Date().toISOString();
+  sessionStatus.lastCheck = timestamp;
+  
   try {
+    // Skip if too many attempts already made
+    if (!forceCheck && sessionRecoveryAttempts >= maxSessionRecoveryAttempts) {
+      console.warn(`[AUTH ${timestamp}] Maximum session recovery attempts (${maxSessionRecoveryAttempts}) reached, giving up`);
+      return false;
+    }
+    
     // Check if we have a session in Supabase
     const { data: { session }, error } = await supabase.auth.getSession();
     
     // Check if we have the auth_active flag but no actual session
     const hasAuthFlag = localStorage.getItem('auth_active') === 'true';
+    const lastAuthTimestamp = localStorage.getItem('auth_timestamp');
+    const storedEmail = localStorage.getItem('auth_email');
+    
+    // Update status object
+    sessionStatus.hasActiveSession = !!session;
     
     if (error) {
-      console.error("[AUTH] Error checking session:", error);
-      return null;
+      console.error(`[AUTH ${timestamp}] Error checking session:`, error);
+      sessionStatus.sessionError = error;
+      return false;
     }
     
-    // Session recovery logic
+    // Enhanced session recovery logic
     if (!session && hasAuthFlag) {
-      console.warn("[AUTH] Detected broken auth state - has flag but no session");
+      sessionRecoveryAttempts++;
+      console.warn(`[AUTH ${timestamp}] Detected broken auth state - has flag but no session (attempt ${sessionRecoveryAttempts}/${maxSessionRecoveryAttempts})`);
+      console.log(`[AUTH ${timestamp}] Last activity: ${lastAuthTimestamp || 'unknown'}, email: ${storedEmail || 'unknown'}`);
       
-      // Force re-login in case of broken state
-      if (window.confirm("Your session appears to be broken. Refresh to attempt recovery?")) {
-        window.location.reload();
+      sessionStatus.recoveryAttempted = true;
+      
+      // Attempt to refresh the session
+      try {
+        const { data, error: refreshError } = await supabase.auth.refreshSession();
+        if (!refreshError && data.session) {
+          console.log(`[AUTH ${timestamp}] Successfully recovered session`);
+          // Update local state to reflect recovered session
+          localStorage.setItem('auth_timestamp', timestamp);
+          return true;
+        } else if (refreshError) {
+          console.error(`[AUTH ${timestamp}] Failed to refresh session:`, refreshError);
+        }
+      } catch (refreshError) {
+        console.error(`[AUTH ${timestamp}] Error during session refresh:`, refreshError);
+      }
+      
+      // If we've reached max attempts, alert the user about the broken state
+      if (sessionRecoveryAttempts >= maxSessionRecoveryAttempts) {
+        if (window.confirm("Your session appears to be broken. Refresh to attempt recovery?")) {
+          window.location.reload();
+          return true; // Returning true as we're handling the recovery with a page reload
+        }
       }
     }
     
-    return session;
+    return !!session;
   } catch (err) {
-    console.error("[AUTH] Unexpected error in checkAndRecoverSession:", err);
-    return null;
+    console.error(`[AUTH ${timestamp}] Unexpected error in checkAndRecoverSession:`, err);
+    sessionStatus.sessionError = err as Error;
+    return false;
   }
 };
+
+// Export session status object for debugging
+export const getSessionStatus = () => ({
+  ...sessionStatus,
+  recoveryAttempts: sessionRecoveryAttempts,
+  maxRecoveryAttempts: maxSessionRecoveryAttempts
+});

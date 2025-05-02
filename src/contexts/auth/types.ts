@@ -17,4 +17,5 @@ export interface AuthContextType {
   logout: () => Promise<void>;
   isAuthenticated: boolean;
   refreshUserProfile: () => Promise<void>;
+  getAuthDebugInfo: () => any; // Add debug function to type
 }
