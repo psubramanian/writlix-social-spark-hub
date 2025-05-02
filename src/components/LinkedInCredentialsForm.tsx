@@ -1,3 +1,4 @@
+
 import { useState, useEffect } from 'react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -6,6 +7,7 @@ import { Label } from "@/components/ui/label";
 import { useToast } from "@/components/ui/use-toast";
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '../contexts/AuthContext';
+import { Tables } from '@/integrations/supabase/types';
 
 const LinkedInCredentialsForm = () => {
   const [clientId, setClientId] = useState('');
@@ -21,16 +23,25 @@ const LinkedInCredentialsForm = () => {
 
   const fetchCredentials = async () => {
     try {
+      if (!user?.id) {
+        console.error('No user ID available for fetching credentials');
+        return;
+      }
+
       const { data, error } = await supabase
         .from('user_linkedin_credentials')
         .select('client_id, client_secret')
+        .eq('user_id', user.id)
         .maybeSingle();
 
-      if (error) throw error;
+      if (error) {
+        console.error('Error fetching LinkedIn credentials:', error);
+        return;
+      }
 
       if (data) {
-        setClientId(data.client_id);
-        setClientSecret(data.client_secret);
+        setClientId(data.client_id || '');
+        setClientSecret(data.client_secret || '');
         setHasCredentials(true);
       }
     } catch (error) {
@@ -43,8 +54,13 @@ const LinkedInCredentialsForm = () => {
     setLoading(true);
 
     try {
-      const credentials = {
-        user_id: user?.id,
+      if (!user?.id) {
+        throw new Error('User not authenticated');
+      }
+
+      // Properly type the credentials data to match what Supabase expects
+      const credentials: Partial<Tables<'user_linkedin_credentials'>> = {
+        user_id: user.id,
         client_id: clientId,
         client_secret: clientSecret,
       };
@@ -56,14 +72,14 @@ const LinkedInCredentialsForm = () => {
         const { error: updateError } = await supabase
           .from('user_linkedin_credentials')
           .update(credentials)
-          .eq('user_id', user?.id);
+          .eq('user_id', user.id);
         
         error = updateError;
       } else {
         // For insert operation
         const { error: insertError } = await supabase
           .from('user_linkedin_credentials')
-          .insert(credentials);
+          .insert(credentials as Tables<'user_linkedin_credentials'>);
         
         error = insertError;
       }

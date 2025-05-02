@@ -16,6 +16,7 @@ import { supabase } from '@/integrations/supabase/client';
 import { getCurrentUser } from '@/utils/supabaseUserUtils';
 import { toast } from 'sonner';
 import { parsePhoneNumber, isValidPhoneNumber } from 'libphonenumber-js';
+import { Tables } from '@/integrations/supabase/types';
 
 // List of countries for the dropdown
 const countries = [
@@ -85,42 +86,46 @@ export function AccountSettingsForm() {
 
   useEffect(() => {
     const loadProfileData = async () => {
-      const user = await getCurrentUser();
-      if (!user) return;
+      try {
+        const user = await getCurrentUser();
+        if (!user) return;
 
-      const { data: profile, error } = await supabase
-        .from('profiles')
-        .select('*')
-        .eq('id', user.id)
-        .single();
+        const { data: profile, error } = await supabase
+          .from('profiles')
+          .select('*')
+          .eq('id', user.id)
+          .single();
 
-      if (error) {
-        console.error('Error loading profile:', error);
-        return;
-      }
-
-      if (profile) {
-        // If mobile number exists, try to determine the country code
-        if (profile.mobile_number) {
-          try {
-            const phoneNumber = parsePhoneNumber(profile.mobile_number);
-            if (phoneNumber) {
-              setSelectedCountryCode(`+${phoneNumber.countryCallingCode}`);
-            }
-          } catch (error) {
-            console.error('Error parsing phone number:', error);
-          }
+        if (error) {
+          console.error('Error loading profile:', error);
+          return;
         }
 
-        form.reset({
-          first_name: profile.first_name || "",
-          last_name: profile.last_name || "",
-          gender: profile.gender || "",
-          date_of_birth: profile.date_of_birth ? new Date(profile.date_of_birth) : new Date(),
-          country: profile.country || "",
-          email: profile.email || "",
-          mobile_number: profile.mobile_number || "",
-        });
+        if (profile) {
+          // If mobile number exists, try to determine the country code
+          if (profile.mobile_number) {
+            try {
+              const phoneNumber = parsePhoneNumber(profile.mobile_number);
+              if (phoneNumber) {
+                setSelectedCountryCode(`+${phoneNumber.countryCallingCode}`);
+              }
+            } catch (error) {
+              console.error('Error parsing phone number:', error);
+            }
+          }
+
+          form.reset({
+            first_name: profile.first_name || "",
+            last_name: profile.last_name || "",
+            gender: profile.gender || "",
+            date_of_birth: profile.date_of_birth ? new Date(profile.date_of_birth) : new Date(),
+            country: profile.country || "",
+            email: profile.email || "",
+            mobile_number: profile.mobile_number || "",
+          });
+        }
+      } catch (error) {
+        console.error('Unexpected error when loading profile data:', error);
       }
     };
 
@@ -133,17 +138,20 @@ export function AccountSettingsForm() {
       const user = await getCurrentUser();
       if (!user) throw new Error('No user found');
 
+      // Properly type the update data to match what Supabase expects
+      const updateData: Partial<Tables<'profiles'>> = {
+        first_name: values.first_name,
+        last_name: values.last_name,
+        gender: values.gender,
+        date_of_birth: values.date_of_birth.toISOString().split('T')[0],
+        country: values.country,
+        email: values.email,
+        mobile_number: values.mobile_number,
+      };
+
       const { error } = await supabase
         .from('profiles')
-        .update({
-          first_name: values.first_name,
-          last_name: values.last_name,
-          gender: values.gender,
-          date_of_birth: values.date_of_birth.toISOString().split('T')[0],
-          country: values.country,
-          email: values.email,
-          mobile_number: values.mobile_number,
-        })
+        .update(updateData)
         .eq('id', user.id);
 
       if (error) throw error;

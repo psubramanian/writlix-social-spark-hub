@@ -1,3 +1,4 @@
+
 import { useState, useEffect } from 'react';
 import { Button } from '@/components/ui/button';
 import { useToast } from '@/components/ui/use-toast';
@@ -37,20 +38,28 @@ const LinkedInOAuth = () => {
           .eq('user_id', user.id)
           .maybeSingle();
           
-        if (error) throw error;
+        if (error) {
+          console.error('Error checking LinkedIn connection:', error);
+          throw error;
+        }
         
-        setCredentialsPresent(!!data?.client_id);
-        
-        if (data?.access_token) {
-          setIsConnected(true);
+        // Only access data properties if data exists and is not an error
+        if (data) {
+          setCredentialsPresent(!!data.client_id);
           
-          if (data.linkedin_profile_data) {
-            // Properly type and access the linkedin_profile_data
-            const profileData = data.linkedin_profile_data as LinkedInProfileData;
-            if (profileData && typeof profileData === 'object' && profileData.localizedFirstName) {
-              setProfileName(`${profileData.localizedFirstName} ${profileData.localizedLastName || ''}`);
+          if (data.access_token) {
+            setIsConnected(true);
+            
+            if (data.linkedin_profile_data) {
+              // Properly type and access the linkedin_profile_data
+              const profileData = data.linkedin_profile_data as LinkedInProfileData;
+              if (profileData && typeof profileData === 'object' && profileData.localizedFirstName) {
+                setProfileName(`${profileData.localizedFirstName} ${profileData.localizedLastName || ''}`);
+              }
             }
           }
+        } else {
+          setCredentialsPresent(false);
         }
       } catch (error) {
         console.error('Error checking LinkedIn connection:', error);
@@ -99,7 +108,7 @@ const LinkedInOAuth = () => {
         return;
       }
       
-      if (code && state && savedState && state === savedState) {
+      if (code && state && savedState && state === savedState && user?.id) {
         setConnecting(true);
         try {
           // Clear the state from session storage
@@ -171,8 +180,12 @@ const LinkedInOAuth = () => {
         .eq('user_id', user.id)
         .maybeSingle();
         
-      if (credentialsError) throw credentialsError;
+      if (credentialsError) {
+        console.error('Error fetching LinkedIn credentials:', credentialsError);
+        throw credentialsError;
+      }
       
+      // Check if credentials exist and have a client_id
       if (!credentials || !credentials.client_id) {
         toast({
           title: "LinkedIn Credentials Missing",
