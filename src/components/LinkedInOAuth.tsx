@@ -1,3 +1,4 @@
+
 import { useState, useEffect } from 'react';
 import { Button } from '@/components/ui/button';
 import { useToast } from '@/components/ui/use-toast';
@@ -42,6 +43,7 @@ const LinkedInOAuth = () => {
           throw error;
         }
         
+        // Only access data properties if data exists and is not an error
         if (data) {
           setCredentialsPresent(!!data.client_id);
           
