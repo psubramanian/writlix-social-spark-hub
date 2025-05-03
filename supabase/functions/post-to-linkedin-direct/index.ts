@@ -1,145 +1,112 @@
-import { serve } from 'https://deno.land/std@0.168.0/http/server.ts';
+
+import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2';
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
-  'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
+  'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type, x-app-version',
+  'Access-Control-Allow-Methods': 'GET, POST, PUT, DELETE, OPTIONS',
 };
-
-interface RequestBody {
-  content: string;
-  userId: string;
-}
 
 serve(async (req) => {
   // Handle CORS preflight requests
   if (req.method === 'OPTIONS') {
     return new Response(null, { headers: corsHeaders });
   }
-  
+
   try {
-    // Get environment variables
-    const supabaseUrl = Deno.env.get('SUPABASE_URL') || '';
-    const supabaseServiceKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') || '';
+    const supabaseUrl = Deno.env.get('SUPABASE_URL')!;
+    const supabaseKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!;
+    const supabase = createClient(supabaseUrl, supabaseKey);
     
-    if (!supabaseUrl || !supabaseServiceKey) {
-      throw new Error('Missing environment variables');
-    }
-    
-    // Create Supabase client
-    const supabase = createClient(supabaseUrl, supabaseServiceKey);
-    
-    // Parse request body
-    const { content, userId } = await req.json() as RequestBody;
+    const { content, userId } = await req.json();
     
     if (!content) {
       throw new Error('Content is required');
     }
-    
+
     if (!userId) {
       throw new Error('User ID is required');
     }
-
-    // Enforce LinkedIn content length limit
-    const trimmedContent = content.substring(0, 3000);
-    
-    console.log(`Posting content to LinkedIn for user: ${userId}`);
     
     // Get LinkedIn credentials for the user
     const { data: credentials, error: credentialsError } = await supabase
       .from('user_linkedin_credentials')
-      .select('*')
+      .select('access_token, linkedin_profile_id')
       .eq('user_id', userId)
       .maybeSingle();
-    
-    if (credentialsError || !credentials) {
-      console.error('LinkedIn credentials error:', credentialsError);
-      throw new Error('LinkedIn credentials not found');
+      
+    if (credentialsError || !credentials || !credentials.access_token) {
+      throw new Error('LinkedIn access token not found. Please reconnect your LinkedIn account.');
     }
     
-    if (!credentials.access_token) {
-      throw new Error('LinkedIn access token not found');
-    }
-    
-    // Check if token has expired
-    if (credentials.expires_at) {
-      const expiresAt = new Date(credentials.expires_at);
-      if (expiresAt < new Date()) {
-        // TODO: Implement LinkedIn token refresh using refresh_token
-        throw new Error('LinkedIn access token has expired');
+    // Prepare the LinkedIn Share API request
+    const shareData = {
+      author: `urn:li:person:${credentials.linkedin_profile_id}`,
+      lifecycleState: "PUBLISHED",
+      specificContent: {
+        "com.linkedin.ugc.ShareContent": {
+          shareCommentary: {
+            text: content
+          },
+          shareMediaCategory: "NONE"
+        }
+      },
+      visibility: {
+        "com.linkedin.ugc.MemberNetworkVisibility": "PUBLIC"
       }
-    }
+    };
     
-    // Make LinkedIn API call to post content
-    const linkedinResponse = await fetch('https://api.linkedin.com/v2/ugcPosts', {
+    // Post content to LinkedIn
+    const response = await fetch('https://api.linkedin.com/v2/ugcPosts', {
       method: 'POST',
       headers: {
-        'Content-Type': 'application/json',
         'Authorization': `Bearer ${credentials.access_token}`,
+        'Content-Type': 'application/json',
         'X-Restli-Protocol-Version': '2.0.0',
       },
-      body: JSON.stringify({
-        author: `urn:li:person:${credentials.linkedin_profile_id}`,
-        lifecycleState: 'PUBLISHED',
-        specificContent: {
-          'com.linkedin.ugc.ShareContent': {
-            shareCommentary: {
-              text: trimmedContent
-            },
-            shareMediaCategory: 'NONE'
-          }
-        },
-        visibility: {
-          'com.linkedin.ugc.MemberNetworkVisibility': 'PUBLIC'
-        }
-      })
+      body: JSON.stringify(shareData)
     });
     
-    if (!linkedinResponse.ok) {
-      const errorData = await linkedinResponse.json();
-      console.error('LinkedIn API error:', errorData);
-      throw new Error(`LinkedIn API error: ${linkedinResponse.status} - ${JSON.stringify(errorData)}`);
+    const responseData = await response.json();
+    
+    if (!response.ok) {
+      console.error('LinkedIn posting error:', responseData);
+      
+      // Handle expired token
+      if (response.status === 401) {
+        return new Response(JSON.stringify({
+          success: false,
+          error: 'LinkedIn authorization expired. Please reconnect your LinkedIn account.'
+        }), {
+          headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+          status: 401
+        });
+      }
+      
+      throw new Error(responseData.message || 'Failed to post to LinkedIn');
     }
     
-    const linkedinData = await linkedinResponse.json();
-    console.log('Successfully posted to LinkedIn:', linkedinData);
+    console.log('Successfully posted to LinkedIn:', responseData);
     
-    // Store the post in the database as published content
-    const { data: contentData, error: contentError } = await supabase
-      .from('content_ideas')
-      .insert({
-        title: trimmedContent.substring(0, 50) + '...',
-        content: trimmedContent,
-        status: 'Published',
-        user_id: userId
-      })
-      .select();
-    
-    if (contentError) {
-      console.error('Error saving content to database:', contentError);
-    }
-    
-    return new Response(
-      JSON.stringify({ 
-        success: true, 
-        message: 'Content posted to LinkedIn successfully',
-        postId: linkedinData.id
-      }),
-      { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
-    );
+    return new Response(JSON.stringify({
+      success: true,
+      postId: responseData.id,
+      message: 'Posted successfully to LinkedIn'
+    }), {
+      headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+      status: 200
+    });
     
   } catch (error) {
-    console.error('Error in post-to-linkedin-direct:', error);
+    console.error('Error posting to LinkedIn:', error);
     
-    return new Response(
-      JSON.stringify({ 
-        success: false, 
-        error: error.message || 'An error occurred while posting to LinkedIn' 
-      }),
-      { 
-        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-        status: 500 
-      }
-    );
+    return new Response(JSON.stringify({
+      success: false,
+      error: error.message || 'Failed to post to LinkedIn'
+    }), {
+      headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+      status: 500
+    });
   }
 });
