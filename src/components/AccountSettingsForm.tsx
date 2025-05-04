@@ -16,7 +16,7 @@ import { supabase } from '@/integrations/supabase/client';
 import { getCurrentUser } from '@/utils/supabaseUserUtils';
 import { toast } from 'sonner';
 import { parsePhoneNumber, isValidPhoneNumber } from 'libphonenumber-js';
-import { Tables } from '@/integrations/supabase/types';
+import { TablesUpdate } from '@/integrations/supabase/types';
 
 // List of countries for the dropdown
 const countries = [
@@ -93,8 +93,8 @@ export function AccountSettingsForm() {
         const { data: profile, error } = await supabase
           .from('profiles')
           .select('*')
-          .eq('id', user.id)
-          .single();
+          .eq('id', user.id as string)
+          .maybeSingle();
 
         if (error) {
           console.error('Error loading profile:', error);
@@ -139,8 +139,8 @@ export function AccountSettingsForm() {
       const user = await getCurrentUser();
       if (!user) throw new Error('No user found');
 
-      // Properly type the update data using the TablesUpdate type
-      const updateData: Partial<Tables<'profiles'>> = {
+      // Use TablesUpdate type for the update data
+      const updateData: TablesUpdate<'profiles'> = {
         first_name: values.first_name,
         last_name: values.last_name,
         gender: values.gender,
@@ -153,7 +153,7 @@ export function AccountSettingsForm() {
       const { error } = await supabase
         .from('profiles')
         .update(updateData)
-        .eq('id', user.id);
+        .eq('id', user.id as string);
 
       if (error) throw error;
       

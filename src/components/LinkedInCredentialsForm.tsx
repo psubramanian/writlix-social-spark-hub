@@ -31,7 +31,7 @@ const LinkedInCredentialsForm = () => {
       const { data, error } = await supabase
         .from('user_linkedin_credentials')
         .select('client_id, client_secret')
-        .eq('user_id', user.id)
+        .eq('user_id', user.id as string)
         .maybeSingle();
 
       if (error) {
@@ -60,7 +60,7 @@ const LinkedInCredentialsForm = () => {
 
       if (hasCredentials) {
         // For update operation
-        const credentials: Partial<Tables<'user_linkedin_credentials'>> = {
+        const credentials = {
           client_id: clientId,
           client_secret: clientSecret,
         };
@@ -68,13 +68,13 @@ const LinkedInCredentialsForm = () => {
         const { error: updateError } = await supabase
           .from('user_linkedin_credentials')
           .update(credentials)
-          .eq('user_id', user.id);
+          .eq('user_id', user.id as string);
         
         if (updateError) throw updateError;
       } else {
         // For insert operation
         const credentials: TablesInsert<'user_linkedin_credentials'> = {
-          user_id: user.id,
+          user_id: user.id as string,
           client_id: clientId,
           client_secret: clientSecret,
         };
