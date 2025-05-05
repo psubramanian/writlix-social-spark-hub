@@ -1,4 +1,3 @@
-
 import React, { useEffect, useState } from 'react';
 import { useAuth } from '../contexts/auth';
 import { useNavigate } from 'react-router-dom';
@@ -179,7 +178,7 @@ const Login = () => {
     }
   };
 
-  // Handle email/password signup
+  // Handle email/password signup with captcha
   const handleSignup = async (data: SignupFormValues) => {
     try {
       setErrorMessage(null);
@@ -193,7 +192,7 @@ const Login = () => {
       // Reset any stale profile bypass attempts
       localStorage.removeItem('profile_bypass_attempts');
       
-      await signUp(data.email, data.password);
+      await signUp(data.email, data.password, data.captchaToken);
       
       toast({
         title: "Account created",

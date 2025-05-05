@@ -15,7 +15,7 @@ export interface AuthContextType {
   isLoading: boolean;
   login: (provider: 'google' | 'linkedin_oidc') => Promise<void>;
   loginWithPassword: (email: string, password: string) => Promise<any>;
-  signUp: (email: string, password: string) => Promise<any>;
+  signUp: (email: string, password: string, captchaToken?: string) => Promise<any>;
   logout: () => Promise<void>;
   isAuthenticated: boolean;
   refreshUserProfile: () => Promise<void>;

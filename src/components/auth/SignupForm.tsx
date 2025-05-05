@@ -1,5 +1,5 @@
 
-import React from 'react';
+import React, { useRef } from 'react';
 import { useForm } from 'react-hook-form';
 import { z } from 'zod';
 import { zodResolver } from '@hookform/resolvers/zod';
@@ -7,6 +7,7 @@ import { Loader2 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "@/components/ui/form";
 import { Input } from '@/components/ui/input';
+import ReCAPTCHA from 'react-google-recaptcha';
 
 const signupSchema = z.object({
   email: z.string().email({ message: "Please enter a valid email address" }),
@@ -17,12 +18,17 @@ const signupSchema = z.object({
   path: ["confirmPassword"],
 });
 
-export type SignupFormValues = z.infer<typeof signupSchema>;
+export type SignupFormValues = z.infer<typeof signupSchema> & {
+  captchaToken?: string;
+};
 
 interface SignupFormProps {
   onSubmit: (data: SignupFormValues) => Promise<void>;
   isLoading: boolean;
 }
+
+// Supabase site key for reCAPTCHA
+const RECAPTCHA_SITE_KEY = "6LeIxAcTAAAAAJcZVRqyHh71UMIEGNQ_MXjiZKhI"; // This is a test key that always passes
 
 export const SignupForm: React.FC<SignupFormProps> = ({ onSubmit, isLoading }) => {
   const form = useForm<SignupFormValues>({
@@ -34,7 +40,25 @@ export const SignupForm: React.FC<SignupFormProps> = ({ onSubmit, isLoading }) =
     },
   });
 
-  const handleSubmit = form.handleSubmit(onSubmit);
+  const recaptchaRef = useRef<ReCAPTCHA>(null);
+
+  const handleSubmit = form.handleSubmit(async (data) => {
+    try {
+      // Get the reCAPTCHA token
+      const captchaToken = await recaptchaRef.current?.executeAsync();
+      
+      // Reset the reCAPTCHA so it can be executed again if needed
+      recaptchaRef.current?.reset();
+      
+      // Submit the form with the captcha token
+      await onSubmit({
+        ...data,
+        captchaToken: captchaToken || undefined
+      });
+    } catch (error) {
+      console.error("reCAPTCHA error:", error);
+    }
+  });
 
   return (
     <Form {...form}>
@@ -78,6 +102,14 @@ export const SignupForm: React.FC<SignupFormProps> = ({ onSubmit, isLoading }) =
             </FormItem>
           )}
         />
+        
+        {/* Invisible reCAPTCHA */}
+        <ReCAPTCHA
+          ref={recaptchaRef}
+          size="invisible"
+          sitekey={RECAPTCHA_SITE_KEY}
+        />
+        
         <Button 
           type="submit" 
           className="w-full" 

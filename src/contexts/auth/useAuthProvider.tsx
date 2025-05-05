@@ -341,20 +341,27 @@ export function useAuthProvider(): AuthContextType {
     }
   };
   
-  // Add email/password signup
-  const signUp = async (email: string, password: string) => {
+  // Update signUp to handle captchaToken
+  const signUp = async (email: string, password: string, captchaToken?: string) => {
     const timestamp = new Date().toISOString();
     
     try {
       setIsLoading(true);
       console.log(`[AUTH ${timestamp}] Creating new account for: ${email}`);
       
+      const options: any = {
+        emailRedirectTo: `${window.location.origin}/login`
+      };
+      
+      // Add captchaToken to options if provided
+      if (captchaToken) {
+        options.captchaToken = captchaToken;
+      }
+      
       const { data, error } = await supabase.auth.signUp({
         email,
         password,
-        options: {
-          emailRedirectTo: `${window.location.origin}/login`
-        }
+        options
       });
       
       if (error) throw error;
