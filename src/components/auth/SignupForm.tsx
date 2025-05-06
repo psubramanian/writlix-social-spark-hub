@@ -1,5 +1,5 @@
 
-import React, { useRef } from 'react';
+import React, { useState } from 'react';
 import { useForm } from 'react-hook-form';
 import { z } from 'zod';
 import { zodResolver } from '@hookform/resolvers/zod';
@@ -39,24 +39,30 @@ export const SignupForm: React.FC<SignupFormProps> = ({ onSubmit, isLoading }) =
       confirmPassword: '',
     },
   });
+  
+  const [captchaToken, setCaptchaToken] = useState<string | null>(null);
+  const [captchaError, setCaptchaError] = useState<boolean>(false);
 
-  const recaptchaRef = useRef<ReCAPTCHA>(null);
+  const handleCaptchaChange = (token: string | null) => {
+    setCaptchaToken(token);
+    setCaptchaError(false);
+  };
 
   const handleSubmit = form.handleSubmit(async (data) => {
+    // Verify captcha is completed before submission
+    if (!captchaToken) {
+      setCaptchaError(true);
+      return;
+    }
+    
     try {
-      // Get the reCAPTCHA token
-      const captchaToken = await recaptchaRef.current?.executeAsync();
-      
-      // Reset the reCAPTCHA so it can be executed again if needed
-      recaptchaRef.current?.reset();
-      
       // Submit the form with the captcha token
       await onSubmit({
         ...data,
-        captchaToken: captchaToken || undefined
+        captchaToken: captchaToken
       });
     } catch (error) {
-      console.error("reCAPTCHA error:", error);
+      console.error("Form submission error:", error);
     }
   });
 
@@ -103,12 +109,18 @@ export const SignupForm: React.FC<SignupFormProps> = ({ onSubmit, isLoading }) =
           )}
         />
         
-        {/* Invisible reCAPTCHA */}
-        <ReCAPTCHA
-          ref={recaptchaRef}
-          size="invisible"
-          sitekey={RECAPTCHA_SITE_KEY}
-        />
+        {/* Visible reCAPTCHA */}
+        <div className="my-4">
+          <ReCAPTCHA
+            sitekey={RECAPTCHA_SITE_KEY}
+            onChange={handleCaptchaChange}
+          />
+          {captchaError && (
+            <p className="text-sm text-destructive mt-2">
+              Please complete the captcha verification
+            </p>
+          )}
+        </div>
         
         <Button 
           type="submit" 

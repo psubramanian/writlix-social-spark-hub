@@ -192,6 +192,10 @@ const Login = () => {
       // Reset any stale profile bypass attempts
       localStorage.removeItem('profile_bypass_attempts');
       
+      if (!data.captchaToken) {
+        throw new Error("CAPTCHA verification is required");
+      }
+      
       await signUp(data.email, data.password, data.captchaToken);
       
       toast({
@@ -203,12 +207,29 @@ const Login = () => {
       setAuthMode('login');
     } catch (error: any) {
       console.error(`[SIGNUP] Signup error:`, error);
-      setErrorMessage(error.message || "There was an error creating your account. Please try again.");
-      toast({
-        title: "Signup Failed",
-        description: error.message || "There was an error creating your account. Please try again.",
-        variant: "destructive",
-      });
+      
+      // Enhanced error messages for captcha issues
+      if (error.message && (
+          error.message.includes('captcha') || 
+          error.message.includes('CAPTCHA') ||
+          error.message.includes('invalid-input-response')
+      )) {
+        setErrorMessage("CAPTCHA verification failed. Please complete the CAPTCHA challenge correctly and try again.");
+        
+        toast({
+          title: "CAPTCHA Verification Failed",
+          description: "Please complete the CAPTCHA verification and try again.",
+          variant: "destructive",
+        });
+      } else {
+        setErrorMessage(error.message || "There was an error creating your account. Please try again.");
+        
+        toast({
+          title: "Signup Failed",
+          description: error.message || "There was an error creating your account. Please try again.",
+          variant: "destructive",
+        });
+      }
     } finally {
       setIsLoading(false);
     }
