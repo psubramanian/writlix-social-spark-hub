@@ -13,6 +13,7 @@ interface SubscriptionProtectedRouteProps {
 const SubscriptionProtectedRoute = ({ children, featureName }: SubscriptionProtectedRouteProps) => {
   const { 
     loading, 
+    subscription,
     isTrialActive, 
     isSubscriptionActive,
     isSubscriptionExpired,
@@ -33,8 +34,14 @@ const SubscriptionProtectedRoute = ({ children, featureName }: SubscriptionProte
     );
   }
   
-  // User can access if they have an active trial or active subscription
-  const canAccess = isTrialActive || isSubscriptionActive;
+  // Check if the subscription is canceled but still within the billing period
+  const isWithinCanceledPeriod = isSubscriptionCanceled && subscription?.active_till 
+    ? new Date(subscription.active_till) > new Date() 
+    : false;
+    
+  // User can access if they have an active trial, active subscription, or 
+  // a canceled subscription that's still within the billing period
+  const canAccess = isTrialActive || isSubscriptionActive || isWithinCanceledPeriod;
   
   // If user can't access, redirect to subscription page with feature info
   if (!canAccess) {
