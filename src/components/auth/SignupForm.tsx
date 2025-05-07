@@ -27,8 +27,8 @@ interface SignupFormProps {
   isLoading: boolean;
 }
 
-// Replace this with a real reCAPTCHA site key for production
-// Test key that always passes verification, should be replaced with an actual key
+// Replace this with your actual reCAPTCHA site key once you have it
+// For now, we still use the test key but you should replace this with your real key
 const RECAPTCHA_SITE_KEY = "6LeIxAcTAAAAAJcZVRqyHh71UMIEGNQ_MXjiZKhI";
 
 export const SignupForm: React.FC<SignupFormProps> = ({ onSubmit, isLoading }) => {

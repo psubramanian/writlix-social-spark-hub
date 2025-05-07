@@ -1,4 +1,3 @@
-
 import { useState, useEffect, useRef, useCallback } from "react";
 import { Session } from "@supabase/supabase-js";
 import { useToast } from "@/components/ui/use-toast";
@@ -349,11 +348,33 @@ export function useAuthProvider(): AuthContextType {
       setIsLoading(true);
       console.log(`[AUTH ${timestamp}] Creating new account for: ${email}`);
       
+      // Validate captcha token if provided
+      if (captchaToken) {
+        console.log(`[AUTH ${timestamp}] Validating captcha token`);
+        
+        try {
+          const { error } = await supabase.functions.invoke('validate-recaptcha', {
+            body: { token: captchaToken }
+          });
+          
+          if (error) {
+            console.error(`[AUTH ${timestamp}] Captcha validation error:`, error);
+            throw new Error("CAPTCHA verification failed. Please try again.");
+          }
+        } catch (captchaError: any) {
+          console.error(`[AUTH ${timestamp}] Captcha validation error:`, captchaError);
+          throw new Error("CAPTCHA verification failed. Please try again.");
+        }
+      } else if (process.env.NODE_ENV === 'production') {
+        // In production, always require captcha
+        throw new Error("CAPTCHA verification is required");
+      }
+      
       const options: any = {
         emailRedirectTo: `${window.location.origin}/login`
       };
       
-      // Add captchaToken to options if provided
+      // We still pass the captchaToken to Supabase as it has its own verification
       if (captchaToken) {
         options.captchaToken = captchaToken;
       }

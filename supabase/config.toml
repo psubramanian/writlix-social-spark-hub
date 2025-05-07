@@ -60,3 +60,6 @@ verify_jwt = true
 
 [functions.post-to-linkedin-direct]
 verify_jwt = true
+
+[functions.validate-recaptcha]
+verify_jwt = false
