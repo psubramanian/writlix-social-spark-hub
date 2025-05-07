@@ -1,9 +1,11 @@
 
-import React from 'react';
+import React, { useEffect, useState } from 'react';
+import { useSearchParams } from 'react-router-dom';
 import { SubscriptionCard } from '@/components/subscription/SubscriptionCard';
 import { useSubscription } from '@/hooks/useSubscription';
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
-import { AlertCircle, Info, Loader2 } from "lucide-react";
+import { AlertCircle, Info, Loader2, Lock } from "lucide-react";
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 
 const Subscription = () => {
   const { 
@@ -21,6 +23,21 @@ const Subscription = () => {
   } = useSubscription();
 
   const daysLeft = getDaysLeft();
+  const [searchParams] = useSearchParams();
+  const fromPage = searchParams.get('from');
+  const featureName = searchParams.get('feature');
+  const [showRedirectAlert, setShowRedirectAlert] = useState(!!fromPage && !!featureName);
+
+  // Auto-hide redirect alert after 10 seconds
+  useEffect(() => {
+    if (showRedirectAlert) {
+      const timer = setTimeout(() => {
+        setShowRedirectAlert(false);
+      }, 10000);
+      
+      return () => clearTimeout(timer);
+    }
+  }, [showRedirectAlert]);
 
   if (loading) {
     return (
@@ -66,6 +83,23 @@ const Subscription = () => {
         <p className="text-muted-foreground">Manage your subscription plan</p>
       </div>
 
+      {showRedirectAlert && (
+        <Alert className="mb-6 border-blue-400">
+          <Lock className="h-4 w-4" />
+          <AlertTitle>Premium Feature Required</AlertTitle>
+          <AlertDescription>
+            <p>
+              <span className="font-medium">{featureName}</span> is a premium feature. 
+              {isSubscriptionExpired 
+                ? " Your subscription has expired." 
+                : isTrialActive
+                  ? ` Your trial will end in ${daysLeft} days.`
+                  : " Subscribe to access this feature."}
+            </p>
+          </AlertDescription>
+        </Alert>
+      )}
+
       {isTrialActive && daysLeft > 0 && (
         <Alert className="mb-6">
           <Info className="h-4 w-4" />
@@ -94,6 +128,35 @@ const Subscription = () => {
             Your subscription has been canceled. You will have access until the end of the current billing period.
           </AlertDescription>
         </Alert>
+      )}
+
+      {fromPage && featureName && (
+        <Card className="mb-6">
+          <CardHeader>
+            <CardTitle className="flex items-center">
+              <Lock className="h-5 w-5 mr-2" />
+              Premium Features
+            </CardTitle>
+          </CardHeader>
+          <CardContent>
+            <div className="space-y-4">
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div className="bg-muted rounded-lg p-4">
+                  <h3 className="font-medium text-lg mb-2">Data Seed</h3>
+                  <p className="text-sm text-muted-foreground">
+                    Generate high-quality content ideas using AI tailored for professional social media posts.
+                  </p>
+                </div>
+                <div className="bg-muted rounded-lg p-4">
+                  <h3 className="font-medium text-lg mb-2">Instant Post</h3>
+                  <p className="text-sm text-muted-foreground">
+                    Create and publish LinkedIn posts instantly with AI-assisted content generation from images.
+                  </p>
+                </div>
+              </div>
+            </div>
+          </CardContent>
+        </Card>
       )}
 
       <div className="flex justify-center items-center min-h-[400px]">

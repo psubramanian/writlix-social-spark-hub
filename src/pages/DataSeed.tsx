@@ -6,6 +6,7 @@ import ContentDialog from '../components/data-seed/ContentDialog';
 import { useContentGeneration } from '@/hooks/useContentGeneration';
 import { Loader } from 'lucide-react';
 import type { ContentItem, GenerationOptions } from '@/types/content';
+import { PremiumBadge } from '@/components/ui/premium-badge';
 
 const DataSeed = () => {
   const {
@@ -50,9 +51,14 @@ const DataSeed = () => {
         </div>
       )}
       
-      <div className="mb-8">
-        <h1 className="text-2xl font-bold">Data Seed</h1>
-        <p className="text-muted-foreground">Generate content ideas using AI</p>
+      <div className="mb-8 flex items-center justify-between">
+        <div>
+          <h1 className="text-2xl font-bold flex items-center gap-2">
+            Data Seed
+            <PremiumBadge />
+          </h1>
+          <p className="text-muted-foreground">Generate content ideas using AI</p>
+        </div>
       </div>
       
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">

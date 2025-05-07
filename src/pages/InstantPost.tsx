@@ -7,6 +7,7 @@ import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 import { Loader2, Upload, AlertCircle } from 'lucide-react';
 import RichTextEditor from '@/components/RichTextEditor';
 import { useInstantPost } from '@/hooks/useInstantPost';
+import { PremiumBadge } from '@/components/ui/premium-badge';
 
 const InstantPost = () => {
   const [content, setContent] = useState('');
@@ -120,10 +121,17 @@ const InstantPost = () => {
 
   return (
     <div className="container max-w-4xl mx-auto py-8">
-      <h1 className="text-3xl font-bold mb-6">Instant LinkedIn Post</h1>
-      <p className="text-muted-foreground mb-6">
-        Create and post content to LinkedIn instantly. Write your own content or generate it from an image.
-      </p>
+      <div className="flex items-center justify-between mb-6">
+        <div>
+          <h1 className="text-3xl font-bold flex items-center gap-2">
+            Instant LinkedIn Post
+            <PremiumBadge />
+          </h1>
+          <p className="text-muted-foreground">
+            Create and post content to LinkedIn instantly. Write your own content or generate it from an image.
+          </p>
+        </div>
+      </div>
       
       <div className="grid gap-6">
         {/* Write your own content */}

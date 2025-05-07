@@ -4,7 +4,7 @@ import { Link, useLocation } from "react-router-dom";
 import { useAuth } from '../contexts/AuthContext';
 import { useSubscription } from '../hooks/useSubscription';
 import { format } from 'date-fns';
-import { BarChart, Settings, LogOut, FileText, Calendar, CreditCard, Send } from 'lucide-react';
+import { BarChart, Settings, LogOut, FileText, Calendar, CreditCard, Send, Lock } from 'lucide-react';
 import {
   Sidebar as ShadcnSidebar,
   SidebarContent,
@@ -14,19 +14,29 @@ import {
   SidebarMenuItem,
   SidebarMenuButton,
 } from "@/components/ui/sidebar";
+import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
+import { cn } from "@/lib/utils";
 
 const Sidebar = () => {
   const location = useLocation();
   const { logout } = useAuth();
-  const { subscription, loading, formatSubscriptionStatus } = useSubscription();
+  const { 
+    subscription, 
+    loading, 
+    formatSubscriptionStatus,
+    isTrialActive,
+    isSubscriptionActive
+  } = useSubscription();
+  
+  const hasActiveSubscription = isTrialActive || isSubscriptionActive;
   
   const menuItems = [
-    { icon: BarChart, label: 'Dashboard', path: '/dashboard' },
-    { icon: FileText, label: 'Data Seed', path: '/data-seed' },
-    { icon: Calendar, label: 'Schedule', path: '/schedule' },
-    { icon: Send, label: 'Instant Post', path: '/instant-post' },
-    { icon: Settings, label: 'Settings', path: '/settings' },
-    { icon: CreditCard, label: 'Subscription', path: '/subscription' },
+    { icon: BarChart, label: 'Dashboard', path: '/dashboard', premium: false },
+    { icon: FileText, label: 'Data Seed', path: '/data-seed', premium: true },
+    { icon: Calendar, label: 'Schedule', path: '/schedule', premium: false },
+    { icon: Send, label: 'Instant Post', path: '/instant-post', premium: true },
+    { icon: Settings, label: 'Settings', path: '/settings', premium: false },
+    { icon: CreditCard, label: 'Subscription', path: '/subscription', premium: false },
   ];
   
   return (
@@ -42,20 +52,42 @@ const Sidebar = () => {
       
       <SidebarContent>
         <SidebarMenu>
-          {menuItems.map((item) => (
-            <SidebarMenuItem key={item.path}>
-              <SidebarMenuButton
-                asChild
-                isActive={location.pathname === item.path}
-                tooltip={item.label}
-              >
-                <Link to={item.path}>
-                  <item.icon />
-                  <span>{item.label}</span>
-                </Link>
-              </SidebarMenuButton>
-            </SidebarMenuItem>
-          ))}
+          {menuItems.map((item) => {
+            const isPremiumLocked = item.premium && !hasActiveSubscription;
+            
+            return (
+              <SidebarMenuItem key={item.path}>
+                <Tooltip>
+                  <TooltipTrigger asChild>
+                    <div className="w-full">
+                      <SidebarMenuButton
+                        asChild
+                        isActive={location.pathname === item.path}
+                        tooltip={item.label}
+                        className={cn(
+                          isPremiumLocked && "opacity-70 cursor-default"
+                        )}
+                      >
+                        <Link to={isPremiumLocked ? "/subscription" : item.path} className="flex items-center w-full">
+                          <item.icon />
+                          <span>{item.label}</span>
+                          {isPremiumLocked && <Lock className="ml-2 h-3 w-3" />}
+                        </Link>
+                      </SidebarMenuButton>
+                    </div>
+                  </TooltipTrigger>
+                  {isPremiumLocked && (
+                    <TooltipContent className="w-60">
+                      <p>
+                        {item.label} is a premium feature. 
+                        {isTrialActive ? " Your trial has expired." : " Please subscribe to access."}
+                      </p>
+                    </TooltipContent>
+                  )}
+                </Tooltip>
+              </SidebarMenuItem>
+            );
+          })}
         </SidebarMenu>
       </SidebarContent>
       

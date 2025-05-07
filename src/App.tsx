@@ -1,3 +1,4 @@
+
 import { Toaster } from "@/components/ui/toaster";
 import { Toaster as Sonner } from "@/components/ui/sonner";
 import { TooltipProvider } from "@/components/ui/tooltip";
@@ -20,6 +21,7 @@ import { Loader2 } from "lucide-react";
 import { useEffect, useState, memo } from "react";
 import ProfileComplete from "./pages/ProfileComplete";
 import { ThemeProvider } from "./components/ThemeProvider";
+import SubscriptionProtectedRoute from "./components/routes/SubscriptionProtectedRoute";
 
 // Create QueryClient outside of component to ensure it's only created once
 const queryClient = new QueryClient({
@@ -182,7 +184,9 @@ const AppRoutes = memo(() => {
       
       <Route path="/data-seed" element={
         <ProtectedRoute>
-          <DataSeed />
+          <SubscriptionProtectedRoute featureName="Data Seed">
+            <DataSeed />
+          </SubscriptionProtectedRoute>
         </ProtectedRoute>
       } />
       
@@ -212,7 +216,9 @@ const AppRoutes = memo(() => {
       
       <Route path="/instant-post" element={
         <ProtectedRoute>
-          <InstantPost />
+          <SubscriptionProtectedRoute featureName="Instant Post">
+            <InstantPost />
+          </SubscriptionProtectedRoute>
         </ProtectedRoute>
       } />
       
