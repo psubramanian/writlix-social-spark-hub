@@ -17,6 +17,7 @@ import { getCurrentUser } from '@/utils/supabaseUserUtils';
 import { toast } from 'sonner';
 import { parsePhoneNumber, isValidPhoneNumber } from 'libphonenumber-js';
 import { Tables, TablesUpdate } from '@/integrations/supabase/types';
+import { User } from '@supabase/supabase-js';
 
 // List of countries for the dropdown
 const countries = [
@@ -90,8 +91,12 @@ export function AccountSettingsForm() {
     const loadProfileData = async () => {
       try {
         const user = await getCurrentUser();
-        if (!user) return;
+        if (!user) {
+          console.error('No user found when loading profile data');
+          return;
+        }
 
+        // Type safety: explicitly define the result type and handle errors
         const { data: profile, error } = await supabase
           .from('profiles')
           .select('*')
@@ -103,11 +108,15 @@ export function AccountSettingsForm() {
           return;
         }
 
+        // Check if we have valid profile data (not an error object)
         if (profile) {
+          console.log('Loaded profile data:', profile);
+
           // If mobile number exists, try to determine the country code
-          if (profile.mobile_number) {
+          const mobileNumber = profile.mobile_number;
+          if (mobileNumber) {
             try {
-              const phoneNumber = parsePhoneNumber(profile.mobile_number);
+              const phoneNumber = parsePhoneNumber(mobileNumber);
               if (phoneNumber) {
                 setSelectedCountryCode(`+${phoneNumber.countryCallingCode}`);
               }
@@ -139,10 +148,12 @@ export function AccountSettingsForm() {
     setIsLoading(true);
     try {
       const user = await getCurrentUser();
-      if (!user) throw new Error('No user found');
+      if (!user) {
+        throw new Error('No user found');
+      }
 
-      // Create an object matching the TablesUpdate<'profiles'> type
-      const updateData = {
+      // Create an explicitly typed update object
+      const updateData: TablesUpdate<'profiles'> = {
         first_name: values.first_name,
         last_name: values.last_name,
         gender: values.gender,
@@ -150,8 +161,9 @@ export function AccountSettingsForm() {
         country: values.country,
         email: values.email,
         mobile_number: values.mobile_number,
-      } as TablesUpdate<'profiles'>;
+      };
 
+      // Use proper type for the UUID comparison
       const { error } = await supabase
         .from('profiles')
         .update(updateData)

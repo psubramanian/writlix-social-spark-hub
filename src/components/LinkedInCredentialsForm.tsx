@@ -27,6 +27,8 @@ const LinkedInCredentialsForm = () => {
         console.error('No user ID available for fetching credentials');
         return;
       }
+      
+      console.log('Fetching LinkedIn credentials for user ID:', user.id);
 
       const { data, error } = await supabase
         .from('user_linkedin_credentials')
@@ -39,11 +41,14 @@ const LinkedInCredentialsForm = () => {
         return;
       }
 
-      if (data) {
+      if (data && typeof data === 'object' && 'client_id' in data) {
+        console.log('Found LinkedIn credentials', { hasClientId: !!data.client_id });
         // Type-safe access to properties
         setClientId(data.client_id || '');
         setClientSecret(data.client_secret || '');
         setHasCredentials(true);
+      } else {
+        console.log('No LinkedIn credentials found');
       }
     } catch (error) {
       console.error('Error fetching LinkedIn credentials:', error);
@@ -61,10 +66,10 @@ const LinkedInCredentialsForm = () => {
 
       if (hasCredentials) {
         // For update operation
-        const credentials = {
+        const credentials: TablesUpdate<'user_linkedin_credentials'> = {
           client_id: clientId,
           client_secret: clientSecret,
-        } as TablesUpdate<'user_linkedin_credentials'>;
+        };
         
         const { error: updateError } = await supabase
           .from('user_linkedin_credentials')
@@ -74,11 +79,11 @@ const LinkedInCredentialsForm = () => {
         if (updateError) throw updateError;
       } else {
         // For insert operation
-        const credentials = {
+        const credentials: TablesInsert<'user_linkedin_credentials'> = {
           user_id: user.id,
           client_id: clientId,
           client_secret: clientSecret,
-        } as TablesInsert<'user_linkedin_credentials'>;
+        };
         
         const { error: insertError } = await supabase
           .from('user_linkedin_credentials')
