@@ -7,7 +7,7 @@ import { Label } from "@/components/ui/label";
 import { useToast } from "@/components/ui/use-toast";
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '../contexts/AuthContext';
-import { Tables, TablesInsert } from '@/integrations/supabase/types';
+import { TablesInsert, TablesUpdate } from '@/integrations/supabase/types';
 
 const LinkedInCredentialsForm = () => {
   const [clientId, setClientId] = useState('');
@@ -31,7 +31,7 @@ const LinkedInCredentialsForm = () => {
       const { data, error } = await supabase
         .from('user_linkedin_credentials')
         .select('client_id, client_secret')
-        .eq('user_id', user.id as string)
+        .eq('user_id', user.id)
         .maybeSingle();
 
       if (error) {
@@ -40,6 +40,7 @@ const LinkedInCredentialsForm = () => {
       }
 
       if (data) {
+        // Type-safe access to properties
         setClientId(data.client_id || '');
         setClientSecret(data.client_secret || '');
         setHasCredentials(true);
@@ -63,21 +64,21 @@ const LinkedInCredentialsForm = () => {
         const credentials = {
           client_id: clientId,
           client_secret: clientSecret,
-        };
+        } as TablesUpdate<'user_linkedin_credentials'>;
         
         const { error: updateError } = await supabase
           .from('user_linkedin_credentials')
           .update(credentials)
-          .eq('user_id', user.id as string);
+          .eq('user_id', user.id);
         
         if (updateError) throw updateError;
       } else {
         // For insert operation
-        const credentials: TablesInsert<'user_linkedin_credentials'> = {
-          user_id: user.id as string,
+        const credentials = {
+          user_id: user.id,
           client_id: clientId,
           client_secret: clientSecret,
-        };
+        } as TablesInsert<'user_linkedin_credentials'>;
         
         const { error: insertError } = await supabase
           .from('user_linkedin_credentials')

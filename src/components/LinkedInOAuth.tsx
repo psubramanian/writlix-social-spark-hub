@@ -1,4 +1,3 @@
-
 import { useState, useEffect } from 'react';
 import { Button } from '@/components/ui/button';
 import { useToast } from '@/components/ui/use-toast';
@@ -6,6 +5,7 @@ import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { Loader2 } from "lucide-react";
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '../contexts/AuthContext';
+import { Json } from '@/integrations/supabase/types';
 
 // Define types for LinkedIn profile data to avoid TypeScript errors
 interface LinkedInProfileData {
@@ -35,7 +35,7 @@ const LinkedInOAuth = () => {
         const { data, error } = await supabase
           .from('user_linkedin_credentials')
           .select('client_id, access_token, linkedin_profile_data')
-          .eq('user_id', user.id as string)
+          .eq('user_id', user.id)
           .maybeSingle();
           
         if (error) {
@@ -114,10 +114,6 @@ const LinkedInOAuth = () => {
           // Clear the state from session storage
           sessionStorage.removeItem('linkedin_state');
           
-          if (!user) {
-            throw new Error('User not authenticated');
-          }
-          
           // Get the exact redirect URI that was used in the authorization request
           const redirectUri = window.location.origin + window.location.pathname;
           console.log('Redirect URI for token exchange:', redirectUri);
@@ -127,7 +123,7 @@ const LinkedInOAuth = () => {
             body: { 
               code,
               state,
-              user_id: user.id as string,
+              user_id: user.id,
               redirect_uri: redirectUri
             }
           });
@@ -163,7 +159,7 @@ const LinkedInOAuth = () => {
   
   const handleConnect = async () => {
     try {
-      if (!user) {
+      if (!user?.id) {
         toast({
           title: "Authentication Required",
           description: "Please log in to connect your LinkedIn account",
@@ -176,7 +172,7 @@ const LinkedInOAuth = () => {
       const { data: credentials, error: credentialsError } = await supabase
         .from('user_linkedin_credentials')
         .select('client_id')
-        .eq('user_id', user.id as string)
+        .eq('user_id', user.id)
         .maybeSingle();
         
       if (credentialsError) {
@@ -230,7 +226,7 @@ const LinkedInOAuth = () => {
           linkedin_profile_id: null,
           linkedin_profile_data: null
         })
-        .eq('user_id', user.id as string);
+        .eq('user_id', user.id);
         
       if (error) throw error;
       

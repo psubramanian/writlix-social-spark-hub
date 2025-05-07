@@ -16,7 +16,7 @@ import { supabase } from '@/integrations/supabase/client';
 import { getCurrentUser } from '@/utils/supabaseUserUtils';
 import { toast } from 'sonner';
 import { parsePhoneNumber, isValidPhoneNumber } from 'libphonenumber-js';
-import { TablesUpdate } from '@/integrations/supabase/types';
+import { Tables, TablesUpdate } from '@/integrations/supabase/types';
 
 // List of countries for the dropdown
 const countries = [
@@ -67,11 +67,13 @@ const formSchema = z.object({
   }, "Invalid phone number"),
 });
 
+type ProfileFormValues = z.infer<typeof formSchema>;
+
 export function AccountSettingsForm() {
   const [isLoading, setIsLoading] = useState(false);
   const [selectedCountryCode, setSelectedCountryCode] = useState("+1");
 
-  const form = useForm<z.infer<typeof formSchema>>({
+  const form = useForm<ProfileFormValues>({
     resolver: zodResolver(formSchema),
     defaultValues: {
       first_name: "",
@@ -93,7 +95,7 @@ export function AccountSettingsForm() {
         const { data: profile, error } = await supabase
           .from('profiles')
           .select('*')
-          .eq('id', user.id as string)
+          .eq('id', user.id)
           .maybeSingle();
 
         if (error) {
@@ -133,14 +135,14 @@ export function AccountSettingsForm() {
     loadProfileData();
   }, [form]);
 
-  const onSubmit = async (values: z.infer<typeof formSchema>) => {
+  const onSubmit = async (values: ProfileFormValues) => {
     setIsLoading(true);
     try {
       const user = await getCurrentUser();
       if (!user) throw new Error('No user found');
 
-      // Use TablesUpdate type for the update data
-      const updateData: TablesUpdate<'profiles'> = {
+      // Create an object matching the TablesUpdate<'profiles'> type
+      const updateData = {
         first_name: values.first_name,
         last_name: values.last_name,
         gender: values.gender,
@@ -148,12 +150,12 @@ export function AccountSettingsForm() {
         country: values.country,
         email: values.email,
         mobile_number: values.mobile_number,
-      };
+      } as TablesUpdate<'profiles'>;
 
       const { error } = await supabase
         .from('profiles')
         .update(updateData)
-        .eq('id', user.id as string);
+        .eq('id', user.id);
 
       if (error) throw error;
       

@@ -35,6 +35,7 @@ const SubscriptionProtectedRoute = ({ children, featureName }: SubscriptionProte
   }
   
   // Check if the subscription is canceled but still within the billing period
+  // Make sure to handle potential undefined values
   const isWithinCanceledPeriod = isSubscriptionCanceled && subscription?.active_till 
     ? new Date(subscription.active_till) > new Date() 
     : false;
