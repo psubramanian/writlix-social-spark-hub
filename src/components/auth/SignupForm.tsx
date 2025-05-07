@@ -27,8 +27,9 @@ interface SignupFormProps {
   isLoading: boolean;
 }
 
-// Supabase site key for reCAPTCHA
-const RECAPTCHA_SITE_KEY = "6LeIxAcTAAAAAJcZVRqyHh71UMIEGNQ_MXjiZKhI"; // This is a test key that always passes
+// Replace this with a real reCAPTCHA site key for production
+// Test key that always passes verification, should be replaced with an actual key
+const RECAPTCHA_SITE_KEY = "6LeIxAcTAAAAAJcZVRqyHh71UMIEGNQ_MXjiZKhI";
 
 export const SignupForm: React.FC<SignupFormProps> = ({ onSubmit, isLoading }) => {
   const form = useForm<SignupFormValues>({
@@ -63,6 +64,22 @@ export const SignupForm: React.FC<SignupFormProps> = ({ onSubmit, isLoading }) =
       });
     } catch (error) {
       console.error("Form submission error:", error);
+      
+      // If token expires during submission, we need to reset it
+      if (error instanceof Error && 
+          (error.message.includes('captcha') || 
+           error.message.includes('CAPTCHA') || 
+           error.message.includes('verification'))) {
+        setCaptchaToken(null);
+        // Reset the reCAPTCHA widget
+        const recaptchaElement = document.querySelector('.g-recaptcha');
+        if (recaptchaElement) {
+          const recaptchaInstance = window.grecaptcha?.getResponse ? window.grecaptcha : null;
+          if (recaptchaInstance) {
+            recaptchaInstance.reset();
+          }
+        }
+      }
     }
   });
 
@@ -109,14 +126,20 @@ export const SignupForm: React.FC<SignupFormProps> = ({ onSubmit, isLoading }) =
           )}
         />
         
-        {/* Visible reCAPTCHA */}
-        <div className="my-4">
-          <ReCAPTCHA
-            sitekey={RECAPTCHA_SITE_KEY}
-            onChange={handleCaptchaChange}
-          />
+        {/* Visible reCAPTCHA with improved presentation */}
+        <div className="my-4 flex flex-col items-center">
+          <div className="mb-2 w-full">
+            <FormLabel className="mb-2 block text-sm font-medium">
+              Please complete the verification below
+            </FormLabel>
+            <ReCAPTCHA
+              sitekey={RECAPTCHA_SITE_KEY}
+              onChange={handleCaptchaChange}
+              className="transform scale-[0.95] origin-left md:scale-100"
+            />
+          </div>
           {captchaError && (
-            <p className="text-sm text-destructive mt-2">
+            <p className="text-sm text-destructive mt-1 self-start">
               Please complete the captcha verification
             </p>
           )}
@@ -136,3 +159,13 @@ export const SignupForm: React.FC<SignupFormProps> = ({ onSubmit, isLoading }) =
     </Form>
   );
 };
+
+// Add TypeScript support for reCAPTCHA
+declare global {
+  interface Window {
+    grecaptcha?: {
+      reset: () => void;
+      getResponse: () => string;
+    };
+  }
+}

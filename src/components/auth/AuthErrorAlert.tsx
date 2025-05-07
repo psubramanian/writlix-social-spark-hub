@@ -15,7 +15,7 @@ export const AuthErrorAlert: React.FC<AuthErrorAlertProps> = ({ message }) => {
   let description = message;
   
   // Parse common Supabase auth errors for better user feedback
-  if (message.includes('captcha') || message.includes('CAPTCHA')) {
+  if (message.includes('captcha') || message.includes('CAPTCHA') || message.includes('invalid-input-response')) {
     title = "CAPTCHA Verification Failed";
     description = "Please complete the CAPTCHA verification correctly and try again.";
   } else if (message.includes('email already exists')) {
@@ -27,6 +27,9 @@ export const AuthErrorAlert: React.FC<AuthErrorAlertProps> = ({ message }) => {
   } else if (message.includes('invalid credentials')) {
     title = "Invalid Credentials";
     description = "The email or password you entered is incorrect. Please try again.";
+  } else if (message.includes('token') && message.includes('expired')) {
+    title = "Session Expired";
+    description = "Your verification has expired. Please try again.";
   }
   
   return (
