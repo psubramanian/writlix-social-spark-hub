@@ -39,6 +39,18 @@ const SubscriptionProtectedRoute = ({ children, featureName }: SubscriptionProte
     ? new Date(subscription.active_till) > new Date() 
     : false;
     
+  // Add debug logging to help identify the issue
+  console.log('Subscription status:', {
+    isTrialActive,
+    isSubscriptionActive,
+    isSubscriptionCanceled,
+    isWithinCanceledPeriod,
+    active_till: subscription?.active_till,
+    now: new Date().toISOString(),
+    comparison: subscription?.active_till ? 
+      new Date(subscription.active_till) > new Date() : 'No active_till date'
+  });
+    
   // User can access if they have an active trial, active subscription, or 
   // a canceled subscription that's still within the billing period
   const canAccess = isTrialActive || isSubscriptionActive || isWithinCanceledPeriod;

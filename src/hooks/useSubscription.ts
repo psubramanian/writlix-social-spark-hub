@@ -66,6 +66,9 @@ export function useSubscription() {
 
       if (error) throw error;
 
+      // Log data for debugging
+      console.log("Subscription data from DB:", data);
+
       // Handle subscription expiration
       if (data) {
         const now = new Date();
@@ -89,6 +92,12 @@ export function useSubscription() {
       }
 
       setSubscription(data);
+      // Log subscription state for debugging
+      console.log("Final subscription state:", { 
+        status: data?.status, 
+        active_till: data?.active_till,
+        isCanceled: data?.status === 'canceled'
+      });
     } catch (error: any) {
       console.error('Error fetching subscription:', error);
       setError(error.message);
@@ -310,6 +319,15 @@ export function useSubscription() {
   const isSubscriptionExpired = subscription?.status === 'expired' || 
     (subscription?.status === 'trial' && getDaysLeft() === 0);
   const isSubscriptionCanceled = subscription?.status === 'canceled';
+
+  console.log("Computed subscription states:", {
+    isTrialActive,
+    isSubscriptionActive,
+    isSubscriptionExpired,
+    isSubscriptionCanceled,
+    status: subscription?.status,
+    daysLeft: getDaysLeft()
+  });
 
   return {
     subscription,
