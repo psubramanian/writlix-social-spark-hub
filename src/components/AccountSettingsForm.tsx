@@ -69,13 +69,14 @@ const formSchema = z.object({
 
 type Profile = Database['public']['Tables']['profiles']['Row'];
 type ProfileUpdate = Database['public']['Tables']['profiles']['Update'];
+type ProfileFormValues = z.infer<typeof formSchema>;
 
 export function AccountSettingsForm() {
   const [isLoading, setIsLoading] = useState(false);
   const [isInitialLoading, setIsInitialLoading] = useState(true);
   const [selectedCountryCode, setSelectedCountryCode] = useState("+1");
 
-  const form = useForm<z.infer<typeof formSchema>>({
+  const form = useForm<ProfileFormValues>({
     resolver: zodResolver(formSchema),
     defaultValues: {
       first_name: "",
@@ -92,13 +93,16 @@ export function AccountSettingsForm() {
     const loadProfileData = async () => {
       try {
         const user = await getCurrentUser();
-        if (!user) return;
+        if (!user) {
+          console.error('No user found when loading profile data');
+          return;
+        }
 
         const { data: profile, error } = await supabase
           .from('profiles')
           .select('*')
           .eq('id', user.id)
-          .single();
+          .maybeSingle<Profile>();
 
         if (error) {
           console.error('Error loading profile:', error);
@@ -107,7 +111,8 @@ export function AccountSettingsForm() {
         }
 
         if (profile) {
-          // If mobile number exists, try to determine the country code
+          console.log('Loaded profile data:', profile);
+
           if (profile.mobile_number) {
             try {
               const phoneNumber = parsePhoneNumber(profile.mobile_number);
@@ -140,23 +145,27 @@ export function AccountSettingsForm() {
     loadProfileData();
   }, [form]);
 
-  const onSubmit = async (values: z.infer<typeof formSchema>) => {
+  const onSubmit = async (values: ProfileFormValues) => {
     setIsLoading(true);
     try {
       const user = await getCurrentUser();
-      if (!user) throw new Error('No user found');
+      if (!user) {
+        throw new Error('No user found');
+      }
+
+      const updateData: ProfileUpdate = {
+        first_name: values.first_name,
+        last_name: values.last_name,
+        gender: values.gender,
+        date_of_birth: values.date_of_birth.toISOString().split('T')[0],
+        country: values.country,
+        email: values.email,
+        mobile_number: values.mobile_number,
+      };
 
       const { error } = await supabase
         .from('profiles')
-        .update({
-          first_name: values.first_name,
-          last_name: values.last_name,
-          gender: values.gender,
-          date_of_birth: values.date_of_birth.toISOString().split('T')[0],
-          country: values.country,
-          email: values.email,
-          mobile_number: values.mobile_number,
-        })
+        .update(updateData)
         .eq('id', user.id);
 
       if (error) throw error;

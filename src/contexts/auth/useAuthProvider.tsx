@@ -1,4 +1,3 @@
-
 import { useState, useEffect, useRef, useCallback } from "react";
 import { Session } from "@supabase/supabase-js";
 import { useToast } from "@/components/ui/use-toast";
@@ -215,6 +214,7 @@ export function useAuthProvider(): AuthContextType {
     }
   }, [initComplete, session, user, attemptSessionRecovery]);
 
+  // Handle social provider login
   const login = async (provider: 'google' | 'linkedin_oidc') => {
     const timestamp = new Date().toISOString();
     
@@ -291,6 +291,119 @@ export function useAuthProvider(): AuthContextType {
       });
       
       throw error;
+    }
+  };
+
+  // Add email/password login
+  const loginWithPassword = async (email: string, password: string) => {
+    const timestamp = new Date().toISOString();
+    
+    try {
+      setIsLoading(true);
+      console.log(`[AUTH ${timestamp}] Attempting email/password login for: ${email}`);
+      
+      // Store flag to indicate auth is in progress
+      localStorage.setItem('auth_active', 'true');
+      localStorage.setItem('auth_timestamp', timestamp);
+      localStorage.setItem('auth_email', email);
+      
+      const { data, error } = await supabase.auth.signInWithPassword({
+        email,
+        password
+      });
+      
+      if (error) throw error;
+      
+      console.log(`[AUTH ${timestamp}] Email login successful for: ${email}`);
+      
+      // Update session manually since we're not redirecting
+      if (data?.session) {
+        setSession(data.session);
+        loadUserProfile(data.session);
+      }
+      
+      return data;
+    } catch (error: any) {
+      console.error(`[AUTH ${timestamp}] Email login error:`, error);
+      localStorage.removeItem('auth_active');
+      setIsLoading(false);
+      
+      toast({
+        title: "Login Failed",
+        description: error.message || "There was an error signing in with email and password.",
+        variant: "destructive",
+      });
+      
+      throw error;
+    } finally {
+      setIsLoading(false);
+    }
+  };
+  
+  // Update signUp to handle captchaToken
+  const signUp = async (email: string, password: string, captchaToken?: string) => {
+    const timestamp = new Date().toISOString();
+    
+    try {
+      setIsLoading(true);
+      console.log(`[AUTH ${timestamp}] Creating new account for: ${email}`);
+      
+      // Validate captcha token if provided
+      if (captchaToken) {
+        console.log(`[AUTH ${timestamp}] Validating captcha token`);
+        
+        try {
+          const { error } = await supabase.functions.invoke('validate-recaptcha', {
+            body: { token: captchaToken }
+          });
+          
+          if (error) {
+            console.error(`[AUTH ${timestamp}] Captcha validation error:`, error);
+            throw new Error("CAPTCHA verification failed. Please try again.");
+          }
+        } catch (captchaError: any) {
+          console.error(`[AUTH ${timestamp}] Captcha validation error:`, captchaError);
+          throw new Error("CAPTCHA verification failed. Please try again.");
+        }
+      } else if (process.env.NODE_ENV === 'production') {
+        // In production, always require captcha
+        throw new Error("CAPTCHA verification is required");
+      }
+      
+      const options: any = {
+        emailRedirectTo: `${window.location.origin}/login`
+      };
+      
+      // We still pass the captchaToken to Supabase as it has its own verification
+      if (captchaToken) {
+        options.captchaToken = captchaToken;
+      }
+      
+      const { data, error } = await supabase.auth.signUp({
+        email,
+        password,
+        options
+      });
+      
+      if (error) throw error;
+      
+      console.log(`[AUTH ${timestamp}] Account creation successful for: ${email}`);
+      console.log(`[AUTH ${timestamp}] Email confirmation status:`, data?.user?.email_confirmed_at ? 'Confirmed' : 'Needs confirmation');
+      
+      return data;
+    } catch (error: any) {
+      console.error(`[AUTH ${timestamp}] Signup error:`, error);
+      setIsLoading(false);
+      
+      toast({
+        title: "Signup Failed",
+        description: error.message || "There was an error creating your account.",
+        variant: "destructive",
+      });
+      
+      throw error;
+    } finally {
+      setIsLoading(false);
     }
   };
 
@@ -395,6 +508,8 @@ export function useAuthProvider(): AuthContextType {
     session,
     isLoading,
     login,
+    loginWithPassword,
+    signUp,
     logout,
     isAuthenticated: !!session,
     refreshUserProfile,
