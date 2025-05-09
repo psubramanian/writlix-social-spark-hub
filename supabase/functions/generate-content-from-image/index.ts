@@ -58,7 +58,14 @@ async function callOpenAIWithRetry(
         max_tokens: 500,
       });
       
-      return response.choices[0]?.message?.content || 'Failed to generate content';
+      let content = response.choices[0]?.message?.content || 'Failed to generate content';
+      
+      // Clean up any markdown code blocks that might be in the response
+      content = content.replace(/```html\s*/g, '');
+      content = content.replace(/```\s*$/g, '');
+      content = content.trim();
+      
+      return content;
     } catch (error) {
       console.error(`Attempt ${attempt + 1} failed:`, error);
       lastError = error;

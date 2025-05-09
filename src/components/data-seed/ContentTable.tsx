@@ -46,10 +46,23 @@ const ContentTable = ({
     setCurrentPage(page);
   };
   
-  // Strip HTML tags for preview display
+  // Strip HTML tags for plain text display when needed
   const stripHtml = (html: string) => {
     const doc = new DOMParser().parseFromString(html, 'text/html');
     return doc.body.textContent || '';
+  };
+  
+  // Create a safe preview of HTML content
+  const createRichTextPreview = (htmlContent: string) => {
+    // Create a temporary div to hold the HTML content
+    const tempDiv = document.createElement('div');
+    tempDiv.innerHTML = htmlContent;
+    
+    // Get the text content
+    const textContent = tempDiv.textContent || tempDiv.innerText || '';
+    
+    // Truncate to a reasonable preview length
+    return textContent.substring(0, 100) + (textContent.length > 100 ? '...' : '');
   };
 
   return (
@@ -76,7 +89,8 @@ const ContentTable = ({
                     <TableCell className="font-medium">{item.title}</TableCell>
                     <TableCell className="relative">
                       <div className="line-clamp-2">
-                        {item.preview || stripHtml(item.content).substring(0, 100) + '...'}
+                        {/* Use preview text if available, otherwise create a preview from the content */}
+                        {item.preview || createRichTextPreview(item.content)}
                       </div>
                       <Button
                         variant="ghost"
