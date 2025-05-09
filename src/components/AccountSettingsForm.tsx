@@ -1,4 +1,3 @@
-
 import { useState, useEffect } from 'react';
 import { zodResolver } from "@hookform/resolvers/zod";
 import { useForm } from "react-hook-form";
@@ -10,13 +9,14 @@ import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
-import { CalendarIcon, MapPin } from 'lucide-react';
+import { CalendarIcon, MapPin, Loader2 } from 'lucide-react';
 import { cn } from "@/lib/utils";
 import { supabase } from '@/integrations/supabase/client';
 import { getCurrentUser } from '@/utils/supabaseUserUtils';
 import { toast } from 'sonner';
 import { parsePhoneNumber, isValidPhoneNumber } from 'libphonenumber-js';
-import { Tables } from '@/integrations/supabase/types';
+import { Database } from '@/integrations/supabase/types';
+import { PostgrestError } from '@supabase/supabase-js';
 
 // List of countries for the dropdown
 const countries = [
@@ -67,8 +67,12 @@ const formSchema = z.object({
   }, "Invalid phone number"),
 });
 
+type Profile = Database['public']['Tables']['profiles']['Row'];
+type ProfileUpdate = Database['public']['Tables']['profiles']['Update'];
+
 export function AccountSettingsForm() {
   const [isLoading, setIsLoading] = useState(false);
+  const [isInitialLoading, setIsInitialLoading] = useState(true);
   const [selectedCountryCode, setSelectedCountryCode] = useState("+1");
 
   const form = useForm<z.infer<typeof formSchema>>({
@@ -98,6 +102,7 @@ export function AccountSettingsForm() {
 
         if (error) {
           console.error('Error loading profile:', error);
+          toast.error('Failed to load profile data');
           return;
         }
 
@@ -114,19 +119,21 @@ export function AccountSettingsForm() {
             }
           }
 
-          // Use null coalescence to handle potentially missing fields
           form.reset({
-            first_name: profile.first_name || "",
-            last_name: profile.last_name || "",
-            gender: profile.gender || "",
+            first_name: profile.first_name ?? "",
+            last_name: profile.last_name ?? "",
+            gender: profile.gender ?? "",
             date_of_birth: profile.date_of_birth ? new Date(profile.date_of_birth) : new Date(),
-            country: profile.country || "",
-            email: profile.email || "",
-            mobile_number: profile.mobile_number || "",
+            country: profile.country ?? "",
+            email: profile.email ?? "",
+            mobile_number: profile.mobile_number ?? "",
           });
         }
       } catch (error) {
         console.error('Unexpected error when loading profile data:', error);
+        toast.error('An unexpected error occurred');
+      } finally {
+        setIsInitialLoading(false);
       }
     };
 
@@ -139,33 +146,40 @@ export function AccountSettingsForm() {
       const user = await getCurrentUser();
       if (!user) throw new Error('No user found');
 
-      // First, prepare the update data as a simple object
-      const updateData = {
-        first_name: values.first_name,
-        last_name: values.last_name,
-        gender: values.gender,
-        date_of_birth: values.date_of_birth.toISOString().split('T')[0],
-        country: values.country,
-        email: values.email,
-        mobile_number: values.mobile_number,
-      };
-
-      // Then use the update method with the prepared data
       const { error } = await supabase
         .from('profiles')
-        .update(updateData)
+        .update({
+          first_name: values.first_name,
+          last_name: values.last_name,
+          gender: values.gender,
+          date_of_birth: values.date_of_birth.toISOString().split('T')[0],
+          country: values.country,
+          email: values.email,
+          mobile_number: values.mobile_number,
+        })
         .eq('id', user.id);
 
       if (error) throw error;
       
       toast.success('Profile updated successfully');
-    } catch (error: any) {
+    } catch (error) {
       console.error('Error updating profile:', error);
-      toast.error('Failed to update profile');
+      const errorMessage = error instanceof PostgrestError 
+        ? 'Database error occurred'
+        : 'Failed to update profile';
+      toast.error(errorMessage);
     } finally {
       setIsLoading(false);
     }
   };
+
+  if (isInitialLoading) {
+    return (
+      <div className="flex items-center justify-center p-8">
+        <Loader2 className="h-8 w-8 animate-spin" />
+      </div>
+    );
+  }
 
   return (
     <Form {...form}>
