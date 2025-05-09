@@ -1,4 +1,3 @@
-
 import { format } from 'date-fns';
 import { Send, Loader2 } from 'lucide-react';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
@@ -6,10 +5,13 @@ import { Button } from '@/components/ui/button';
 
 interface ScheduledPost {
   id: string;
+  next_run_at?: string;
+  timezone?: string;
   content_ideas?: {
     title: string;
     status: string;
   };
+  // Keep backward compatibility with the old structure
   schedule_settings?: Array<{
     next_run_at: string;
     time_of_day: string;
@@ -26,17 +28,41 @@ interface ScheduledPostsListProps {
 
 export function ScheduledPostsList({ posts, postingId, onPostNow, loading = false }: ScheduledPostsListProps) {
   const formatScheduleTime = (post: ScheduledPost) => {
-    if (!post.schedule_settings?.[0]) return 'Not scheduled';
-    
-    const settings = post.schedule_settings[0];
-    const nextRun = new Date(settings.next_run_at);
-    const time = settings.time_of_day;
-    const timezone = settings.timezone || 'UTC';
-    
-    const formattedDate = format(nextRun, 'PPP');
-    const formattedTime = format(nextRun, 'p');
-    
-    return `${formattedDate} at ${formattedTime} (${timezone})`;
+    try {
+      // Check if next_run_at is directly on the post object (new structure)
+      if (post.next_run_at) {
+        const nextRun = new Date(post.next_run_at);
+        const timezone = post.timezone || 'UTC';
+        
+        // Make sure we have a valid date before formatting
+        if (!isNaN(nextRun.getTime())) {
+          const formattedDate = format(nextRun, 'PPP');
+          const formattedTime = format(nextRun, 'p');
+          
+          return `${formattedDate} at ${formattedTime} (${timezone})`;
+        }
+      }
+      
+      // Fall back to the old structure if available
+      if (post.schedule_settings?.[0]) {
+        const settings = post.schedule_settings[0];
+        const nextRun = new Date(settings.next_run_at);
+        const timezone = settings.timezone || 'UTC';
+        
+        if (!isNaN(nextRun.getTime())) {
+          const formattedDate = format(nextRun, 'PPP');
+          const formattedTime = format(nextRun, 'p');
+          
+          return `${formattedDate} at ${formattedTime} (${timezone})`;
+        }
+      }
+      
+      // If we get here, we couldn't format the time
+      return 'Not scheduled';
+    } catch (error) {
+      console.error('Error formatting schedule time:', error);
+      return 'Not scheduled';
+    }
   };
 
   return (

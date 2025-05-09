@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
@@ -12,6 +11,17 @@ import { LinkedInWarning } from '@/components/dashboard/LinkedInWarning';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '../contexts/AuthContext';
 import { useScheduleSettings } from '@/hooks/useScheduleSettings';
+
+// Add type definition for scheduled posts that's consistent with our components
+interface ScheduledPostDisplay {
+  id: string;
+  content_ideas?: {
+    title: string;
+    status: string;
+  };
+  next_run_at: string;
+  timezone: string;
+}
 
 const Schedule = () => {
   const navigate = useNavigate();
