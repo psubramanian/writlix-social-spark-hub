@@ -1,4 +1,3 @@
-
 import { useState, useEffect, useCallback } from 'react';
 import { useAuth } from '@/contexts/AuthContext';
 import { supabase } from '@/integrations/supabase/client';
@@ -96,7 +95,10 @@ export function useSubscription() {
       console.log("Final subscription state:", { 
         status: data?.status, 
         active_till: data?.active_till,
-        isCanceled: data?.status === 'canceled'
+        isCanceled: data?.status === 'canceled',
+        // Add formatted dates for easier debugging
+        active_till_formatted: data?.active_till ? format(new Date(data.active_till), 'PPP HH:mm:ss') : null,
+        now_formatted: format(new Date(), 'PPP HH:mm:ss')
       });
     } catch (error: any) {
       console.error('Error fetching subscription:', error);
@@ -281,22 +283,45 @@ export function useSubscription() {
     try {
       setLoading(true);
       
+      // Log pre-cancellation state for debugging
+      console.log('Pre-cancellation subscription state:', {
+        id: subscription?.id,
+        status: subscription?.status,
+        active_till: subscription?.active_till,
+        active_till_formatted: subscription?.active_till ? format(new Date(subscription.active_till), 'PPP HH:mm:ss') : null
+      });
+      
       // Update the subscription status in the database
-      const { error: updateError } = await supabase
+      // IMPORTANT: We only update the status to 'canceled' but keep the active_till date unchanged
+      const { data, error: updateError } = await supabase
         .from('user_subscriptions')
         .update({ 
           status: 'canceled',
         })
-        .eq('user_id', user?.id);
+        .eq('user_id', user?.id)
+        .select()
+        .single();
         
       if (updateError) throw updateError;
+      
+      // Log post-cancellation response
+      console.log('Post-cancellation database response:', data);
       
       toast({
         title: "Subscription Cancelled",
         description: "Your subscription has been cancelled. You will have access until the end of the current billing period.",
       });
       
+      // Fetch to ensure we have latest data
       await fetchSubscription();
+      
+      // Double-check the post-fetch state
+      console.log('Final subscription state after cancellation:', { 
+        status: subscription?.status, 
+        active_till: subscription?.active_till,
+        isAccessible: subscription?.active_till ? new Date(subscription?.active_till) > new Date() : false
+      });
+      
     } catch (error: any) {
       console.error("Cancellation error:", error);
       toast({
@@ -320,13 +345,20 @@ export function useSubscription() {
     (subscription?.status === 'trial' && getDaysLeft() === 0);
   const isSubscriptionCanceled = subscription?.status === 'canceled';
 
+  // Add detailed debugging information
   console.log("Computed subscription states:", {
     isTrialActive,
     isSubscriptionActive,
     isSubscriptionExpired,
     isSubscriptionCanceled,
     status: subscription?.status,
-    daysLeft: getDaysLeft()
+    daysLeft: getDaysLeft(),
+    active_till: subscription?.active_till,
+    active_till_timestamp: subscription?.active_till ? new Date(subscription.active_till).getTime() : null,
+    now_timestamp: new Date().getTime(),
+    diff_ms: subscription?.active_till ? new Date(subscription.active_till).getTime() - new Date().getTime() : null,
+    diff_days: subscription?.active_till ? Math.ceil((new Date(subscription.active_till).getTime() - new Date().getTime()) / (1000 * 60 * 60 * 24)) : null,
+    access_allowed: isTrialActive || isSubscriptionActive || (isSubscriptionCanceled && subscription?.active_till && new Date(subscription.active_till) > new Date())
   });
 
   return {

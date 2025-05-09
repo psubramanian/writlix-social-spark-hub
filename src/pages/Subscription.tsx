@@ -6,6 +6,7 @@ import { useSubscription } from '@/hooks/useSubscription';
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { AlertCircle, Info, Loader2, Lock } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { SubscriptionDebug } from '@/components/subscription/SubscriptionDebug';
 
 const Subscription = () => {
   const { 
@@ -38,6 +39,12 @@ const Subscription = () => {
       return () => clearTimeout(timer);
     }
   }, [showRedirectAlert]);
+
+  // Check if this is likely a development or admin environment
+  // In production, you'd want to limit this to admin users
+  const isDevelopmentOrAdmin = () => {
+    return process.env.NODE_ENV === 'development' || window.location.hostname === 'localhost';
+  };
 
   if (loading) {
     return (
@@ -125,7 +132,7 @@ const Subscription = () => {
           <Info className="h-4 w-4" />
           <AlertTitle>Subscription Canceled</AlertTitle>
           <AlertDescription>
-            Your subscription has been canceled. You will have access until the end of the current billing period.
+            Your subscription has been canceled. You will have access until {subscription?.active_till ? new Date(subscription.active_till).toLocaleDateString() : 'the end of the current billing period'}.
           </AlertDescription>
         </Alert>
       )}
@@ -170,6 +177,9 @@ const Subscription = () => {
           isRazorpayLoaded={isRazorpayLoaded}
         />
       </div>
+      
+      {/* Show subscription debug information for development/admin users */}
+      {isDevelopmentOrAdmin() && <SubscriptionDebug />}
     </div>
   );
 };

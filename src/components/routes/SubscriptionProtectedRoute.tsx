@@ -3,7 +3,7 @@ import React from 'react';
 import { Navigate, useLocation } from 'react-router-dom';
 import { useSubscription } from '@/hooks/useSubscription';
 import { Alert, AlertTitle, AlertDescription } from '@/components/ui/alert';
-import { AlertCircle, Loader2 } from 'lucide-react';
+import { AlertCircle, Info, Loader2 } from 'lucide-react';
 
 interface SubscriptionProtectedRouteProps {
   children: React.ReactNode;
@@ -34,14 +34,29 @@ const SubscriptionProtectedRoute = ({ children, featureName }: SubscriptionProte
     );
   }
   
-  // Check if the subscription is canceled but still within the billing period
-  // Make sure to handle potential undefined values
-  const isWithinCanceledPeriod = isSubscriptionCanceled && subscription?.active_till 
-    ? new Date(subscription.active_till) > new Date() 
-    : false;
+  // IMPROVED: Check if the subscription is canceled but still within the billing period
+  // Handle nullish values and perform a safer date comparison
+  let isWithinCanceledPeriod = false;
+  
+  try {
+    if (isSubscriptionCanceled && subscription?.active_till) {
+      const activeTillDate = new Date(subscription.active_till);
+      const now = new Date();
+      
+      // Ensure we have valid dates before comparison
+      if (!isNaN(activeTillDate.getTime()) && !isNaN(now.getTime())) {
+        isWithinCanceledPeriod = activeTillDate > now;
+      }
+    }
+  } catch (error) {
+    // If there's an error in date parsing or comparison, log it but default to false
+    console.error('Error determining canceled subscription access:', error);
+    isWithinCanceledPeriod = false;
+  }
     
-  // Add debug logging to help identify the issue
-  console.log('Subscription status:', {
+  // Enhanced debug logging to help identify the issue
+  console.log('Subscription access check:', {
+    featureName,
     isTrialActive,
     isSubscriptionActive,
     isSubscriptionCanceled,
@@ -49,7 +64,9 @@ const SubscriptionProtectedRoute = ({ children, featureName }: SubscriptionProte
     active_till: subscription?.active_till,
     now: new Date().toISOString(),
     comparison: subscription?.active_till ? 
-      new Date(subscription.active_till) > new Date() : 'No active_till date'
+      `${new Date(subscription.active_till).toISOString()} > ${new Date().toISOString()} = ${new Date(subscription.active_till) > new Date()}` 
+      : 'No active_till date',
+    canAccess: isTrialActive || isSubscriptionActive || isWithinCanceledPeriod
   });
     
   // User can access if they have an active trial, active subscription, or 
