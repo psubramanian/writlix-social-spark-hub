@@ -1,6 +1,6 @@
 
 import React from 'react';
-import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from '@/components/ui/dialog';
 import RichTextEditor from '@/components/RichTextEditor';
 import { Button } from '@/components/ui/button';
 import { RefreshCw } from 'lucide-react';
@@ -50,7 +50,14 @@ const ContentDialog = ({ content, onClose, onUpdate, onRegenerate }: ContentDial
       {content && (
         <DialogContent className="max-w-4xl w-[90vw] h-auto max-h-[90vh] overflow-hidden">
           <DialogHeader className="flex flex-row items-center justify-between">
-            <DialogTitle>{content.title}</DialogTitle>
+            <div>
+              <DialogTitle>{content.title}</DialogTitle>
+              {content.status && (
+                <DialogDescription>
+                  Status: <span className={`font-medium ${content.status === 'Published' ? 'text-green-500' : 'text-blue-500'}`}>{content.status}</span>
+                </DialogDescription>
+              )}
+            </div>
             {content.status !== 'Published' && onRegenerate && (
               <Button 
                 variant="outline" 

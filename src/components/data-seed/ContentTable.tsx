@@ -45,6 +45,12 @@ const ContentTable = ({
   const handlePageChange = (page: number) => {
     setCurrentPage(page);
   };
+  
+  // Strip HTML tags for preview display
+  const stripHtml = (html: string) => {
+    const doc = new DOMParser().parseFromString(html, 'text/html');
+    return doc.body.textContent || '';
+  };
 
   return (
     <Card className="lg:col-span-2">
@@ -69,7 +75,9 @@ const ContentTable = ({
                   <TableRow key={item.id}>
                     <TableCell className="font-medium">{item.title}</TableCell>
                     <TableCell className="relative">
-                      <div className="line-clamp-2">{item.preview}</div>
+                      <div className="line-clamp-2">
+                        {item.preview || stripHtml(item.content).substring(0, 100) + '...'}
+                      </div>
                       <Button
                         variant="ghost"
                         size="icon"

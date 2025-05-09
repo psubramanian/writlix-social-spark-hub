@@ -49,11 +49,14 @@ export const useContentGenerate = (setGeneratedContent: React.Dispatch<React.Set
       const newContentItems: ContentItem[] = [];
       
       for (const item of generationData) {
+        // Ensure the content has proper HTML formatting
+        const formattedContent = ensureHtmlFormatting(item.content);
+        
         const { data: dbData, error: dbError } = await supabase
           .from('content_ideas')
           .insert({
             title: item.title,
-            content: item.content,
+            content: formattedContent,
             status: 'Review',
             user_id: user.id
           })
@@ -69,7 +72,7 @@ export const useContentGenerate = (setGeneratedContent: React.Dispatch<React.Set
             id: `content-${Date.now()}-${Math.random().toString(36).substring(2, 9)}`,
             title: item.title,
             preview: item.preview,
-            content: item.content,
+            content: formattedContent,
             status: 'Review',
             db_id: dbData[0].id
           });
@@ -92,6 +95,19 @@ export const useContentGenerate = (setGeneratedContent: React.Dispatch<React.Set
     } finally {
       setGenerating(false);
     }
+  };
+  
+  // Helper function to ensure content has proper HTML formatting
+  const ensureHtmlFormatting = (content: string): string => {
+    // If content doesn't contain any HTML tags, wrap it in paragraphs
+    if (!content.includes('<')) {
+      // Split by double newlines and wrap each part in a paragraph
+      return content
+        .split(/\n\s*\n/)
+        .map(paragraph => `<p>${paragraph.replace(/\n/g, '<br>')}</p>`)
+        .join('');
+    }
+    return content;
   };
 
   return {

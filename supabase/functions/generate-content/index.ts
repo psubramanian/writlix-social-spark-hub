@@ -37,12 +37,14 @@ serve(async (req) => {
         messages: [
           {
             role: 'system',
-            content: `You are a professional LinkedIn content creator. Generate engaging and professional LinkedIn posts about the given topic. Each post should have a title, a short preview, and a full detailed content. 
+            content: `You are a professional LinkedIn content creator. Generate engaging and professional LinkedIn posts about the given topic. Each post should have a title, a short preview, and a full detailed content that includes proper HTML formatting.
+            
+            Use basic HTML formatting tags like <p>, <strong>, <em>, <ul>, <li>, <h3> for structure and emphasis. Include line breaks with <br> where appropriate.
             
             Format your response as a JSON array with each object having these exact fields:
             - title: A catchy, professional title
-            - preview: A 2-3 sentence summary 
-            - content: A full, detailed post with multiple paragraphs
+            - preview: A 2-3 sentence summary (plain text)
+            - content: A full, detailed post with multiple paragraphs formatted with HTML tags
             
             Return ONLY the JSON array with no markdown formatting, code blocks, or additional text.`
           },
