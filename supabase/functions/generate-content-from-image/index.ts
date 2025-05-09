@@ -61,8 +61,10 @@ async function callOpenAIWithRetry(
       let content = response.choices[0]?.message?.content || 'Failed to generate content';
       
       // Clean up any markdown code blocks that might be in the response
+      // These regex patterns will remove code block markers commonly found in AI responses
       content = content.replace(/```html\s*/g, '');
       content = content.replace(/```\s*$/g, '');
+      content = content.replace(/```/g, ''); // Remove any remaining triple backticks
       content = content.trim();
       
       return content;
