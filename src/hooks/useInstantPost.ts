@@ -1,3 +1,4 @@
+
 import { useState } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { getCurrentUser } from '@/utils/supabaseUserUtils';
@@ -16,6 +17,19 @@ export function useInstantPost() {
     const sanitizedName = name.replace(/[^a-zA-Z0-9-_]/g, '_');
     
     return `${sanitizedName}.${ext}`;
+  };
+
+  // Helper function to ensure content has proper HTML formatting
+  const ensureHtmlFormatting = (content: string): string => {
+    // If content doesn't contain any HTML tags, wrap it in paragraphs
+    if (!content.includes('<')) {
+      // Split by double newlines and wrap each part in a paragraph
+      return content
+        .split(/\n\s*\n/)
+        .map(paragraph => `<p>${paragraph.replace(/\n/g, '<br>')}</p>`)
+        .join('');
+    }
+    return content;
   };
 
   // Function to generate content from image
@@ -77,7 +91,9 @@ export function useInstantPost() {
         throw new Error('Invalid response from AI service');
       }
 
-      return data.content;
+      // Apply HTML formatting to ensure consistency
+      const formattedContent = ensureHtmlFormatting(data.content);
+      return formattedContent;
     } catch (error: any) {
       console.error('Error in generateContentFromImage:', error);
       throw error;

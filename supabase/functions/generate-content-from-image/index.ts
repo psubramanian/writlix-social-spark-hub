@@ -45,7 +45,7 @@ async function callOpenAIWithRetry(
         messages: [
           {
             role: 'system', 
-            content: 'You are a professional LinkedIn content creator expert. Analyze the image and generate an engaging LinkedIn post about it. The post should be professionally written, include relevant hashtags, and be formatted for LinkedIn with line breaks and emojis where appropriate. Keep the post concise but impactful, around 200-300 words maximum.'
+            content: 'You are a professional LinkedIn content creator expert. Analyze the image and generate an engaging LinkedIn post about it. The post should be professionally written, include relevant hashtags, and be formatted for LinkedIn with line breaks and emojis where appropriate. Use proper HTML formatting tags like <p>, <strong>, <em>, <ul>, <li>, <h3> for structure and emphasis. Include line breaks with <br> where appropriate. Keep the post concise but impactful, around 200-300 words maximum.'
           },
           {
             role: 'user',
