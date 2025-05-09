@@ -20,7 +20,8 @@ const Subscription = () => {
     isSubscriptionActive,
     isSubscriptionExpired,
     isSubscriptionCanceled,
-    isRazorpayLoaded
+    isRazorpayLoaded,
+    formatSubscriptionStatus
   } = useSubscription();
 
   const daysLeft = getDaysLeft();

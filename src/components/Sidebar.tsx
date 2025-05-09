@@ -3,7 +3,6 @@ import React from 'react';
 import { Link, useLocation } from "react-router-dom";
 import { useAuth } from '../contexts/AuthContext';
 import { useSubscription } from '../hooks/useSubscription';
-import { format } from 'date-fns';
 import { BarChart, Settings, LogOut, FileText, Calendar, CreditCard, Send, Lock } from 'lucide-react';
 import {
   Sidebar as ShadcnSidebar,
@@ -25,10 +24,13 @@ const Sidebar = () => {
     loading, 
     formatSubscriptionStatus,
     isTrialActive,
-    isSubscriptionActive
+    isSubscriptionActive,
+    isSubscriptionCanceled
   } = useSubscription();
   
-  const hasActiveSubscription = isTrialActive || isSubscriptionActive;
+  // A user has access if they have an active trial, active subscription, or canceled subscription that hasn't expired
+  const hasActiveSubscription = isTrialActive || isSubscriptionActive || 
+    (isSubscriptionCanceled && subscription?.active_till && new Date(subscription.active_till) > new Date());
   
   const menuItems = [
     { icon: BarChart, label: 'Dashboard', path: '/dashboard', premium: false },
@@ -80,7 +82,9 @@ const Sidebar = () => {
                     <TooltipContent className="w-60">
                       <p>
                         {item.label} is a premium feature. 
-                        {isTrialActive ? " Your trial has expired." : " Please subscribe to access."}
+                        {isSubscriptionCanceled ? 
+                          " Your subscription is canceled but access continues until the end of billing period." : 
+                          " Please subscribe to access."}
                       </p>
                     </TooltipContent>
                   )}

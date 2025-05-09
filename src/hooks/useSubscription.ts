@@ -1,3 +1,4 @@
+
 import { useState, useEffect, useCallback } from 'react';
 import { useAuth } from '@/contexts/AuthContext';
 import { supabase } from '@/integrations/supabase/client';
@@ -146,6 +147,11 @@ export function useSubscription() {
 
     if (subscription.status === 'expired') {
       return 'Subscription expired';
+    }
+    
+    if (subscription.status === 'canceled' && subscription.active_till) {
+      const endDate = new Date(subscription.active_till);
+      return `Subscription status: canceled (Access until ${format(endDate, 'MMM dd, yyyy')})`;
     }
 
     return `Subscription status: ${subscription.status}`;

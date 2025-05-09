@@ -11,7 +11,8 @@ export function SubscriptionDebug() {
     isSubscriptionActive,
     isSubscriptionExpired,
     isSubscriptionCanceled,
-    getDaysLeft
+    getDaysLeft,
+    formatSubscriptionStatus
   } = useSubscription();
 
   if (!subscription) {
@@ -25,6 +26,7 @@ export function SubscriptionDebug() {
     : false;
   
   const daysLeft = getDaysLeft();
+  const formattedStatus = formatSubscriptionStatus();
 
   return (
     <Card className="mt-4">
@@ -41,6 +43,9 @@ export function SubscriptionDebug() {
           <div className="font-medium">Status:</div>
           <div>{subscription.status}</div>
           
+          <div className="font-medium">Formatted Status:</div>
+          <div>{formattedStatus}</div>
+          
           <div className="font-medium">Active Till:</div>
           <div>
             {activeTill ? format(activeTill, 'yyyy-MM-dd HH:mm:ss') : 'N/A'}
@@ -54,10 +59,10 @@ export function SubscriptionDebug() {
           
           <div className="font-medium">Access States:</div>
           <div className="space-x-2">
-            <Badge variant={isTrialActive ? "success" : "outline"} className="text-xs">
+            <Badge variant={isTrialActive ? "default" : "outline"} className="text-xs">
               Trial: {isTrialActive ? 'Active' : 'Inactive'}
             </Badge>
-            <Badge variant={isSubscriptionActive ? "success" : "outline"} className="text-xs">
+            <Badge variant={isSubscriptionActive ? "default" : "outline"} className="text-xs">
               Sub: {isSubscriptionActive ? 'Active' : 'Inactive'}
             </Badge>
             <Badge variant={isSubscriptionCanceled ? "warning" : "outline"} className="text-xs">
