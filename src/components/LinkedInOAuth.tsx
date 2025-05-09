@@ -116,8 +116,10 @@ const LinkedInOAuth = () => {
           sessionStorage.removeItem('linkedin_state');
           
           // Get the exact redirect URI that was used in the authorization request
-          const redirectUri = window.location.origin + window.location.pathname;
-          console.log('Redirect URI for token exchange:', redirectUri);
+          //const redirectUri = window.location.origin + window.location.pathname;
+          //console.log('Redirect URI for token exchange:', redirectUri);
+          const redirectUri = encodeURIComponent(`https://xhccvoivnelbzvzxmcoy.supabase.co/auth/v1/callback`);
+          console.log('Using redirect URI:', `https://xhccvoivnelbzvzxmcoy.supabase.co/auth/v1/callback`);      
           
           // Exchange the code for an access token
           const { data, error } = await supabase.functions.invoke('linkedin-oauth', {
