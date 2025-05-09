@@ -1,4 +1,3 @@
-
 import { useState } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { getCurrentUser } from '@/utils/supabaseUserUtils';
@@ -6,6 +5,18 @@ import { getCurrentUser } from '@/utils/supabaseUserUtils';
 export function useInstantPost() {
   const [isGenerating, setIsGenerating] = useState(false);
   const [isPosting, setIsPosting] = useState(false);
+
+  // Helper function to sanitize filenames
+  const sanitizeFileName = (fileName: string): string => {
+    // Replace special characters with underscores, keep file extension
+    const name = fileName.split('.').slice(0, -1).join('.');
+    const ext = fileName.split('.').pop();
+    
+    // Remove characters that might cause issues
+    const sanitizedName = name.replace(/[^a-zA-Z0-9-_]/g, '_');
+    
+    return `${sanitizedName}.${ext}`;
+  };
 
   // Function to generate content from image
   const generateContentFromImage = async (image: File): Promise<string> => {
@@ -17,7 +28,11 @@ export function useInstantPost() {
         throw new Error("Authentication required");
       }
 
-      const fileName = `${user.id}_${Date.now()}_${image.name}`;
+      // Sanitize the filename to avoid potential issues
+      const sanitizedName = sanitizeFileName(image.name);
+      const fileName = `${user.id}_${Date.now()}_${sanitizedName}`;
+      
+      console.log(`Uploading image: ${fileName}`);
       
       // Upload to temp-images bucket with public read access
       const { data: uploadData, error: uploadError } = await supabase
@@ -30,7 +45,7 @@ export function useInstantPost() {
 
       if (uploadError) {
         console.error('Error uploading image:', uploadError);
-        throw new Error("Failed to upload image");
+        throw new Error("Failed to upload image: " + uploadError.message);
       }
 
       // Get the public URL for the image
@@ -42,6 +57,8 @@ export function useInstantPost() {
       if (!publicUrlData.publicUrl) {
         throw new Error("Failed to get public URL for image");
       }
+
+      console.log(`Image URL: ${publicUrlData.publicUrl}`);
 
       // Call the edge function to generate content based on image
       const { data, error } = await supabase.functions.invoke('generate-content-from-image', {
