@@ -196,9 +196,10 @@ const LinkedInOAuth = () => {
       sessionStorage.setItem('linkedin_state', state);
       
       // Get the redirect URI (current page)
-      const redirectUri = encodeURIComponent(window.location.origin + window.location.pathname);
-      console.log('Using redirect URI:', window.location.origin + window.location.pathname);
-      
+      //const redirectUri = encodeURIComponent(window.location.origin + window.location.pathname);
+      //console.log('Using redirect URI:', window.location.origin + window.location.pathname);
+      const redirectUri = encodeURIComponent(`${window.location.origin}/auth/callback`);
+      console.log('Using redirect URI:', `${window.location.origin}/auth/callback`);      
       // Redirect to LinkedIn authorization page
       const linkedInAuthUrl = `https://www.linkedin.com/oauth/v2/authorization?response_type=code&client_id=${credentials.client_id}&redirect_uri=${redirectUri}&state=${state}&scope=r_liteprofile%20r_emailaddress%20w_member_social`;
       
