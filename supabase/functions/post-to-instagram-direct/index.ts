@@ -22,7 +22,7 @@ serve(async (req) => {
     const { content, userId, imageUrl } = await req.json();
     
     if (!content) {
-      throw new Error('Caption is required');
+      throw new Error('Content is required');
     }
 
     if (!userId) {
@@ -30,7 +30,7 @@ serve(async (req) => {
     }
     
     if (!imageUrl) {
-      throw new Error('Instagram requires an image for posting. Please provide an image URL.');
+      throw new Error('Image URL is required for Instagram posts');
     }
     
     // Get Instagram credentials for the user
@@ -50,41 +50,12 @@ serve(async (req) => {
 
     const accessToken = credentials.long_lived_token || credentials.access_token;
     
-    // For Instagram, we need to first get the connected business account
-    const accountsResponse = await fetch(`https://graph.facebook.com/v18.0/me/accounts?access_token=${accessToken}`);
-    const accountsData = await accountsResponse.json();
+    // Instagram API requires a two-step process:
+    // 1. Create a media container
+    // 2. Publish the container to the feed
     
-    if (!accountsResponse.ok) {
-      console.error('Instagram business accounts fetch error:', accountsData);
-      throw new Error('Failed to retrieve your Instagram business accounts.');
-    }
-    
-    if (!accountsData.data || accountsData.data.length === 0) {
-      throw new Error('No Facebook pages found. You need to have a Facebook page connected to your Instagram business account to post content.');
-    }
-    
-    // Use the first page
-    const page = accountsData.data[0];
-    const pageAccessToken = page.access_token;
-    const pageId = page.id;
-    
-    // Get Instagram business account ID associated with this page
-    const instagramAccountsResponse = await fetch(`https://graph.facebook.com/v18.0/${pageId}?fields=instagram_business_account&access_token=${pageAccessToken}`);
-    const instagramAccountsData = await instagramAccountsResponse.json();
-    
-    if (!instagramAccountsResponse.ok) {
-      console.error('Instagram business account fetch error:', instagramAccountsData);
-      throw new Error('Failed to retrieve your Instagram business account.');
-    }
-    
-    if (!instagramAccountsData.instagram_business_account) {
-      throw new Error('No Instagram business account found. You need to connect your Facebook page to an Instagram business account.');
-    }
-    
-    const igBusinessAccountId = instagramAccountsData.instagram_business_account.id;
-    
-    // For Instagram, first create a media object
-    const createMediaResponse = await fetch(`https://graph.facebook.com/v18.0/${igBusinessAccountId}/media`, {
+    // First, create the media container
+    const createMediaResponse = await fetch(`https://graph.instagram.com/v18.0/me/media`, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
@@ -92,7 +63,7 @@ serve(async (req) => {
       body: JSON.stringify({
         image_url: imageUrl,
         caption: content,
-        access_token: pageAccessToken
+        access_token: accessToken
       })
     });
     
@@ -100,27 +71,42 @@ serve(async (req) => {
     
     if (!createMediaResponse.ok) {
       console.error('Instagram media creation error:', createMediaData);
-      throw new Error(createMediaData.error?.message || 'Failed to create Instagram media object');
+      throw new Error(createMediaData.error?.message || 'Failed to create Instagram media');
     }
     
-    const mediaObjectId = createMediaData.id;
+    const creationId = createMediaData.id;
+    if (!creationId) {
+      throw new Error('Failed to get creation ID from Instagram');
+    }
     
-    // Then publish the media object
-    const publishResponse = await fetch(`https://graph.facebook.com/v18.0/${igBusinessAccountId}/media_publish`, {
+    // Now publish the media
+    const publishResponse = await fetch(`https://graph.instagram.com/v18.0/me/media_publish`, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
       },
       body: JSON.stringify({
-        creation_id: mediaObjectId,
-        access_token: pageAccessToken
+        creation_id: creationId,
+        access_token: accessToken
       })
     });
     
     const publishData = await publishResponse.json();
     
     if (!publishResponse.ok) {
-      console.error('Instagram publish error:', publishData);
+      console.error('Instagram publishing error:', publishData);
+      
+      // Handle expired token
+      if (publishResponse.status === 401 || publishData.error?.code === 190) {
+        return new Response(JSON.stringify({
+          success: false,
+          error: 'Instagram authorization expired. Please reconnect your Instagram account.'
+        }), {
+          headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+          status: 401
+        });
+      }
+      
       throw new Error(publishData.error?.message || 'Failed to publish to Instagram');
     }
     
