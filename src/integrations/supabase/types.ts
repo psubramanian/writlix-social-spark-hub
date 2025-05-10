@@ -164,6 +164,7 @@ export type Database = {
           created_at: string
           id: string
           next_run_at: string
+          platforms: Json | null
           status: string
           timezone: string | null
           updated_at: string
@@ -174,6 +175,7 @@ export type Database = {
           created_at?: string
           id?: string
           next_run_at: string
+          platforms?: Json | null
           status?: string
           timezone?: string | null
           updated_at?: string
@@ -184,6 +186,7 @@ export type Database = {
           created_at?: string
           id?: string
           next_run_at?: string
+          platforms?: Json | null
           status?: string
           timezone?: string | null
           updated_at?: string
@@ -226,6 +229,90 @@ export type Database = {
           name?: string
           price?: number
           updated_at?: string
+        }
+        Relationships: []
+      }
+      user_facebook_credentials: {
+        Row: {
+          access_token: string | null
+          client_id: string
+          client_secret: string
+          created_at: string | null
+          expires_at: string | null
+          facebook_profile_data: Json | null
+          facebook_user_id: string | null
+          id: string
+          long_lived_token: string | null
+          updated_at: string | null
+          user_id: string
+        }
+        Insert: {
+          access_token?: string | null
+          client_id: string
+          client_secret: string
+          created_at?: string | null
+          expires_at?: string | null
+          facebook_profile_data?: Json | null
+          facebook_user_id?: string | null
+          id?: string
+          long_lived_token?: string | null
+          updated_at?: string | null
+          user_id: string
+        }
+        Update: {
+          access_token?: string | null
+          client_id?: string
+          client_secret?: string
+          created_at?: string | null
+          expires_at?: string | null
+          facebook_profile_data?: Json | null
+          facebook_user_id?: string | null
+          id?: string
+          long_lived_token?: string | null
+          updated_at?: string | null
+          user_id?: string
+        }
+        Relationships: []
+      }
+      user_instagram_credentials: {
+        Row: {
+          access_token: string | null
+          client_id: string
+          client_secret: string
+          created_at: string | null
+          expires_at: string | null
+          id: string
+          instagram_profile_data: Json | null
+          instagram_user_id: string | null
+          long_lived_token: string | null
+          updated_at: string | null
+          user_id: string
+        }
+        Insert: {
+          access_token?: string | null
+          client_id: string
+          client_secret: string
+          created_at?: string | null
+          expires_at?: string | null
+          id?: string
+          instagram_profile_data?: Json | null
+          instagram_user_id?: string | null
+          long_lived_token?: string | null
+          updated_at?: string | null
+          user_id: string
+        }
+        Update: {
+          access_token?: string | null
+          client_id?: string
+          client_secret?: string
+          created_at?: string | null
+          expires_at?: string | null
+          id?: string
+          instagram_profile_data?: Json | null
+          instagram_user_id?: string | null
+          long_lived_token?: string | null
+          updated_at?: string | null
+          user_id?: string
         }
         Relationships: []
       }

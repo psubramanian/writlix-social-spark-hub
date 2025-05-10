@@ -4,7 +4,11 @@ import { useNavigate, useLocation } from 'react-router-dom';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import LinkedInOAuth from '../components/LinkedInOAuth';
+import FacebookOAuth from '../components/FacebookOAuth';
+import InstagramOAuth from '../components/InstagramOAuth';
 import LinkedInCredentialsForm from '../components/LinkedInCredentialsForm';
+import FacebookCredentialsForm from '../components/FacebookCredentialsForm';
+import InstagramCredentialsForm from '../components/InstagramCredentialsForm';
 import { AccountSettingsForm } from '../components/AccountSettingsForm';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
@@ -63,6 +67,7 @@ const Settings = () => {
           </TabsContent>
           
           <TabsContent value="connections" className="mt-0 space-y-6">
+            {/* LinkedIn Connection */}
             <LinkedInCredentialsForm />
             <Card>
               <CardHeader>
@@ -71,6 +76,30 @@ const Settings = () => {
               </CardHeader>
               <CardContent>
                 <LinkedInOAuth />
+              </CardContent>
+            </Card>
+            
+            {/* Facebook Connection */}
+            <FacebookCredentialsForm />
+            <Card>
+              <CardHeader>
+                <CardTitle>Facebook Connection</CardTitle>
+                <CardDescription>Connect your Facebook account to enable post scheduling</CardDescription>
+              </CardHeader>
+              <CardContent>
+                <FacebookOAuth />
+              </CardContent>
+            </Card>
+            
+            {/* Instagram Connection */}
+            <InstagramCredentialsForm />
+            <Card>
+              <CardHeader>
+                <CardTitle>Instagram Connection</CardTitle>
+                <CardDescription>Connect your Instagram account to enable post scheduling</CardDescription>
+              </CardHeader>
+              <CardContent>
+                <InstagramOAuth />
               </CardContent>
             </Card>
           </TabsContent>

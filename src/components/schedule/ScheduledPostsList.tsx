@@ -1,128 +1,134 @@
+
+import React from 'react';
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { Button } from "@/components/ui/button";
+import { Skeleton } from "@/components/ui/skeleton";
 import { format } from 'date-fns';
-import { Send, Loader2 } from 'lucide-react';
-import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
-import { Button } from '@/components/ui/button';
+import { AlertCircle, Loader2, Calendar, Clock } from "lucide-react";
+import { Facebook, Instagram, Linkedin } from "lucide-react";
 
 interface ScheduledPost {
   id: string;
-  next_run_at?: string;
-  timezone?: string;
   content_ideas?: {
     title: string;
     status: string;
   };
-  // Keep backward compatibility with the old structure
-  schedule_settings?: Array<{
-    next_run_at: string;
-    time_of_day: string;
-    timezone: string;
-  }>;
+  next_run_at: string;
+  timezone: string;
 }
 
 interface ScheduledPostsListProps {
   posts: ScheduledPost[];
+  loading: boolean;
   postingId: string | null;
-  onPostNow: (postId: string) => void;
-  loading?: boolean;
+  onPostNow: (postId: string, platform: string, imageUrl?: string) => void;
 }
 
-export function ScheduledPostsList({ posts, postingId, onPostNow, loading = false }: ScheduledPostsListProps) {
-  const formatScheduleTime = (post: ScheduledPost) => {
-    try {
-      // Check if next_run_at is directly on the post object (new structure)
-      if (post.next_run_at) {
-        const nextRun = new Date(post.next_run_at);
-        const timezone = post.timezone || 'UTC';
-        
-        // Make sure we have a valid date before formatting
-        if (!isNaN(nextRun.getTime())) {
-          const formattedDate = format(nextRun, 'PPP');
-          const formattedTime = format(nextRun, 'p');
-          
-          return `${formattedDate} at ${formattedTime} (${timezone})`;
-        }
-      }
-      
-      // Fall back to the old structure if available
-      if (post.schedule_settings?.[0]) {
-        const settings = post.schedule_settings[0];
-        const nextRun = new Date(settings.next_run_at);
-        const timezone = settings.timezone || 'UTC';
-        
-        if (!isNaN(nextRun.getTime())) {
-          const formattedDate = format(nextRun, 'PPP');
-          const formattedTime = format(nextRun, 'p');
-          
-          return `${formattedDate} at ${formattedTime} (${timezone})`;
-        }
-      }
-      
-      // If we get here, we couldn't format the time
-      return 'Not scheduled';
-    } catch (error) {
-      console.error('Error formatting schedule time:', error);
-      return 'Not scheduled';
-    }
-  };
+export function ScheduledPostsList({
+  posts,
+  loading,
+  postingId,
+  onPostNow
+}: ScheduledPostsListProps) {
+  if (loading) {
+    return (
+      <Card>
+        <CardHeader>
+          <CardTitle>Scheduled Posts</CardTitle>
+          <CardDescription>Your upcoming post schedule</CardDescription>
+        </CardHeader>
+        <CardContent className="space-y-4">
+          <Skeleton className="h-[100px] w-full rounded-md" />
+          <Skeleton className="h-[100px] w-full rounded-md" />
+        </CardContent>
+      </Card>
+    );
+  }
 
   return (
     <Card>
       <CardHeader>
-        <CardTitle>Scheduled Posts ({posts.length})</CardTitle>
-        <CardDescription>Manage your upcoming LinkedIn posts</CardDescription>
+        <CardTitle>Scheduled Posts</CardTitle>
+        <CardDescription>Your upcoming post schedule</CardDescription>
       </CardHeader>
-      <CardContent>
-        {loading ? (
-          <div className="text-center py-12">Loading...</div>
-        ) : posts.length > 0 ? (
-          <div className="space-y-4">
-            {posts.map((post) => (
-              <div 
-                key={post.id} 
-                className="border rounded-md p-4"
-              >
-                <div className="flex justify-between items-start">
-                  <div className="flex-1">
-                    <h3 className="font-medium">{post.content_ideas?.title}</h3>
-                    <p className="text-sm text-muted-foreground mt-1">
-                      {formatScheduleTime(post)}
-                    </p>
-                    <div className="flex items-center mt-2">
-                      <span className="text-xs bg-blue-100 text-blue-800 px-2 py-1 rounded-full">
-                        {post.content_ideas?.status}
-                      </span>
-                    </div>
+      <CardContent className="space-y-4">
+        {posts.length === 0 ? (
+          <div className="flex flex-col items-center justify-center py-12 text-center">
+            <Calendar className="h-12 w-12 text-muted-foreground mb-4" />
+            <h3 className="text-lg font-semibold">No scheduled posts</h3>
+            <p className="text-sm text-muted-foreground max-w-sm mt-2">
+              You haven't scheduled any posts yet. Go to the Content page and schedule some of your content ideas.
+            </p>
+          </div>
+        ) : (
+          posts.map((post) => (
+            <div key={post.id} className="border rounded-md p-4">
+              <div className="flex flex-col space-y-3">
+                <div>
+                  <h3 className="font-medium text-sm">{post.content_ideas?.title || "Untitled Post"}</h3>
+                  <div className="flex items-center gap-2 mt-1 text-xs text-muted-foreground">
+                    <Calendar className="h-3 w-3" />
+                    <span>
+                      {format(new Date(post.next_run_at), "MMM d, yyyy")}
+                    </span>
+                    <Clock className="h-3 w-3 ml-2" />
+                    <span>
+                      {format(new Date(post.next_run_at), "h:mm a")}
+                    </span>
+                    <span className="ml-1">({post.timezone})</span>
                   </div>
-                  <Button
-                    variant="outline"
+                </div>
+                
+                <div className="flex flex-wrap items-center gap-2">
+                  <span className="text-xs text-muted-foreground mr-2">Post now:</span>
+                  <Button 
+                    variant="outline" 
                     size="sm"
-                    onClick={() => onPostNow(post.id)}
+                    className="h-8 px-3 flex items-center gap-1"
+                    onClick={() => onPostNow(post.id, 'linkedin')}
                     disabled={postingId === post.id}
-                    className="ml-4"
                   >
                     {postingId === post.id ? (
-                      <>
-                        <Loader2 className="h-4 w-4 mr-2 animate-spin" />
-                        Posting...
-                      </>
+                      <Loader2 className="h-3 w-3 animate-spin mr-1" />
                     ) : (
-                      <>
-                        <Send className="h-4 w-4 mr-2" />
-                        Post Now
-                      </>
+                      <Linkedin className="h-3 w-3 mr-1" />
                     )}
+                    <span>LinkedIn</span>
+                  </Button>
+                  
+                  <Button 
+                    variant="outline" 
+                    size="sm"
+                    className="h-8 px-3 flex items-center gap-1"
+                    onClick={() => onPostNow(post.id, 'facebook')}
+                    disabled={postingId === post.id}
+                  >
+                    {postingId === post.id ? (
+                      <Loader2 className="h-3 w-3 animate-spin mr-1" />
+                    ) : (
+                      <Facebook className="h-3 w-3 mr-1" />
+                    )}
+                    <span>Facebook</span>
+                  </Button>
+                  
+                  <Button 
+                    variant="outline" 
+                    size="sm"
+                    className="h-8 px-3 flex items-center gap-1"
+                    onClick={() => onPostNow(post.id, 'instagram')}
+                    disabled={postingId === post.id}
+                  >
+                    {postingId === post.id ? (
+                      <Loader2 className="h-3 w-3 animate-spin mr-1" />
+                    ) : (
+                      <Instagram className="h-3 w-3 mr-1" />
+                    )}
+                    <span>Instagram</span>
                   </Button>
                 </div>
               </div>
-            ))}
-          </div>
-        ) : (
-          <div className="text-center py-12">
-            <p className="text-muted-foreground">No posts scheduled yet</p>
-            <p className="text-sm text-muted-foreground mt-2">
-              Move posts from Review to Scheduled in the Data Seed page
-            </p>
-          </div>
+            </div>
+          ))
         )}
       </CardContent>
     </Card>
