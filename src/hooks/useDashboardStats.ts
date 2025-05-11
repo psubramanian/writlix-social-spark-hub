@@ -30,6 +30,7 @@ export function useDashboardStats(selectedMonth: Date) {
       const monthStart = startOfMonth(selectedMonth);
       const monthEnd = endOfMonth(selectedMonth);
       const now = new Date();
+      console.log('Dashboard stats - now:', now.toISOString());
 
       // Count all content ideas for the current month (includes both created and imported)
       const { count: totalContentCount, error: createdError } = await supabase
@@ -68,6 +69,13 @@ export function useDashboardStats(selectedMonth: Date) {
       if (createdError || scheduledError || publishedError || reviewError) {
         throw new Error('Error fetching dashboard stats');
       }
+
+      console.log('Dashboard stats:', {
+        created: totalContentCount,
+        scheduled: scheduledCount,
+        published: publishedCount,
+        review: reviewCount
+      });
 
       setStats({
         postsCreated: totalContentCount || 0,

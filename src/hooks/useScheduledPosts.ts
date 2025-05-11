@@ -6,6 +6,7 @@ import { getCurrentUser, useAuthRedirect } from '@/utils/supabaseUserUtils';
 import { useScheduleSettings } from './useScheduleSettings';
 import { usePostOperations } from './usePostOperations';
 import { usePostScheduling } from './usePostScheduling';
+import { format } from 'date-fns';
 
 interface ScheduledPost {
   id: string;
@@ -38,7 +39,9 @@ export function useScheduledPosts() {
       }
 
       const now = new Date();
+      console.log('Fetching scheduled posts after:', now.toISOString());
 
+      // Get posts that are scheduled for the future
       const { data: postsData, error: postsError } = await supabase
         .from('scheduled_posts')
         .select(`
@@ -57,7 +60,27 @@ export function useScheduledPosts() {
 
       if (postsError) throw postsError;
 
-      setPosts(postsData as ScheduledPost[]);
+      console.log('Fetched scheduled posts:', postsData);
+      
+      // Make sure we have unique posts (no duplicates by next_run_at)
+      const uniquePosts = [];
+      const seenDates = new Set();
+      
+      if (postsData) {
+        for (const post of postsData) {
+          // Format the date for comparison (without seconds)
+          const dateKey = format(new Date(post.next_run_at), 'yyyy-MM-dd HH:mm');
+          
+          if (!seenDates.has(dateKey)) {
+            seenDates.add(dateKey);
+            uniquePosts.push(post);
+          } else {
+            console.log('Skipping duplicate post scheduled for:', dateKey);
+          }
+        }
+      }
+
+      setPosts(uniquePosts as ScheduledPost[]);
     } catch (error: any) {
       console.error('Error fetching posts:', error);
       toast({

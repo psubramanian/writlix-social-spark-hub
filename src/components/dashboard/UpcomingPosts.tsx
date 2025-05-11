@@ -29,6 +29,7 @@ export function UpcomingPosts({ scheduledPostsCount }: UpcomingPostsProps) {
         if (!user) return;
 
         const now = new Date();
+        console.log('Fetching upcoming posts after:', now.toISOString());
         
         // Get posts that are scheduled for the future
         const { data, error } = await supabase
@@ -53,15 +54,27 @@ export function UpcomingPosts({ scheduledPostsCount }: UpcomingPostsProps) {
         }
 
         if (data && data.length > 0) {
-          const formattedPosts = data.map((post) => ({
-            id: post.id,
-            title: post.content_ideas?.title || 'Untitled Post',
-            nextRunAt: post.next_run_at,
-            timezone: post.timezone || 'UTC'
-          }));
+          // Make sure we have unique posts (no duplicates by next_run_at)
+          const uniquePosts = [];
+          const seenDates = new Set();
           
-          console.log('Formatted upcoming posts:', formattedPosts);
-          setUpcomingPosts(formattedPosts);
+          for (const post of data) {
+            // Format the date for comparison (without seconds)
+            const dateKey = format(new Date(post.next_run_at), 'yyyy-MM-dd HH:mm');
+            
+            if (!seenDates.has(dateKey)) {
+              seenDates.add(dateKey);
+              uniquePosts.push({
+                id: post.id,
+                title: post.content_ideas?.title || 'Untitled Post',
+                nextRunAt: post.next_run_at,
+                timezone: post.timezone || 'UTC'
+              });
+            }
+          }
+          
+          console.log('Formatted upcoming posts:', uniquePosts);
+          setUpcomingPosts(uniquePosts);
         } else {
           console.log('No upcoming posts found');
           setUpcomingPosts([]);
@@ -77,19 +90,24 @@ export function UpcomingPosts({ scheduledPostsCount }: UpcomingPostsProps) {
   }, []);
 
   const formatScheduleDate = (dateString: string) => {
-    const date = new Date(dateString);
-    
-    // Check if the date is today
-    if (isToday(date)) {
-      return `today at ${format(date, 'h:mm a')}`;
+    try {
+      const date = new Date(dateString);
+      
+      // Check if the date is today
+      if (isToday(date)) {
+        return `today at ${format(date, 'h:mm a')}`;
+      }
+      
+      // Check if the date is tomorrow
+      if (isTomorrow(date)) {
+        return `tomorrow at ${format(date, 'h:mm a')}`;
+      }
+      
+      return `${format(date, 'MMM d')} at ${format(date, 'h:mm a')}`;
+    } catch (error) {
+      console.error("Error formatting date:", error, dateString);
+      return "Invalid date";
     }
-    
-    // Check if the date is tomorrow
-    if (isTomorrow(date)) {
-      return `tomorrow at ${format(date, 'h:mm a')}`;
-    }
-    
-    return `${format(date, 'MMM d')} at ${format(date, 'h:mm a')}`;
   };
 
   return (
