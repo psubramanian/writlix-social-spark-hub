@@ -1,3 +1,4 @@
+
 import { useState, useEffect } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/components/ui/use-toast';
@@ -36,6 +37,8 @@ export function useScheduledPosts() {
         return;
       }
 
+      const now = new Date();
+
       const { data: postsData, error: postsError } = await supabase
         .from('scheduled_posts')
         .select(`
@@ -48,6 +51,8 @@ export function useScheduledPosts() {
           )
         `)
         .eq('user_id', user.id)
+        .eq('status', 'pending')
+        .gt('next_run_at', now.toISOString()) // Only get future posts
         .order('next_run_at', { ascending: true });
 
       if (postsError) throw postsError;

@@ -3,7 +3,7 @@ import React from 'react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
-import { format } from 'date-fns';
+import { format, isToday, isTomorrow } from 'date-fns';
 import { AlertCircle, Loader2, Calendar, Clock } from "lucide-react";
 import { Facebook, Instagram, Linkedin } from "lucide-react";
 
@@ -30,6 +30,22 @@ export function ScheduledPostsList({
   postingId,
   onPostNow
 }: ScheduledPostsListProps) {
+  const formatScheduleDate = (dateString: string) => {
+    const date = new Date(dateString);
+    
+    // Check if the date is today
+    if (isToday(date)) {
+      return `Today at ${format(date, 'h:mm a')}`;
+    }
+    
+    // Check if the date is tomorrow
+    if (isTomorrow(date)) {
+      return `Tomorrow at ${format(date, 'h:mm a')}`;
+    }
+    
+    return format(date, "MMM d, yyyy 'at' h:mm a");
+  };
+
   if (loading) {
     return (
       <Card>
@@ -68,13 +84,7 @@ export function ScheduledPostsList({
                   <h3 className="font-medium text-sm">{post.content_ideas?.title || "Untitled Post"}</h3>
                   <div className="flex items-center gap-2 mt-1 text-xs text-muted-foreground">
                     <Calendar className="h-3 w-3" />
-                    <span>
-                      {format(new Date(post.next_run_at), "MMM d, yyyy")}
-                    </span>
-                    <Clock className="h-3 w-3 ml-2" />
-                    <span>
-                      {format(new Date(post.next_run_at), "h:mm a")}
-                    </span>
+                    <span>{formatScheduleDate(post.next_run_at)}</span>
                     <span className="ml-1">({post.timezone})</span>
                   </div>
                 </div>

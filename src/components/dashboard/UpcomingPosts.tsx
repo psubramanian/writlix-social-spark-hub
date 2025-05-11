@@ -5,7 +5,7 @@ import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { supabase } from '@/integrations/supabase/client';
 import { getCurrentUser } from '@/utils/supabaseUserUtils';
-import { format } from 'date-fns';
+import { format, isToday, isTomorrow } from 'date-fns';
 
 interface UpcomingPostsProps {
   scheduledPostsCount: number;
@@ -15,6 +15,7 @@ interface UpcomingPost {
   id: string;
   title: string;
   nextRunAt: string;
+  timezone: string;
 }
 
 export function UpcomingPosts({ scheduledPostsCount }: UpcomingPostsProps) {
@@ -27,22 +28,23 @@ export function UpcomingPosts({ scheduledPostsCount }: UpcomingPostsProps) {
         const user = await getCurrentUser();
         if (!user) return;
 
-        // Modified query to properly join tables and fetch scheduled posts
+        const now = new Date();
+        
+        // Get posts that are scheduled for the future
         const { data, error } = await supabase
           .from('scheduled_posts')
           .select(`
             id,
+            next_run_at,
+            timezone,
             content_ideas (
-              id,
               title
-            ),
-            schedule_settings (
-              next_run_at
             )
           `)
           .eq('user_id', user.id)
           .eq('status', 'pending')
-          .order('created_at', { ascending: false })
+          .gt('next_run_at', now.toISOString()) // Only get future posts
+          .order('next_run_at', { ascending: true })
           .limit(2);
 
         if (error) {
@@ -54,7 +56,8 @@ export function UpcomingPosts({ scheduledPostsCount }: UpcomingPostsProps) {
           const formattedPosts = data.map((post) => ({
             id: post.id,
             title: post.content_ideas?.title || 'Untitled Post',
-            nextRunAt: post.schedule_settings?.[0]?.next_run_at || new Date().toISOString()
+            nextRunAt: post.next_run_at,
+            timezone: post.timezone || 'UTC'
           }));
           
           console.log('Formatted upcoming posts:', formattedPosts);
@@ -75,13 +78,14 @@ export function UpcomingPosts({ scheduledPostsCount }: UpcomingPostsProps) {
 
   const formatScheduleDate = (dateString: string) => {
     const date = new Date(dateString);
-    const today = new Date();
+    
+    // Check if the date is today
+    if (isToday(date)) {
+      return `today at ${format(date, 'h:mm a')}`;
+    }
     
     // Check if the date is tomorrow
-    const tomorrow = new Date(today);
-    tomorrow.setDate(tomorrow.getDate() + 1);
-    
-    if (date.toDateString() === tomorrow.toDateString()) {
+    if (isTomorrow(date)) {
       return `tomorrow at ${format(date, 'h:mm a')}`;
     }
     

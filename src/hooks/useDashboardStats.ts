@@ -29,6 +29,7 @@ export function useDashboardStats(selectedMonth: Date) {
 
       const monthStart = startOfMonth(selectedMonth);
       const monthEnd = endOfMonth(selectedMonth);
+      const now = new Date();
 
       // Count all content ideas for the current month (includes both created and imported)
       const { count: totalContentCount, error: createdError } = await supabase
@@ -38,12 +39,13 @@ export function useDashboardStats(selectedMonth: Date) {
         .gte('created_at', monthStart.toISOString())
         .lte('created_at', monthEnd.toISOString());
 
-      // Count scheduled posts (current, not filtered by month)
+      // Count scheduled posts (only future ones)
       const { count: scheduledCount, error: scheduledError } = await supabase
         .from('scheduled_posts')
         .select('id', { count: 'exact', head: true })
         .eq('user_id', user.id)
-        .eq('status', 'pending');
+        .eq('status', 'pending')
+        .gt('next_run_at', now.toISOString()); // Only count future posts
 
       // Count published posts for the current month
       const { count: publishedCount, error: publishedError } = await supabase
