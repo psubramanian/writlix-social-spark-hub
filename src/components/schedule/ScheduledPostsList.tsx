@@ -3,7 +3,8 @@ import React from 'react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
-import { format, isToday, isTomorrow } from 'date-fns';
+import { format } from 'date-fns';
+import { formatInTimeZone } from 'date-fns-tz';
 import { AlertCircle, Loader2, Calendar, Clock } from "lucide-react";
 import { Facebook, Instagram, Linkedin } from "lucide-react";
 
@@ -33,18 +34,23 @@ export function ScheduledPostsList({
   const formatScheduleDate = (dateString: string, timezone: string) => {
     try {
       const date = new Date(dateString);
+      const userTimezone = timezone || 'UTC';
       
-      // Check if the date is today
-      if (isToday(date)) {
-        return `Today at ${format(date, 'h:mm a')}`;
+      // Use formatInTimeZone to ensure correct timezone display
+      // Check if the date is today or tomorrow in the user's timezone
+      const todayInUserTz = formatInTimeZone(new Date(), userTimezone, 'yyyy-MM-dd');
+      const dateInUserTz = formatInTimeZone(date, userTimezone, 'yyyy-MM-dd');
+      const tomorrowInUserTz = formatInTimeZone(new Date(new Date().setDate(new Date().getDate() + 1)), userTimezone, 'yyyy-MM-dd');
+      
+      if (dateInUserTz === todayInUserTz) {
+        return `Today at ${formatInTimeZone(date, userTimezone, 'h:mm a')}`;
       }
       
-      // Check if the date is tomorrow
-      if (isTomorrow(date)) {
-        return `Tomorrow at ${format(date, 'h:mm a')}`;
+      if (dateInUserTz === tomorrowInUserTz) {
+        return `Tomorrow at ${formatInTimeZone(date, userTimezone, 'h:mm a')}`;
       }
       
-      return format(date, "MMM d, yyyy 'at' h:mm a");
+      return formatInTimeZone(date, userTimezone, "MMM d, yyyy 'at' h:mm a");
     } catch (error) {
       console.error("Error formatting date:", error, dateString);
       return "Invalid date";

@@ -40,13 +40,28 @@ export function useDashboardStats(selectedMonth: Date) {
         .gte('created_at', monthStart.toISOString())
         .lte('created_at', monthEnd.toISOString());
 
-      // Count scheduled posts (only future ones)
-      const { count: scheduledCount, error: scheduledError } = await supabase
+      // Count all scheduled posts (only future ones, with no duplicates by content_id)
+      const { data: scheduledPostsData, error: scheduledPostsError } = await supabase
         .from('scheduled_posts')
-        .select('id', { count: 'exact', head: true })
+        .select('content_id')
         .eq('user_id', user.id)
         .eq('status', 'pending')
         .gt('next_run_at', now.toISOString()); // Only count future posts
+
+      if (scheduledPostsError) throw scheduledPostsError;
+      
+      // Deduplicate by content_id to get accurate count
+      const uniqueContentIds = new Set();
+      
+      if (scheduledPostsData) {
+        scheduledPostsData.forEach(post => {
+          if (post.content_id) {
+            uniqueContentIds.add(post.content_id);
+          }
+        });
+      }
+      
+      const scheduledCount = uniqueContentIds.size;
 
       // Count published posts for the current month
       const { count: publishedCount, error: publishedError } = await supabase
@@ -66,7 +81,7 @@ export function useDashboardStats(selectedMonth: Date) {
         .gte('created_at', monthStart.toISOString())
         .lte('created_at', monthEnd.toISOString());
 
-      if (createdError || scheduledError || publishedError || reviewError) {
+      if (createdError || publishedError || reviewError) {
         throw new Error('Error fetching dashboard stats');
       }
 

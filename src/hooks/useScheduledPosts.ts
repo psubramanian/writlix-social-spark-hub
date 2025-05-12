@@ -6,7 +6,7 @@ import { getCurrentUser, useAuthRedirect } from '@/utils/supabaseUserUtils';
 import { useScheduleSettings } from './useScheduleSettings';
 import { usePostOperations } from './usePostOperations';
 import { usePostScheduling } from './usePostScheduling';
-import { format } from 'date-fns';
+import { formatInTimeZone } from 'date-fns-tz';
 
 interface ScheduledPost {
   id: string;
@@ -62,21 +62,26 @@ export function useScheduledPosts() {
 
       console.log('Fetched scheduled posts:', postsData);
       
-      // Make sure we have unique posts (no duplicates by next_run_at)
+      // Improved deduplication: Consider both date and content ID
       const uniquePosts = [];
-      const seenDates = new Set();
+      const seenContentIds = new Set();
       
       if (postsData) {
         for (const post of postsData) {
-          // Format the date for comparison (without seconds)
-          const dateKey = format(new Date(post.next_run_at), 'yyyy-MM-dd HH:mm');
+          const contentId = post.content_ideas?.id;
           
-          if (!seenDates.has(dateKey)) {
-            seenDates.add(dateKey);
-            uniquePosts.push(post);
-          } else {
-            console.log('Skipping duplicate post scheduled for:', dateKey);
+          // Skip this post if we've already seen this content ID
+          if (contentId && seenContentIds.has(contentId)) {
+            console.log(`Skipping duplicate post for content ID: ${contentId}`);
+            continue;
           }
+          
+          // Add this content ID to our tracking set if it exists
+          if (contentId) {
+            seenContentIds.add(contentId);
+          }
+          
+          uniquePosts.push(post);
         }
       }
 

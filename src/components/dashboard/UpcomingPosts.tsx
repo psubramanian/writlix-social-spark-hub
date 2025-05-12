@@ -6,6 +6,7 @@ import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/com
 import { supabase } from '@/integrations/supabase/client';
 import { getCurrentUser } from '@/utils/supabaseUserUtils';
 import { format, isToday, isTomorrow } from 'date-fns';
+import { formatInTimeZone } from 'date-fns-tz';
 
 interface UpcomingPostsProps {
   scheduledPostsCount: number;
@@ -32,6 +33,7 @@ export function UpcomingPosts({ scheduledPostsCount }: UpcomingPostsProps) {
         console.log('Fetching upcoming posts after:', now.toISOString());
         
         // Get posts that are scheduled for the future
+        // Increased limit to 5 instead of 2 to show more posts
         const { data, error } = await supabase
           .from('scheduled_posts')
           .select(`
@@ -39,14 +41,15 @@ export function UpcomingPosts({ scheduledPostsCount }: UpcomingPostsProps) {
             next_run_at,
             timezone,
             content_ideas (
-              title
+              title,
+              id
             )
           `)
           .eq('user_id', user.id)
           .eq('status', 'pending')
           .gt('next_run_at', now.toISOString()) // Only get future posts
           .order('next_run_at', { ascending: true })
-          .limit(2);
+          .limit(5); // Show up to 5 posts instead of just 2
 
         if (error) {
           console.error('Error fetching upcoming posts:', error);
@@ -54,23 +57,30 @@ export function UpcomingPosts({ scheduledPostsCount }: UpcomingPostsProps) {
         }
 
         if (data && data.length > 0) {
-          // Make sure we have unique posts (no duplicates by next_run_at)
+          // Improved deduplication by content ID
           const uniquePosts = [];
-          const seenDates = new Set();
+          const seenContentIds = new Set();
           
           for (const post of data) {
-            // Format the date for comparison (without seconds)
-            const dateKey = format(new Date(post.next_run_at), 'yyyy-MM-dd HH:mm');
+            const contentId = post.content_ideas?.id;
             
-            if (!seenDates.has(dateKey)) {
-              seenDates.add(dateKey);
-              uniquePosts.push({
-                id: post.id,
-                title: post.content_ideas?.title || 'Untitled Post',
-                nextRunAt: post.next_run_at,
-                timezone: post.timezone || 'UTC'
-              });
+            // Skip if we already have this content ID
+            if (contentId && seenContentIds.has(contentId)) {
+              console.log(`Skipping duplicate dashboard post for content ID: ${contentId}`);
+              continue;
             }
+            
+            // Add to tracking set if it exists
+            if (contentId) {
+              seenContentIds.add(contentId);
+            }
+            
+            uniquePosts.push({
+              id: post.id,
+              title: post.content_ideas?.title || 'Untitled Post',
+              nextRunAt: post.next_run_at,
+              timezone: post.timezone || 'UTC'
+            });
           }
           
           console.log('Formatted upcoming posts:', uniquePosts);
@@ -89,21 +99,26 @@ export function UpcomingPosts({ scheduledPostsCount }: UpcomingPostsProps) {
     fetchUpcomingPosts();
   }, []);
 
-  const formatScheduleDate = (dateString: string) => {
+  const formatScheduleDate = (dateString: string, timezone: string) => {
     try {
       const date = new Date(dateString);
+      const userTimezone = timezone || 'UTC';
       
-      // Check if the date is today
-      if (isToday(date)) {
-        return `today at ${format(date, 'h:mm a')}`;
+      // Use formatInTimeZone to ensure correct timezone display
+      // Check if the date is today or tomorrow in the user's timezone
+      const todayInUserTz = formatInTimeZone(new Date(), userTimezone, 'yyyy-MM-dd');
+      const dateInUserTz = formatInTimeZone(date, userTimezone, 'yyyy-MM-dd');
+      const tomorrowInUserTz = formatInTimeZone(new Date(new Date().setDate(new Date().getDate() + 1)), userTimezone, 'yyyy-MM-dd');
+      
+      if (dateInUserTz === todayInUserTz) {
+        return `today at ${formatInTimeZone(date, userTimezone, 'h:mm a')}`;
       }
       
-      // Check if the date is tomorrow
-      if (isTomorrow(date)) {
-        return `tomorrow at ${format(date, 'h:mm a')}`;
+      if (dateInUserTz === tomorrowInUserTz) {
+        return `tomorrow at ${formatInTimeZone(date, userTimezone, 'h:mm a')}`;
       }
       
-      return `${format(date, 'MMM d')} at ${format(date, 'h:mm a')}`;
+      return `${formatInTimeZone(date, userTimezone, 'MMM d')} at ${formatInTimeZone(date, userTimezone, 'h:mm a')}`;
     } catch (error) {
       console.error("Error formatting date:", error, dateString);
       return "Invalid date";
@@ -127,7 +142,7 @@ export function UpcomingPosts({ scheduledPostsCount }: UpcomingPostsProps) {
                   <div key={post.id} className="border rounded-md p-4">
                     <p className="font-medium">{post.title}</p>
                     <p className="text-sm text-muted-foreground mt-1">
-                      Scheduled for {formatScheduleDate(post.nextRunAt)}
+                      Scheduled for {formatScheduleDate(post.nextRunAt, post.timezone)}
                     </p>
                   </div>
                 ))}
