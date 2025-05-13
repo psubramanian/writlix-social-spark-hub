@@ -13,7 +13,7 @@ import { AccountSettingsForm } from '../components/AccountSettingsForm';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 import { AlertCircle } from 'lucide-react';
-import { useAuth } from '@/contexts/AuthContext';
+import { useAuth } from '@/contexts/auth';
 
 const Settings = () => {
   const location = useLocation();

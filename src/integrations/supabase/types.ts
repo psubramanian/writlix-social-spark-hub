@@ -243,6 +243,7 @@ export type Database = {
           facebook_user_id: string | null
           id: string
           long_lived_token: string | null
+          redirect_uri: string | null
           updated_at: string | null
           user_id: string
         }
@@ -256,6 +257,7 @@ export type Database = {
           facebook_user_id?: string | null
           id?: string
           long_lived_token?: string | null
+          redirect_uri?: string | null
           updated_at?: string | null
           user_id: string
         }
@@ -269,6 +271,7 @@ export type Database = {
           facebook_user_id?: string | null
           id?: string
           long_lived_token?: string | null
+          redirect_uri?: string | null
           updated_at?: string | null
           user_id?: string
         }
@@ -285,6 +288,7 @@ export type Database = {
           instagram_profile_data: Json | null
           instagram_user_id: string | null
           long_lived_token: string | null
+          redirect_uri: string | null
           updated_at: string | null
           user_id: string
         }
@@ -298,6 +302,7 @@ export type Database = {
           instagram_profile_data?: Json | null
           instagram_user_id?: string | null
           long_lived_token?: string | null
+          redirect_uri?: string | null
           updated_at?: string | null
           user_id: string
         }
@@ -311,6 +316,7 @@ export type Database = {
           instagram_profile_data?: Json | null
           instagram_user_id?: string | null
           long_lived_token?: string | null
+          redirect_uri?: string | null
           updated_at?: string | null
           user_id?: string
         }
@@ -326,6 +332,7 @@ export type Database = {
           id: string
           linkedin_profile_data: Json | null
           linkedin_profile_id: string | null
+          redirect_uri: string | null
           refresh_token: string | null
           updated_at: string | null
           user_id: string
@@ -339,6 +346,7 @@ export type Database = {
           id?: string
           linkedin_profile_data?: Json | null
           linkedin_profile_id?: string | null
+          redirect_uri?: string | null
           refresh_token?: string | null
           updated_at?: string | null
           user_id: string
@@ -352,6 +360,7 @@ export type Database = {
           id?: string
           linkedin_profile_data?: Json | null
           linkedin_profile_id?: string | null
+          redirect_uri?: string | null
           refresh_token?: string | null
           updated_at?: string | null
           user_id?: string

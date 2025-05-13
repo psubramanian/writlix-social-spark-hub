@@ -31,7 +31,7 @@ serve(async (req) => {
     // Get the LinkedIn credentials for this user
     const { data: credentials, error: credentialsError } = await supabase
       .from('user_linkedin_credentials')
-      .select('client_id, client_secret')
+      .select('client_id, client_secret, redirect_uri')
       .eq('user_id', user_id)
       .maybeSingle();
       
@@ -40,7 +40,9 @@ serve(async (req) => {
       throw new Error('LinkedIn credentials not found. Please add your LinkedIn API credentials in Settings.');
     }
 
-    console.log('Using redirect_uri:', redirect_uri);
+    // Use the provided redirect_uri or the one stored in the database, fall back to a default if needed
+    const finalRedirectUri = redirect_uri || credentials.redirect_uri || `https://xhccvoivnelbzvzxmcoy.supabase.co/auth/v1/callback`;
+    console.log('Using redirect_uri:', finalRedirectUri);
     
     // Exchange the authorization code for an access token
     const tokenResponse = await fetch('https://www.linkedin.com/oauth/v2/accessToken', {
@@ -53,7 +55,7 @@ serve(async (req) => {
         'code': code,
         'client_id': credentials.client_id,
         'client_secret': credentials.client_secret,
-        'redirect_uri': redirect_uri,
+        'redirect_uri': finalRedirectUri,
       }),
     });
 
@@ -88,13 +90,12 @@ serve(async (req) => {
     const { error: tokenSaveError } = await supabase
       .from('user_linkedin_credentials')
       .update({
-        client_id: credentials.client_id,
-        client_secret: credentials.client_secret,
         access_token: tokenData.access_token,
         refresh_token: tokenData.refresh_token,
         expires_at: expiresAt.toISOString(),
         linkedin_profile_id: profileData.id,
-        linkedin_profile_data: profileData
+        linkedin_profile_data: profileData,
+        redirect_uri: finalRedirectUri // Save the redirect URI that was used for this successful authentication
       })
       .eq('user_id', user_id);
       

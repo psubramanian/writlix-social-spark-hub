@@ -5,7 +5,7 @@ import { useToast } from '@/components/ui/use-toast';
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { Loader2 } from "lucide-react";
 import { supabase } from '@/integrations/supabase/client';
-import { useAuth } from '../contexts/AuthContext';
+import { useAuth } from '@/contexts/auth';
 import { Json } from '@/integrations/supabase/types';
 
 // Define types for Facebook profile data
@@ -23,6 +23,7 @@ const FacebookOAuth = () => {
   const { toast } = useToast();
   const { user } = useAuth();
   const [credentialsPresent, setCredentialsPresent] = useState(false);
+  const [redirectUri, setRedirectUri] = useState('');
   
   useEffect(() => {
     const checkConnection = async () => {
@@ -35,7 +36,7 @@ const FacebookOAuth = () => {
         // Check if we have Facebook credentials stored
         const { data, error } = await supabase
           .from('user_facebook_credentials')
-          .select('client_id, access_token, facebook_profile_data')
+          .select('client_id, access_token, facebook_profile_data, redirect_uri')
           .eq('user_id', user.id)
           .maybeSingle();
           
@@ -47,6 +48,12 @@ const FacebookOAuth = () => {
         // Only access data properties if data exists
         if (data && typeof data === 'object') {
           setCredentialsPresent(!!data.client_id);
+          
+          if (data.redirect_uri) {
+            setRedirectUri(data.redirect_uri);
+          } else {
+            setRedirectUri(window.location.origin + window.location.pathname);
+          }
           
           if (data.access_token) {
             setIsConnected(true);
@@ -61,6 +68,7 @@ const FacebookOAuth = () => {
           }
         } else {
           setCredentialsPresent(false);
+          setRedirectUri(window.location.origin + window.location.pathname);
         }
       } catch (error) {
         console.error('Error checking Facebook connection:', error);
@@ -115,8 +123,18 @@ const FacebookOAuth = () => {
           // Clear the state from session storage
           sessionStorage.removeItem('facebook_state');
           
-          const redirectUri = encodeURIComponent(`${window.location.origin}${window.location.pathname}`);
-          console.log('Using redirect URI:', `${window.location.origin}${window.location.pathname}`);      
+          // Get user's configured redirect URI
+          const { data: credentials } = await supabase
+            .from('user_facebook_credentials')
+            .select('redirect_uri')
+            .eq('user_id', user.id)
+            .maybeSingle();
+            
+          // Use custom redirect URI if available, otherwise use default
+          const finalRedirectUri = (credentials && credentials.redirect_uri) || 
+            (window.location.origin + window.location.pathname);
+            
+          console.log('Using redirect URI:', finalRedirectUri);
           
           // Exchange the code for an access token
           const { data, error } = await supabase.functions.invoke('facebook-oauth', {
@@ -124,7 +142,7 @@ const FacebookOAuth = () => {
               code,
               state,
               user_id: user.id,
-              redirect_uri: redirectUri
+              redirect_uri: finalRedirectUri
             }
           });
           
@@ -171,7 +189,7 @@ const FacebookOAuth = () => {
       // Get user's Facebook credentials
       const { data: credentials, error: credentialsError } = await supabase
         .from('user_facebook_credentials')
-        .select('client_id')
+        .select('client_id, redirect_uri')
         .eq('user_id', user.id)
         .maybeSingle();
         
@@ -194,12 +212,15 @@ const FacebookOAuth = () => {
       const state = generateRandomString();
       sessionStorage.setItem('facebook_state', state);
       
+      // Use custom redirect URI if available, default to current page otherwise
+      const finalRedirectUri = credentials.redirect_uri || (window.location.origin + window.location.pathname);
+      
       // Get the redirect URI
-      const redirectUri = encodeURIComponent(`${window.location.origin}${window.location.pathname}`);
-      console.log('Using redirect URI:', `${window.location.origin}${window.location.pathname}`);      
+      const encodedRedirectUri = encodeURIComponent(finalRedirectUri);
+      console.log('Using redirect URI:', finalRedirectUri);      
       
       // Redirect to Facebook authorization page
-      const facebookAuthUrl = `https://www.facebook.com/v18.0/dialog/oauth?client_id=${credentials.client_id}&redirect_uri=${redirectUri}&state=${state}&scope=pages_show_list,pages_read_engagement,pages_manage_posts,public_profile`;
+      const facebookAuthUrl = `https://www.facebook.com/v18.0/dialog/oauth?client_id=${credentials.client_id}&redirect_uri=${encodedRedirectUri}&state=${state}&scope=pages_show_list,pages_read_engagement,pages_manage_posts,public_profile`;
       
       window.location.href = facebookAuthUrl;
     } catch (error: any) {

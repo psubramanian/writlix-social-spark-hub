@@ -6,16 +6,21 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { useToast } from "@/components/ui/use-toast";
 import { supabase } from '@/integrations/supabase/client';
-import { useAuth } from '../contexts/AuthContext';
+import { useAuth } from '@/contexts/auth';
 import { TablesInsert, TablesUpdate } from '@/integrations/supabase/types';
+import { HelpCircle } from 'lucide-react';
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 
 const LinkedInCredentialsForm = () => {
   const [clientId, setClientId] = useState('');
   const [clientSecret, setClientSecret] = useState('');
+  const [redirectUri, setRedirectUri] = useState('');
   const [loading, setLoading] = useState(false);
   const [hasCredentials, setHasCredentials] = useState(false);
   const { toast } = useToast();
   const { user } = useAuth();
+  const defaultRedirectUri = typeof window !== "undefined" ? 
+    window.location.origin + window.location.pathname : "";
 
   useEffect(() => {
     fetchCredentials();
@@ -32,7 +37,7 @@ const LinkedInCredentialsForm = () => {
 
       const { data, error } = await supabase
         .from('user_linkedin_credentials')
-        .select('client_id, client_secret')
+        .select('client_id, client_secret, redirect_uri')
         .eq('user_id', user.id)
         .maybeSingle();
 
@@ -46,9 +51,11 @@ const LinkedInCredentialsForm = () => {
         // Type-safe access to properties
         setClientId(data.client_id || '');
         setClientSecret(data.client_secret || '');
+        setRedirectUri(data.redirect_uri || defaultRedirectUri);
         setHasCredentials(true);
       } else {
         console.log('No LinkedIn credentials found');
+        setRedirectUri(defaultRedirectUri);
       }
     } catch (error) {
       console.error('Error fetching LinkedIn credentials:', error);
@@ -69,6 +76,7 @@ const LinkedInCredentialsForm = () => {
         const credentials: TablesUpdate<'user_linkedin_credentials'> = {
           client_id: clientId,
           client_secret: clientSecret,
+          redirect_uri: redirectUri,
         };
         
         const { error: updateError } = await supabase
@@ -83,6 +91,7 @@ const LinkedInCredentialsForm = () => {
           user_id: user.id,
           client_id: clientId,
           client_secret: clientSecret,
+          redirect_uri: redirectUri,
         };
         
         const { error: insertError } = await supabase
@@ -119,17 +128,6 @@ const LinkedInCredentialsForm = () => {
         <CardTitle>LinkedIn API Credentials</CardTitle>
         <CardDescription>
           Enter your LinkedIn API credentials to enable posting to your account
-          <br />
-          <span>
-            <strong>Redirect URI:</strong>
-            <code style={{ marginLeft: 8 }}>
-              {typeof window !== "undefined" ? window.location.origin + window.location.pathname : ""}
-            </code>
-            <br />
-            <span className="text-xs text-muted-foreground">
-              Copy this URI into your LinkedIn app settings under "Authorized Redirect URLs".
-            </span>
-          </span>
         </CardDescription>
       </CardHeader>
       <CardContent>
@@ -156,6 +154,32 @@ const LinkedInCredentialsForm = () => {
               placeholder="Enter your LinkedIn Client Secret"
               required
             />
+          </div>
+
+          <div className="space-y-2">
+            <div className="flex items-center gap-2">
+              <Label htmlFor="redirectUri">Redirect URI</Label>
+              <TooltipProvider>
+                <Tooltip>
+                  <TooltipTrigger asChild>
+                    <HelpCircle size={16} className="text-muted-foreground" />
+                  </TooltipTrigger>
+                  <TooltipContent className="max-w-sm">
+                    <p>This is the URL where LinkedIn will redirect after authentication. It must match exactly what you configured in your LinkedIn app settings.</p>
+                  </TooltipContent>
+                </Tooltip>
+              </TooltipProvider>
+            </div>
+            <Input
+              id="redirectUri"
+              type="text"
+              value={redirectUri}
+              onChange={(e) => setRedirectUri(e.target.value)}
+              placeholder={defaultRedirectUri}
+            />
+            <p className="text-xs text-muted-foreground">
+              Copy this URI into your LinkedIn app settings under "Authorized Redirect URLs".
+            </p>
           </div>
 
           <Button type="submit" disabled={loading}>

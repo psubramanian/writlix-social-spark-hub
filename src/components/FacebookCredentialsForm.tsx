@@ -6,15 +6,21 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { useToast } from "@/components/ui/use-toast";
 import { supabase } from '@/integrations/supabase/client';
-import { useAuth } from '../contexts/AuthContext';
+import { useAuth } from '@/contexts/auth';
+import { TablesInsert, TablesUpdate } from '@/integrations/supabase/types';
+import { HelpCircle } from 'lucide-react';
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 
 const FacebookCredentialsForm = () => {
   const [clientId, setClientId] = useState('');
   const [clientSecret, setClientSecret] = useState('');
+  const [redirectUri, setRedirectUri] = useState('');
   const [loading, setLoading] = useState(false);
   const [hasCredentials, setHasCredentials] = useState(false);
   const { toast } = useToast();
   const { user } = useAuth();
+  const defaultRedirectUri = typeof window !== "undefined" ? 
+    window.location.origin + window.location.pathname : "";
 
   useEffect(() => {
     fetchCredentials();
@@ -31,7 +37,7 @@ const FacebookCredentialsForm = () => {
 
       const { data, error } = await supabase
         .from('user_facebook_credentials')
-        .select('client_id, client_secret')
+        .select('client_id, client_secret, redirect_uri')
         .eq('user_id', user.id)
         .maybeSingle();
 
@@ -44,9 +50,11 @@ const FacebookCredentialsForm = () => {
         console.log('Found Facebook credentials', { hasClientId: !!data.client_id });
         setClientId(data.client_id || '');
         setClientSecret(data.client_secret || '');
+        setRedirectUri(data.redirect_uri || defaultRedirectUri);
         setHasCredentials(true);
       } else {
         console.log('No Facebook credentials found');
+        setRedirectUri(defaultRedirectUri);
       }
     } catch (error) {
       console.error('Error fetching Facebook credentials:', error);
@@ -64,24 +72,30 @@ const FacebookCredentialsForm = () => {
 
       if (hasCredentials) {
         // For update operation
+        const credentials: TablesUpdate<'user_facebook_credentials'> = {
+          client_id: clientId,
+          client_secret: clientSecret,
+          redirect_uri: redirectUri,
+        };
+        
         const { error: updateError } = await supabase
           .from('user_facebook_credentials')
-          .update({
-            client_id: clientId,
-            client_secret: clientSecret,
-          })
+          .update(credentials)
           .eq('user_id', user.id);
         
         if (updateError) throw updateError;
       } else {
         // For insert operation
+        const credentials: TablesInsert<'user_facebook_credentials'> = {
+          user_id: user.id,
+          client_id: clientId,
+          client_secret: clientSecret,
+          redirect_uri: redirectUri,
+        };
+        
         const { error: insertError } = await supabase
           .from('user_facebook_credentials')
-          .insert({
-            user_id: user.id,
-            client_id: clientId,
-            client_secret: clientSecret,
-          });
+          .insert(credentials);
         
         if (insertError) throw insertError;
       }
@@ -113,17 +127,6 @@ const FacebookCredentialsForm = () => {
         <CardTitle>Facebook API Credentials</CardTitle>
         <CardDescription>
           Enter your Facebook API credentials to enable posting to your account
-          <br />
-          <span>
-            <strong>Redirect URI:</strong>
-            <code style={{ marginLeft: 8 }}>
-              {typeof window !== "undefined" ? window.location.origin + window.location.pathname : ""}
-            </code>
-            <br />
-            <span className="text-xs text-muted-foreground">
-              Copy this URI into your Facebook app settings under "Valid OAuth Redirect URIs".
-            </span>
-          </span>
         </CardDescription>
       </CardHeader>
       <CardContent>
@@ -150,6 +153,32 @@ const FacebookCredentialsForm = () => {
               placeholder="Enter your Facebook App Secret"
               required
             />
+          </div>
+
+          <div className="space-y-2">
+            <div className="flex items-center gap-2">
+              <Label htmlFor="redirectUri">Redirect URI</Label>
+              <TooltipProvider>
+                <Tooltip>
+                  <TooltipTrigger asChild>
+                    <HelpCircle size={16} className="text-muted-foreground" />
+                  </TooltipTrigger>
+                  <TooltipContent className="max-w-sm">
+                    <p>This is the URL where Facebook will redirect after authentication. It must match exactly what you configured in your Facebook app settings.</p>
+                  </TooltipContent>
+                </Tooltip>
+              </TooltipProvider>
+            </div>
+            <Input
+              id="redirectUri"
+              type="text"
+              value={redirectUri}
+              onChange={(e) => setRedirectUri(e.target.value)}
+              placeholder={defaultRedirectUri}
+            />
+            <p className="text-xs text-muted-foreground">
+              Copy this URI into your Facebook app settings under "Valid OAuth Redirect URIs".
+            </p>
           </div>
 
           <Button type="submit" disabled={loading}>

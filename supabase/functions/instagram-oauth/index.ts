@@ -31,7 +31,7 @@ serve(async (req) => {
     // Get the Instagram credentials for this user
     const { data: credentials, error: credentialsError } = await supabase
       .from('user_instagram_credentials')
-      .select('client_id, client_secret')
+      .select('client_id, client_secret, redirect_uri')
       .eq('user_id', user_id)
       .maybeSingle();
       
@@ -40,7 +40,9 @@ serve(async (req) => {
       throw new Error('Instagram credentials not found. Please add your Instagram API credentials in Settings.');
     }
 
-    console.log('Using redirect_uri:', redirect_uri);
+    // Use the provided redirect_uri or the one stored in the database
+    const finalRedirectUri = redirect_uri || credentials.redirect_uri || '';
+    console.log('Using redirect_uri:', finalRedirectUri);
     
     // Exchange the authorization code for an access token
     const tokenResponse = await fetch('https://api.instagram.com/oauth/access_token', {
@@ -53,7 +55,7 @@ serve(async (req) => {
         'client_secret': credentials.client_secret,
         'code': code,
         'grant_type': 'authorization_code',
-        'redirect_uri': redirect_uri,
+        'redirect_uri': finalRedirectUri,
       }),
     });
 
@@ -101,9 +103,10 @@ serve(async (req) => {
         long_lived_token: longLivedTokenData.access_token || null,
         expires_at: expiresAt.toISOString(),
         instagram_user_id: profileData.id,
-        instagram_profile_data: profileData
+        instagram_profile_data: profileData,
+        redirect_uri: finalRedirectUri // Save the redirect URI that was used
       })
-      .eq('user_id', user_id);
+      .eq('user_id', user.id);
       
     if (tokenSaveError) {
       console.error('Failed to save Instagram token:', tokenSaveError);
