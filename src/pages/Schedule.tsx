@@ -2,6 +2,7 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { Separator } from "@/components/ui/separator"; 
 import SchedulePostForm from '../components/SchedulePostForm';
 import { useScheduledPosts } from '../hooks/useScheduledPosts';
 import { useToast } from '@/components/ui/use-toast';
@@ -16,17 +17,6 @@ import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, D
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 
-// Add type definition for scheduled posts that's consistent with our components
-interface ScheduledPostDisplay {
-  id: string;
-  content_ideas?: {
-    title: string;
-    status: string;
-  };
-  next_run_at: string;
-  timezone: string;
-}
-
 interface SocialConnectionStatus {
   linkedin: boolean;
   facebook: boolean;
@@ -35,7 +25,16 @@ interface SocialConnectionStatus {
 
 const Schedule = () => {
   const navigate = useNavigate();
-  const { posts, loading: postsLoading, userSettings, fetchPosts } = useScheduledPosts();
+  const { 
+    posts, 
+    groupedPosts,
+    loading: postsLoading, 
+    userSettings, 
+    fetchPosts,
+    formatScheduleDate,
+    getSchedulePattern
+  } = useScheduledPosts();
+  
   const { postToLinkedIn, postToFacebook, postToInstagram } = usePostOperations();
   const [postingId, setPostingId] = useState<string | null>(null);
   const [activePlatform, setActivePlatform] = useState<string | null>(null);
@@ -112,6 +111,7 @@ const Schedule = () => {
   }, [user]);
 
   const scheduledPosts = posts.filter(post => post.content_ideas?.status !== 'Published');
+  const schedulePattern = userSettings ? getSchedulePattern(userSettings) : undefined;
 
   const handleScheduleSubmit = async (settings: any) => {
     const success = await updateUserSettings(settings);
@@ -216,39 +216,49 @@ const Schedule = () => {
         <p className="text-muted-foreground">Plan and manage your social media posts</p>
       </div>
       
-      <Tabs defaultValue="scheduled">
-        <div className="flex justify-between items-center mb-6">
-          <TabsList>
-            <TabsTrigger value="scheduled">Scheduled Posts</TabsTrigger>
-          </TabsList>
-        </div>
-        
-        <TabsContent value="scheduled" className="mt-0">
+      <div className="grid grid-cols-1 gap-8">
+        {/* Schedule Settings Section */}
+        <div className="mb-6">
+          <h2 className="text-xl font-semibold mb-4">Schedule Settings</h2>
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-            <div className="lg:col-span-1">
+            <div>
               <CurrentScheduleCard settings={userSettings} />
+            </div>
+            <div>
               <SchedulePostForm 
                 onSchedule={handleScheduleSubmit} 
                 initialValues={userSettings}
                 isUpdating={isUpdating}
               />
             </div>
-            
-            <div className="lg:col-span-1">
-              {!checkingConnection && !socialConnections.linkedin && 
-               !socialConnections.facebook && !socialConnections.instagram && (
-                <LinkedInWarning onClick={handleConnectSocial} />
-              )}
-              <ScheduledPostsList
-                posts={scheduledPosts}
-                postingId={postingId}
-                onPostNow={handlePostNow}
-                loading={postsLoading}
-              />
-            </div>
           </div>
-        </TabsContent>
-      </Tabs>
+        </div>
+        
+        <Separator className="my-4" />
+        
+        {/* Scheduled Posts Section */}
+        <div>
+          <h2 className="text-xl font-semibold mb-4">Scheduled Posts</h2>
+          
+          {!checkingConnection && !socialConnections.linkedin && 
+           !socialConnections.facebook && !socialConnections.instagram && (
+            <div className="mb-6">
+              <LinkedInWarning onClick={handleConnectSocial} />
+            </div>
+          )}
+          
+          <ScheduledPostsList
+            posts={scheduledPosts}
+            groupedPosts={groupedPosts}
+            postingId={postingId}
+            onPostNow={handlePostNow}
+            loading={postsLoading}
+            formatScheduleDate={formatScheduleDate}
+            schedulePattern={schedulePattern}
+            userTimezone={userSettings?.timezone}
+          />
+        </div>
+      </div>
       
       {/* Dialog for Instagram image URL input */}
       <Dialog open={instagramDialogOpen} onOpenChange={setInstagramDialogOpen}>
