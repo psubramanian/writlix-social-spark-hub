@@ -7,7 +7,7 @@ export function clearAuthLocalStorage() {
   console.log(`[AUTH ${timestamp}] Clearing all auth-related storage`);
   
   try {
-    // Clear all auth-related localStorage items
+    // Clear all auth-related localStorage items - enhanced to catch more keys
     localStorage.removeItem('profile_skip_attempted');
     localStorage.removeItem('profile_completed');
     localStorage.removeItem('profile_bypass_attempts');
@@ -15,14 +15,25 @@ export function clearAuthLocalStorage() {
     localStorage.removeItem('auth_timestamp');
     localStorage.removeItem('auth_email');
     
-    // Also clear any Supabase specific auth items
-    localStorage.removeItem('writlix_supabase_auth');
+    // Clean all Supabase specific auth items with a more thorough approach
+    Object.keys(localStorage).forEach(key => {
+      if (key.startsWith('supabase.auth.') || 
+          key.includes('sb-') || 
+          key === 'writlix_supabase_auth') {
+        localStorage.removeItem(key);
+        console.log(`[AUTH ${timestamp}] Removed localStorage key: ${key}`);
+      }
+    });
     
     // Clear session storage items
-    sessionStorage.removeItem('auth_flow_started');
-    sessionStorage.removeItem('auth_provider');
-    sessionStorage.removeItem('auth_redirect_url');
-    sessionStorage.removeItem('auth_local_flags');
+    Object.keys(sessionStorage).forEach(key => {
+      if (key.startsWith('auth_') || 
+          key.startsWith('supabase.auth.') || 
+          key.includes('sb-')) {
+        sessionStorage.removeItem(key);
+        console.log(`[AUTH ${timestamp}] Removed sessionStorage key: ${key}`);
+      }
+    });
     
     console.log(`[AUTH ${timestamp}] Successfully cleared auth storage`);
   } catch (error) {
@@ -46,11 +57,19 @@ export function restoreAuthLocalFlags() {
       return;
     }
     
-    const flags = JSON.parse(savedFlags);
+    let flags;
+    try {
+      flags = JSON.parse(savedFlags);
+    } catch (e) {
+      console.warn(`[AUTH ${timestamp}] Invalid JSON format in saved flags: ${savedFlags}`);
+      sessionStorage.removeItem('auth_local_flags');
+      return;
+    }
     
     // Check if flags is a valid object
     if (!flags || typeof flags !== 'object') {
       console.warn(`[AUTH ${timestamp}] Invalid flags format in session storage`);
+      sessionStorage.removeItem('auth_local_flags');
       return;
     }
     
@@ -71,6 +90,11 @@ export function restoreAuthLocalFlags() {
     }
     
     console.log(`[AUTH ${timestamp}] Auth flag restoration complete - restored ${restoredCount} items`);
+    
+    // Clean up session storage after successful restoration
+    if (restoredCount > 0) {
+      sessionStorage.removeItem('auth_local_flags');
+    }
   } catch (e) {
     console.warn(`[AUTH ${timestamp}] Error restoring auth flags:`, e);
   }
@@ -119,4 +143,42 @@ export function getAllAuthStorage() {
       auth_local_flags: sessionStorage.getItem('auth_local_flags')
     }
   };
+}
+
+/**
+ * Perform a complete auth reset - useful for resolving login issues
+ */
+export function performAuthReset() {
+  const timestamp = new Date().toISOString();
+  console.log(`[AUTH ${timestamp}] Performing complete auth reset`);
+  
+  // First clear all storage
+  clearAuthLocalStorage();
+  
+  // Then also clear any other potentially problematic items
+  try {
+    Object.keys(localStorage).forEach(key => {
+      if (key.startsWith('supabase.auth.') || 
+          key.includes('sb-') || 
+          key.startsWith('auth_') || 
+          key.startsWith('profile_')) {
+        localStorage.removeItem(key);
+      }
+    });
+    
+    Object.keys(sessionStorage).forEach(key => {
+      if (key.startsWith('supabase.auth.') || 
+          key.includes('sb-') || 
+          key.startsWith('auth_') || 
+          key.startsWith('profile_')) {
+        sessionStorage.removeItem(key);
+      }
+    });
+    
+    console.log(`[AUTH ${timestamp}] Auth reset completed successfully`);
+    return true;
+  } catch (error) {
+    console.error(`[AUTH ${timestamp}] Error during auth reset:`, error);
+    return false;
+  }
 }

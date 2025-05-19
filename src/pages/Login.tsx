@@ -1,14 +1,15 @@
+
 import React, { useEffect, useState } from 'react';
 import { useAuth } from '../contexts/auth';
 import { useNavigate } from 'react-router-dom';
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from '@/components/ui/card';
 import { useToast } from '@/components/ui/use-toast';
-import { restoreAuthLocalFlags, saveAuthLocalFlagsToSession } from '@/utils/auth/storageUtils';
+import { restoreAuthLocalFlags, saveAuthLocalFlagsToSession, performAuthReset } from '@/utils/auth/storageUtils';
 import { checkAndRecoverSession } from '@/integrations/supabase/client';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Loader2 } from 'lucide-react';
 
-// Import our new components
+// Import our components
 import { LoginForm, LoginFormValues } from '@/components/auth/LoginForm';
 import { SignupForm, SignupFormValues } from '@/components/auth/SignupForm';
 import { SocialLoginButtons } from '@/components/auth/SocialLoginButtons';
@@ -65,7 +66,7 @@ const Login = () => {
       
       console.log(`[LOGIN ${timestamp}] Attempting session recovery`);
       
-      // First check if we have auth flags that suggest a broken session
+      // Check for broken auth state
       const hasAuthFlag = localStorage.getItem('auth_active') === 'true';
       const authTimestamp = localStorage.getItem('auth_timestamp');
       const authEmail = localStorage.getItem('auth_email');
@@ -89,7 +90,11 @@ const Login = () => {
               navigate('/dashboard', { replace: true });
             }, 100);
           } else {
-            console.log(`[LOGIN ${timestamp}] Session recovery failed`);
+            console.log(`[LOGIN ${timestamp}] Session recovery failed - cleaning stale state`);
+            // Clean up stale auth flags
+            localStorage.removeItem('auth_active');
+            localStorage.removeItem('auth_timestamp');
+            localStorage.removeItem('auth_email');
           }
         });
       }
@@ -117,6 +122,9 @@ const Login = () => {
       setIsLoading(true);
       setProvider(providerName);
       console.log(`[LOGIN ${timestamp}] Attempting to login with ${providerName}...`);
+      
+      // Reset auth state before login
+      performAuthReset();
       
       // Before initiating login, save current flags to session storage
       saveAuthLocalFlagsToSession();
@@ -152,6 +160,9 @@ const Login = () => {
       
       console.log(`[LOGIN] Attempting to login with email: ${data.email}`);
       
+      // Reset auth state before login
+      performAuthReset();
+      
       // Save current flags to session storage before login attempt
       saveAuthLocalFlagsToSession();
       
@@ -165,6 +176,11 @@ const Login = () => {
         title: "Login successful",
         description: "Redirecting you to dashboard...",
       });
+      
+      // Force redirect after successful login
+      setTimeout(() => {
+        navigate('/dashboard', { replace: true });
+      }, 100);
     } catch (error: any) {
       console.error(`[LOGIN] Login error:`, error);
       setErrorMessage(error.message || "There was an error logging in. Please try again.");
@@ -185,6 +201,9 @@ const Login = () => {
       setIsLoading(true);
       
       console.log(`[SIGNUP] Attempting to create account with email: ${data.email}`);
+      
+      // Reset auth state before signup
+      performAuthReset();
       
       // Save current flags to session storage
       saveAuthLocalFlagsToSession();

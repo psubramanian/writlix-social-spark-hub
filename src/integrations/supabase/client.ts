@@ -12,7 +12,8 @@ export const supabase = createClient<Database>(SUPABASE_URL, SUPABASE_PUBLISHABL
     persistSession: true,
     autoRefreshToken: true,
     detectSessionInUrl: true,
-    flowType: 'implicit',
+    // Change from 'implicit' to 'pkce' for better reliability
+    flowType: 'pkce',
     debug: process.env.NODE_ENV === 'development',
     // Set a longer storage key to avoid conflicts with other apps
     storageKey: 'writlix_supabase_auth',
@@ -163,10 +164,11 @@ export const checkAndRecoverSession = async (forceCheck = false): Promise<boolea
       
       // If we've reached max attempts, alert the user about the broken state
       if (sessionRecoveryAttempts >= maxSessionRecoveryAttempts) {
-        if (window.confirm("Your session appears to be broken. Refresh to attempt recovery?")) {
-          window.location.reload();
-          return true; // Returning true as we're handling the recovery with a page reload
-        }
+        console.warn(`[AUTH ${timestamp}] Maximum recovery attempts reached, consider clearing local storage`);
+        // Clean up local storage to prevent future attempts
+        localStorage.removeItem('auth_active');
+        localStorage.removeItem('auth_timestamp');
+        localStorage.removeItem('auth_email');
       }
     }
     
@@ -184,3 +186,38 @@ export const getSessionStatus = () => ({
   recoveryAttempts: sessionRecoveryAttempts,
   maxRecoveryAttempts: maxSessionRecoveryAttempts
 });
+
+// Added utility to clean up all auth-related storage
+export const cleanupAuthStorage = () => {
+  const timestamp = new Date().toISOString();
+  console.log(`[AUTH ${timestamp}] Cleaning up all auth-related storage`);
+  
+  try {
+    // Clean localStorage
+    Object.keys(localStorage).forEach(key => {
+      if (key.startsWith('supabase.auth.') || 
+          key.includes('sb-') || 
+          key.startsWith('auth_') || 
+          key.startsWith('profile_') ||
+          key === 'writlix_supabase_auth') {
+        localStorage.removeItem(key);
+      }
+    });
+    
+    // Clean sessionStorage
+    Object.keys(sessionStorage).forEach(key => {
+      if (key.startsWith('supabase.auth.') || 
+          key.includes('sb-') || 
+          key.startsWith('auth_') || 
+          key.startsWith('profile_')) {
+        sessionStorage.removeItem(key);
+      }
+    });
+    
+    console.log(`[AUTH ${timestamp}] Auth storage cleaned up successfully`);
+    return true;
+  } catch (error) {
+    console.error(`[AUTH ${timestamp}] Error cleaning auth storage:`, error);
+    return false;
+  }
+};

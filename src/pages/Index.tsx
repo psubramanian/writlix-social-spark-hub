@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect } from 'react';
 import { useAuth } from '../contexts/auth';
 import { useNavigate } from 'react-router-dom';
@@ -12,6 +13,16 @@ const Index = () => {
   const { isAuthenticated, isLoading } = useAuth();
   const navigate = useNavigate();
   const [isNewsletterPopupOpen, setIsNewsletterPopupOpen] = useState(false);
+  const [contentLoaded, setContentLoaded] = useState(false);
+  
+  // Start loading the content after a short delay for better initial rendering
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      setContentLoaded(true);
+    }, 100);
+    
+    return () => clearTimeout(timer);
+  }, []);
   
   // Redirect authenticated users to dashboard after auth check is complete
   useEffect(() => {
@@ -57,11 +68,19 @@ const Index = () => {
   
   return (
     <div className="min-h-screen bg-black dark:bg-black">
+      {/* Always render Header for faster perceived loading */}
       <Header />
-      <Hero />
-      <Features />
-      <CTASection />
-      <Footer />
+      
+      {/* Conditionally render the rest of the content */}
+      {contentLoaded && (
+        <>
+          <Hero />
+          <Features />
+          <CTASection />
+          <Footer />
+        </>
+      )}
+      
       <NewsletterPopup 
         isOpen={isNewsletterPopupOpen} 
         onClose={() => setIsNewsletterPopupOpen(false)} 

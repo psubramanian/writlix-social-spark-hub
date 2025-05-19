@@ -1,10 +1,11 @@
+
 import { useState, useEffect, useRef, useCallback } from "react";
 import { Session } from "@supabase/supabase-js";
 import { useToast } from "@/components/ui/use-toast";
-import { supabase, checkAndRecoverSession, getSessionStatus } from "@/integrations/supabase/client";
+import { supabase, checkAndRecoverSession, getSessionStatus, cleanupAuthStorage } from "@/integrations/supabase/client";
 import { ExtendedUser, AuthContextType } from "./types";
 import { processUserData, logDebug } from "./utils";
-import { clearAuthLocalStorage, restoreAuthLocalFlags } from "@/utils/auth/storageUtils";
+import { clearAuthLocalStorage, restoreAuthLocalFlags, performAuthReset } from "@/utils/auth/storageUtils";
 
 export function useAuthProvider(): AuthContextType {
   const [user, setUser] = useState<ExtendedUser | null>(null);
@@ -62,13 +63,16 @@ export function useAuthProvider(): AuthContextType {
       if (sessionExists) {
         console.log(`[AUTH ${timestamp}] Session recovery successful`);
         // Allow normal authentication flow to continue
+        return true;
       } else {
         console.log(`[AUTH ${timestamp}] No session found during recovery`);
         setIsLoading(false);
+        return false;
       }
     } catch (error) {
       console.error(`[AUTH ${timestamp}] Session recovery failed:`, error);
       setIsLoading(false);
+      return false;
     }
   }, []);
 
@@ -88,7 +92,7 @@ export function useAuthProvider(): AuthContextType {
     try {
       // Set up auth state listener first, before checking current session
       const { data: { subscription } } = supabase.auth.onAuthStateChange(
-        async (event, newSession) => {
+        (event, newSession) => {
           const eventTimestamp = new Date().toISOString();
           authStateChangeCount.current += 1;
           const count = authStateChangeCount.current;
@@ -97,12 +101,14 @@ export function useAuthProvider(): AuthContextType {
             newSession?.user?.email || 'No user'
           );
           
+          // Use synchronous state updates first
           if (event === 'SIGNED_OUT') {
             console.log(`[AUTH ${eventTimestamp}] (#${count}) User signed out, clearing state`);
             setUser(null);
             setSession(null);
             setIsLoading(false);
-            clearAuthLocalStorage();
+            // Use the comprehensive cleanup
+            performAuthReset();
           }
           
           // Update session state if different
@@ -117,11 +123,14 @@ export function useAuthProvider(): AuthContextType {
             
             // Reset bypass attempts counter on sign in
             localStorage.removeItem('profile_bypass_attempts');
+            localStorage.setItem('auth_active', 'true');
+            localStorage.setItem('auth_timestamp', eventTimestamp);
+            localStorage.setItem('auth_email', newSession.user?.email || '');
             
             // Use setTimeout to avoid any potential auth deadlocks
             setTimeout(() => {
               loadUserProfile(newSession);
-            }, 10);
+            }, 20);
             
             // Check for auth flow and handle redirect
             const authFlowStarted = sessionStorage.getItem('auth_flow_started');
@@ -135,48 +144,58 @@ export function useAuthProvider(): AuthContextType {
               sessionStorage.removeItem('auth_provider');
               sessionStorage.removeItem('auth_redirect_url');
               
+              // Set loading to false before redirect
+              setIsLoading(false);
+              
               // Redirect to the stored URL after a short delay
               // This gives time for other auth state updates to complete
               setTimeout(() => {
                 window.location.href = redirectUrl;
-              }, 100);
+              }, 150);
+            } else {
+              // No redirect needed, just update the loading state
+              setTimeout(() => {
+                setIsLoading(false);
+              }, 50);
             }
           }
         }
       );
       
-      // Then check for existing session
-      supabase.auth.getSession().then(({ data: { session: currentSession }, error }) => {
-        const checkTimestamp = new Date().toISOString();
-        
-        if (error) {
-          console.error(`[AUTH ${checkTimestamp}] Error getting current session:`, error);
-          setIsLoading(false);
-          setInitComplete(true);
-          return;
-        }
-        
-        console.log(`[AUTH ${checkTimestamp}] Initial session check:`, 
-          currentSession ? 'Session found' : 'No session'
-        );
-        
-        setSession(currentSession);
-        
-        if (currentSession) {
-          // Load user profile after a short delay
-          setTimeout(() => {
-            loadUserProfile(currentSession)
-              .finally(() => {
-                setIsLoading(false);
-                setInitComplete(true);
-              });
-          }, 10);
-        } else {
-          // No session found
-          setIsLoading(false);
-          setInitComplete(true);
-        }
-      });
+      // Then check for existing session with a small delay to ensure listener is ready
+      setTimeout(() => {
+        supabase.auth.getSession().then(({ data: { session: currentSession }, error }) => {
+          const checkTimestamp = new Date().toISOString();
+          
+          if (error) {
+            console.error(`[AUTH ${checkTimestamp}] Error getting current session:`, error);
+            setIsLoading(false);
+            setInitComplete(true);
+            return;
+          }
+          
+          console.log(`[AUTH ${checkTimestamp}] Initial session check:`, 
+            currentSession ? 'Session found' : 'No session'
+          );
+          
+          setSession(currentSession);
+          
+          if (currentSession) {
+            // Load user profile after a short delay
+            setTimeout(() => {
+              loadUserProfile(currentSession)
+                .finally(() => {
+                  setIsLoading(false);
+                  setInitComplete(true);
+                });
+            }, 20);
+          } else {
+            // No session found
+            setIsLoading(false);
+            setInitComplete(true);
+          }
+        });
+      }, 10);
       
       return () => {
         subscription.unsubscribe();
@@ -190,14 +209,14 @@ export function useAuthProvider(): AuthContextType {
   
   // Add a safety mechanism to prevent infinite loading state
   useEffect(() => {
-    // If still loading after 5 seconds, force complete
+    // If still loading after 3 seconds, force complete
     const safetyTimer = setTimeout(() => {
       if (isLoading) {
         console.warn("[AUTH] Safety timeout reached - forcing loading state to complete");
         setIsLoading(false);
         setInitComplete(true);
       }
-    }, 5000);
+    }, 3000); // Reduced from 5s to 3s for faster recovery
     
     return () => clearTimeout(safetyTimer);
   }, [isLoading]);
@@ -220,6 +239,18 @@ export function useAuthProvider(): AuthContextType {
     
     try {
       setIsLoading(true);
+      
+      // First clear any existing auth state to prevent conflicts
+      performAuthReset();
+      
+      // Try a global sign out first to ensure clean state
+      try {
+        await supabase.auth.signOut({ scope: 'global' });
+        console.log(`[AUTH ${timestamp}] Performed global sign out before login`);
+      } catch (signOutError) {
+        // Just log the error but continue
+        console.warn(`[AUTH ${timestamp}] Error during pre-login sign out:`, signOutError);
+      }
       
       const currentOrigin = window.location.origin;
       const redirectTo = `${currentOrigin}/dashboard`;
@@ -252,6 +283,10 @@ export function useAuthProvider(): AuthContextType {
       // Reset bypass attempts counter
       localStorage.removeItem('profile_bypass_attempts');
       
+      // Set auth_active flag
+      localStorage.setItem('auth_active', 'true');
+      localStorage.setItem('auth_timestamp', timestamp);
+      
       // Initiate OAuth sign-in with enhanced options
       const { data, error } = await supabase.auth.signInWithOAuth({
         provider,
@@ -263,8 +298,8 @@ export function useAuthProvider(): AuthContextType {
               prompt: 'select_account',
             })
           },
-          // Specify flow type explicitly for more reliable redirects
-          flowType: 'implicit',
+          // Use PKCE flow for better security and reliability
+          flowType: 'pkce',
         }
       });
 
@@ -276,13 +311,17 @@ export function useAuthProvider(): AuthContextType {
         // Add a small delay before redirect to ensure all state is saved
         setTimeout(() => {
           window.location.href = data.url;
-        }, 50);
+        }, 100);
       } else {
         throw new Error(`Authentication with ${provider} failed. No redirect URL returned.`);
       }
     } catch (error: any) {
       console.error(`[AUTH ${timestamp}] Login error:`, error);
       setIsLoading(false);
+      
+      // Clean up the auth flags since login failed
+      localStorage.removeItem('auth_active');
+      localStorage.removeItem('auth_timestamp');
       
       toast({
         title: "Login Failed",
@@ -302,6 +341,18 @@ export function useAuthProvider(): AuthContextType {
       setIsLoading(true);
       console.log(`[AUTH ${timestamp}] Attempting email/password login for: ${email}`);
       
+      // Clear any existing auth state first
+      performAuthReset();
+      
+      // Try a global sign out first to ensure clean state
+      try {
+        await supabase.auth.signOut({ scope: 'global' });
+        console.log(`[AUTH ${timestamp}] Performed global sign out before login`);
+      } catch (signOutError) {
+        // Just log the error but continue
+        console.warn(`[AUTH ${timestamp}] Error during pre-login sign out:`, signOutError);
+      }
+      
       // Store flag to indicate auth is in progress
       localStorage.setItem('auth_active', 'true');
       localStorage.setItem('auth_timestamp', timestamp);
@@ -319,7 +370,14 @@ export function useAuthProvider(): AuthContextType {
       // Update session manually since we're not redirecting
       if (data?.session) {
         setSession(data.session);
-        loadUserProfile(data.session);
+        
+        // Use setTimeout to avoid auth deadlocks
+        setTimeout(() => {
+          loadUserProfile(data.session!);
+          setIsLoading(false);
+        }, 20);
+      } else {
+        setIsLoading(false);
       }
       
       return data;
@@ -335,8 +393,6 @@ export function useAuthProvider(): AuthContextType {
       });
       
       throw error;
-    } finally {
-      setIsLoading(false);
     }
   };
   
@@ -347,6 +403,9 @@ export function useAuthProvider(): AuthContextType {
     try {
       setIsLoading(true);
       console.log(`[AUTH ${timestamp}] Creating new account for: ${email}`);
+      
+      // Clear any existing auth state first
+      performAuthReset();
       
       // Validate captcha token if provided
       if (captchaToken) {
@@ -414,16 +473,23 @@ export function useAuthProvider(): AuthContextType {
       setIsLoading(true);
       console.log(`[AUTH ${timestamp}] Logging out user`);
       
-      // Clear all auth-related storage before logout
-      clearAuthLocalStorage();
+      // First try to perform a comprehensive auth reset
+      performAuthReset();
       
-      const { error } = await supabase.auth.signOut({
-        scope: 'global' // Sign out from all tabs/devices
-      });
+      // Attempt global sign out to invalidate on all devices
+      try {
+        const { error } = await supabase.auth.signOut({
+          scope: 'global' // Sign out from all tabs/devices
+        });
+        
+        if (error) {
+          console.error(`[AUTH ${timestamp}] Sign out API error:`, error);
+        }
+      } catch (signOutError) {
+        console.error(`[AUTH ${timestamp}] Error during sign out:`, signOutError);
+      }
       
-      if (error) throw error;
-      
-      // Explicitly set user and session state to null
+      // Explicitly set user and session state to null to ensure UI updates
       setUser(null);
       setSession(null);
       
@@ -434,6 +500,11 @@ export function useAuthProvider(): AuthContextType {
         title: "Logged Out",
         description: "You have been successfully logged out.",
       });
+      
+      // Redirect to home page after logout
+      setTimeout(() => {
+        window.location.href = '/';
+      }, 100);
     } catch (error: any) {
       console.error(`[AUTH ${timestamp}] Logout error:`, error);
       toast({
