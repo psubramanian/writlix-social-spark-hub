@@ -109,7 +109,11 @@ const Schedule = () => {
     };
     
     checkSocialConnections();
-  }, [user]);
+    
+    // Add debug logging for timezone issues
+    console.log('Schedule page user timezone:', userSettings?.timezone);
+    console.log('Schedule pattern:', schedulePattern);
+  }, [user, userSettings]);
 
   const scheduledPosts = posts.filter(post => post.content_ideas?.status !== 'Published');
   const schedulePattern = userSettings ? getSchedulePattern(userSettings) : undefined;

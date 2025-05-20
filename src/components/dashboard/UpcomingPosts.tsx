@@ -157,10 +157,16 @@ export function UpcomingPosts({ scheduledPostsCount }: UpcomingPostsProps) {
       const dateInTz = toZonedTime(date, postTimezone);
       const nowInTz = toZonedTime(now, postTimezone);
       
+      // Debug timezone conversion
+      console.log('Dashboard post date:', dateString);
+      console.log('Using timezone:', postTimezone);
+      console.log('Converted date (zoned):', dateInTz.toString());
+      console.log('Current time (zoned):', nowInTz.toString());
+      
       // Is this date in the past?
       const isPast = dateInTz < nowInTz;
       
-      // Format date considering timezone
+      // Format date considering timezone with explicit AM/PM for 12-hour time
       const formattedDate = formatInTimeZone(date, postTimezone, 'MMM d at h:mm a');
       
       return isPast ? `was scheduled for ${formattedDate}` : `scheduled for ${formattedDate}`;

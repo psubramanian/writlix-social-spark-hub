@@ -15,7 +15,7 @@ interface GroupedPosts {
   tomorrow: ScheduledPost[];
   thisWeek: ScheduledPost[];
   later: ScheduledPost[];
-  past: ScheduledPost[]; // Added past posts
+  past: ScheduledPost[];
 }
 
 interface ScheduledPostsListProps {
@@ -61,6 +61,7 @@ export function ScheduledPostsList({
   const formatTimeInTimezone = (dateString: string, timezone: string) => {
     try {
       const date = parseISO(dateString);
+      // Use the correct format string to ensure we're displaying AM/PM properly
       return formatInTimeZone(date, timezone, 'h:mm a');
     } catch (error) {
       console.error("Error formatting time:", error);
@@ -88,6 +89,11 @@ export function ScheduledPostsList({
     const postDate = parseISO(post.next_run_at);
     const now = new Date();
     const isPastDate = postDate < now && !isToday(postDate);
+    
+    // Debug logging to identify time conversion issues
+    console.log(`Post ${post.id} scheduled for:`, post.next_run_at);
+    console.log(`Using timezone:`, postTimezone);
+    console.log(`Formatted time:`, formatTimeInTimezone(post.next_run_at, postTimezone));
     
     return (
       <div key={post.id} className={`border rounded-md p-4 ${isPastDate ? 'bg-amber-50 dark:bg-amber-900/20' : 'bg-white dark:bg-slate-900'}`}>

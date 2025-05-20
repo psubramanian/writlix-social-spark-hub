@@ -30,7 +30,7 @@ export interface GroupedPosts {
   tomorrow: ScheduledPost[];
   thisWeek: ScheduledPost[];
   later: ScheduledPost[];
-  past: ScheduledPost[]; // Added past posts group
+  past: ScheduledPost[];
 }
 
 export function useScheduledPosts() {
@@ -177,12 +177,23 @@ export function useScheduledPosts() {
       
       console.log(`Formatting date ${dateString} in timezone ${userTimezone}`);
       
+      // Debug the native Date object
+      const nativeDate = new Date(dateString);
+      console.log('Native JS date interpretation:', nativeDate.toString());
+      console.log('Native JS date hours/minutes:', nativeDate.getHours(), ':', nativeDate.getMinutes());
+      
+      // Debug the date-fns-tz conversion
+      const zonedDate = toZonedTime(date, userTimezone);
+      console.log('Zoned date in', userTimezone, ':', zonedDate.toString());
+      console.log('Zoned date hours/minutes:', zonedDate.getHours(), ':', zonedDate.getMinutes());
+      
       // Use formatInTimeZone to ensure correct timezone display
       // Check if the date is today or tomorrow in the user's timezone
       const todayInUserTz = formatInTimeZone(new Date(), userTimezone, 'yyyy-MM-dd');
       const dateInUserTz = formatInTimeZone(date, userTimezone, 'yyyy-MM-dd');
       const tomorrowInUserTz = formatInTimeZone(addDays(new Date(), 1), userTimezone, 'yyyy-MM-dd');
       
+      // Format with explicit AM/PM marker to ensure 12-hour clock is displayed correctly
       if (dateInUserTz === todayInUserTz) {
         return `Today at ${formatInTimeZone(date, userTimezone, 'h:mm a')}`;
       }
@@ -191,7 +202,7 @@ export function useScheduledPosts() {
         return `Tomorrow at ${formatInTimeZone(date, userTimezone, 'h:mm a')}`;
       }
       
-      return formatInTimeZone(date, userTimezone, "MMM d, yyyy");
+      return formatInTimeZone(date, userTimezone, "MMM d, yyyy 'at' h:mm a");
     } catch (error) {
       console.error("Error formatting date:", error, dateString);
       return "Invalid date";
