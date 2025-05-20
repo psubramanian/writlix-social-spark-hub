@@ -6,8 +6,8 @@ import { getCurrentUser, useAuthRedirect } from '@/utils/supabaseUserUtils';
 import { useScheduleSettings } from './useScheduleSettings';
 import { usePostOperations } from './usePostOperations';
 import { usePostScheduling } from './usePostScheduling';
-import { format, isToday, isTomorrow, addDays, isBefore, isAfter } from 'date-fns';
-import { formatInTimeZone } from 'date-fns-tz';
+import { format, isToday, isTomorrow, addDays, isBefore, isAfter, parseISO } from 'date-fns';
+import { formatInTimeZone, toZonedTime } from 'date-fns-tz';
 
 export interface ScheduledPost {
   id: string;
@@ -57,7 +57,6 @@ export function useScheduledPosts() {
         return;
       }
 
-      const now = new Date();
       console.log('Fetching all scheduled posts');
 
       // Get all posts, not just future ones (removed the .gt filter)
@@ -107,7 +106,7 @@ export function useScheduledPosts() {
       setPosts(postsArray);
       
       // Group posts by timeframe
-      groupPostsByTimeframe(postsArray);
+      groupPostsByTimeframe(postsArray, userSettings?.timezone || 'UTC');
       
     } catch (error: any) {
       console.error('Error fetching posts:', error);
@@ -121,7 +120,7 @@ export function useScheduledPosts() {
     }
   };
   
-  const groupPostsByTimeframe = (posts: ScheduledPost[]) => {
+  const groupPostsByTimeframe = (posts: ScheduledPost[], defaultTimezone: string) => {
     const today: ScheduledPost[] = [];
     const tomorrow: ScheduledPost[] = [];
     const thisWeek: ScheduledPost[] = [];
@@ -132,20 +131,33 @@ export function useScheduledPosts() {
     const endOfWeek = addDays(now, 7);
     
     posts.forEach(post => {
-      const postDate = new Date(post.next_run_at);
+      // Use the post's timezone if available, otherwise fall back to user timezone
+      const timezone = post.timezone || defaultTimezone || 'UTC';
+      // Parse date and convert to the appropriate timezone
+      const postDate = toZonedTime(parseISO(post.next_run_at), timezone);
+      const nowInTimezone = toZonedTime(now, timezone);
+      const endOfWeekInTimezone = toZonedTime(endOfWeek, timezone);
       
-      // Check if this is a past post
-      if (isBefore(postDate, now) && !isToday(postDate)) {
+      // Check if this is a past post (considering timezone)
+      if (isBefore(postDate, nowInTimezone) && !isToday(postDate)) {
         past.push(post);
       } else if (isToday(postDate)) {
         today.push(post);
       } else if (isTomorrow(postDate)) {
         tomorrow.push(post);
-      } else if (isBefore(postDate, endOfWeek)) {
+      } else if (isBefore(postDate, endOfWeekInTimezone)) {
         thisWeek.push(post);
       } else {
         later.push(post);
       }
+    });
+    
+    console.log('Grouped posts by timeframe with timezone consideration:', {
+      today: today.length,
+      tomorrow: tomorrow.length, 
+      thisWeek: thisWeek.length,
+      later: later.length,
+      past: past.length
     });
     
     setGroupedPosts({
@@ -160,14 +172,16 @@ export function useScheduledPosts() {
   // Format the schedule date with timezone consideration
   const formatScheduleDate = (dateString: string, timezone: string) => {
     try {
-      const date = new Date(dateString);
+      const date = parseISO(dateString);
       const userTimezone = timezone || 'UTC';
+      
+      console.log(`Formatting date ${dateString} in timezone ${userTimezone}`);
       
       // Use formatInTimeZone to ensure correct timezone display
       // Check if the date is today or tomorrow in the user's timezone
       const todayInUserTz = formatInTimeZone(new Date(), userTimezone, 'yyyy-MM-dd');
       const dateInUserTz = formatInTimeZone(date, userTimezone, 'yyyy-MM-dd');
-      const tomorrowInUserTz = formatInTimeZone(new Date(new Date().setDate(new Date().getDate() + 1)), userTimezone, 'yyyy-MM-dd');
+      const tomorrowInUserTz = formatInTimeZone(addDays(new Date(), 1), userTimezone, 'yyyy-MM-dd');
       
       if (dateInUserTz === todayInUserTz) {
         return `Today at ${formatInTimeZone(date, userTimezone, 'h:mm a')}`;
@@ -177,7 +191,7 @@ export function useScheduledPosts() {
         return `Tomorrow at ${formatInTimeZone(date, userTimezone, 'h:mm a')}`;
       }
       
-      return formatInTimeZone(date, userTimezone, "MMM d, yyyy 'at' h:mm a");
+      return formatInTimeZone(date, userTimezone, "MMM d, yyyy");
     } catch (error) {
       console.error("Error formatting date:", error, dateString);
       return "Invalid date";
@@ -224,6 +238,13 @@ export function useScheduledPosts() {
     
     initialize();
   }, []);
+
+  // Re-group posts whenever userSettings timezone changes
+  useEffect(() => {
+    if (posts.length > 0 && userSettings?.timezone) {
+      groupPostsByTimeframe(posts, userSettings.timezone);
+    }
+  }, [userSettings?.timezone, posts]);
 
   return {
     posts,

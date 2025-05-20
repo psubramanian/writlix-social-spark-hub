@@ -5,8 +5,8 @@ import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { supabase } from '@/integrations/supabase/client';
 import { getCurrentUser } from '@/utils/supabaseUserUtils';
-import { format, isToday, isTomorrow } from 'date-fns';
-import { formatInTimeZone } from 'date-fns-tz';
+import { parseISO } from 'date-fns';
+import { formatInTimeZone, toZonedTime } from 'date-fns-tz';
 import { Badge } from '@/components/ui/badge';
 
 interface UpcomingPostsProps {
@@ -24,14 +24,43 @@ export function UpcomingPosts({ scheduledPostsCount }: UpcomingPostsProps) {
   const [upcomingPosts, setUpcomingPosts] = useState<UpcomingPost[]>([]);
   const [pastDuePosts, setPastDuePosts] = useState<UpcomingPost[]>([]);
   const [loading, setLoading] = useState(true);
+  const [userTimezone, setUserTimezone] = useState<string>('UTC');
 
   useEffect(() => {
+    // First, fetch the user's timezone from schedule settings
+    const fetchUserTimezone = async () => {
+      try {
+        const user = await getCurrentUser();
+        if (!user) return 'UTC';
+
+        const { data, error } = await supabase
+          .from('schedule_settings')
+          .select('timezone')
+          .eq('user_id', user.id)
+          .maybeSingle();
+
+        if (error) {
+          console.error('Error fetching user timezone:', error);
+          return 'UTC';
+        }
+
+        return data?.timezone || 'UTC';
+      } catch (error) {
+        console.error('Error in fetchUserTimezone:', error);
+        return 'UTC';
+      }
+    };
+
     const fetchAllPosts = async () => {
       try {
         const user = await getCurrentUser();
         if (!user) return;
 
-        const now = new Date();
+        // Get user timezone first
+        const timezone = await fetchUserTimezone();
+        setUserTimezone(timezone);
+        console.log('User timezone for dashboard posts:', timezone);
+
         console.log('Fetching all scheduled posts for dashboard');
         
         // Get all posts without the time filter
@@ -81,12 +110,15 @@ export function UpcomingPosts({ scheduledPostsCount }: UpcomingPostsProps) {
               id: post.id,
               title: post.content_ideas?.title || 'Untitled Post',
               nextRunAt: post.next_run_at,
-              timezone: post.timezone || 'UTC'
+              timezone: post.timezone || timezone // Use post timezone or default to user timezone
             };
             
             // Sort into past due or upcoming
-            const postDate = new Date(post.next_run_at);
-            if (postDate < now && !isToday(postDate)) {
+            const postTimezone = post.timezone || timezone;
+            const postDate = toZonedTime(parseISO(post.next_run_at), postTimezone);
+            const nowInTimezone = toZonedTime(now, postTimezone);
+            
+            if (postDate < nowInTimezone) {
               pastDue.push(formattedPost);
             } else {
               upcoming.push(formattedPost);
@@ -117,28 +149,19 @@ export function UpcomingPosts({ scheduledPostsCount }: UpcomingPostsProps) {
 
   const formatScheduleDate = (dateString: string, timezone: string) => {
     try {
-      const date = new Date(dateString);
-      const userTimezone = timezone || 'UTC';
+      const date = parseISO(dateString);
+      const postTimezone = timezone || userTimezone || 'UTC';
       const now = new Date();
       
+      // Convert dates to correct timezone for comparison
+      const dateInTz = toZonedTime(date, postTimezone);
+      const nowInTz = toZonedTime(now, postTimezone);
+      
       // Is this date in the past?
-      const isPast = date < now && !isToday(date);
+      const isPast = dateInTz < nowInTz;
       
-      // Use formatInTimeZone to ensure correct timezone display
-      // Check if the date is today or tomorrow in the user's timezone
-      const todayInUserTz = formatInTimeZone(new Date(), userTimezone, 'yyyy-MM-dd');
-      const dateInUserTz = formatInTimeZone(date, userTimezone, 'yyyy-MM-dd');
-      const tomorrowInUserTz = formatInTimeZone(new Date(new Date().setDate(new Date().getDate() + 1)), userTimezone, 'yyyy-MM-dd');
-      
-      let formattedDate;
-      
-      if (dateInUserTz === todayInUserTz) {
-        formattedDate = `today at ${formatInTimeZone(date, userTimezone, 'h:mm a')}`;
-      } else if (dateInUserTz === tomorrowInUserTz) {
-        formattedDate = `tomorrow at ${formatInTimeZone(date, userTimezone, 'h:mm a')}`;
-      } else {
-        formattedDate = `${formatInTimeZone(date, userTimezone, 'MMM d')} at ${formatInTimeZone(date, userTimezone, 'h:mm a')}`;
-      }
+      // Format date considering timezone
+      const formattedDate = formatInTimeZone(date, postTimezone, 'MMM d at h:mm a');
       
       return isPast ? `was scheduled for ${formattedDate}` : `scheduled for ${formattedDate}`;
     } catch (error) {
@@ -149,7 +172,7 @@ export function UpcomingPosts({ scheduledPostsCount }: UpcomingPostsProps) {
 
   const renderPost = (post: UpcomingPost, isPast = false) => {
     return (
-      <div key={post.id} className="border rounded-md p-4">
+      <div key={post.id} className={`border rounded-md p-4 ${isPast ? 'bg-amber-50 dark:bg-amber-900/20' : ''}`}>
         <div className="flex justify-between items-start">
           <p className="font-medium">{post.title}</p>
           {isPast && (

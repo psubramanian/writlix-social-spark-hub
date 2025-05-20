@@ -7,6 +7,8 @@ import { Badge } from "@/components/ui/badge";
 import { Calendar, Clock, Loader2 } from "lucide-react";
 import { Facebook, Instagram, Linkedin } from "lucide-react";
 import type { ScheduledPost } from '@/hooks/useScheduledPosts';
+import { formatInTimeZone } from 'date-fns-tz';
+import { isToday, isTomorrow, parseISO } from 'date-fns';
 
 interface GroupedPosts {
   today: ScheduledPost[];
@@ -37,7 +39,7 @@ export function ScheduledPostsList({
   schedulePattern,
   userTimezone = 'UTC'
 }: ScheduledPostsListProps) {
-  console.log('Rendering scheduled posts:', posts);
+  console.log('Rendering scheduled posts with timezone:', userTimezone);
   console.log('Grouped posts:', groupedPosts);
 
   if (loading) {
@@ -55,6 +57,17 @@ export function ScheduledPostsList({
     );
   }
 
+  // Helper function to show time in proper timezone format
+  const formatTimeInTimezone = (dateString: string, timezone: string) => {
+    try {
+      const date = parseISO(dateString);
+      return formatInTimeZone(date, timezone, 'h:mm a');
+    } catch (error) {
+      console.error("Error formatting time:", error);
+      return "Invalid time";
+    }
+  };
+
   const renderPostGroup = (title: string, groupPosts: ScheduledPost[]) => {
     if (groupPosts.length === 0) return null;
     
@@ -69,11 +82,15 @@ export function ScheduledPostsList({
   };
   
   const renderPost = (post: ScheduledPost) => {
+    // Use the post's timezone if available, otherwise fall back to user timezone
+    const postTimezone = post.timezone || userTimezone || 'UTC';
     // Determine if post date is in the past
-    const isPastDate = new Date(post.next_run_at) < new Date();
+    const postDate = parseISO(post.next_run_at);
+    const now = new Date();
+    const isPastDate = postDate < now && !isToday(postDate);
     
     return (
-      <div key={post.id} className="border rounded-md p-4 bg-white dark:bg-slate-900">
+      <div key={post.id} className={`border rounded-md p-4 ${isPastDate ? 'bg-amber-50 dark:bg-amber-900/20' : 'bg-white dark:bg-slate-900'}`}>
         <div className="flex flex-col space-y-3">
           <div className="flex justify-between items-start">
             <h3 className="font-medium">{post.content_ideas?.title || "Untitled Post"}</h3>
@@ -92,7 +109,16 @@ export function ScheduledPostsList({
           <div className="flex items-center gap-2 text-sm text-muted-foreground">
             <Calendar className="h-4 w-4" />
             <span className={`font-medium ${isPastDate ? 'text-amber-600' : ''}`}>
-              {formatScheduleDate(post.next_run_at, post.timezone || userTimezone)}
+              {formatScheduleDate(post.next_run_at, postTimezone)}
+            </span>
+          </div>
+          
+          <div className="flex items-center gap-2 text-sm text-muted-foreground">
+            <Clock className="h-4 w-4" />
+            <span>
+              {isPastDate ? "Was scheduled for " : "Scheduled for "} 
+              {formatTimeInTimezone(post.next_run_at, postTimezone)} 
+              {postTimezone !== 'UTC' ? ` (${postTimezone})` : ''}
             </span>
           </div>
           
@@ -172,11 +198,12 @@ export function ScheduledPostsList({
           </div>
         ) : (
           <div>
+            {/* Show past posts first with warning styling */}
+            {renderPostGroup("Past Due", groupedPosts.past)}
             {renderPostGroup("Today", groupedPosts.today)}
             {renderPostGroup("Tomorrow", groupedPosts.tomorrow)}
             {renderPostGroup("This Week", groupedPosts.thisWeek)}
             {renderPostGroup("Later", groupedPosts.later)}
-            {renderPostGroup("Past Due", groupedPosts.past)}
           </div>
         )}
       </CardContent>
