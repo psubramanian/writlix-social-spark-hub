@@ -13,6 +13,7 @@ interface GroupedPosts {
   tomorrow: ScheduledPost[];
   thisWeek: ScheduledPost[];
   later: ScheduledPost[];
+  past: ScheduledPost[]; // Added past posts
 }
 
 interface ScheduledPostsListProps {
@@ -68,19 +69,31 @@ export function ScheduledPostsList({
   };
   
   const renderPost = (post: ScheduledPost) => {
+    // Determine if post date is in the past
+    const isPastDate = new Date(post.next_run_at) < new Date();
+    
     return (
       <div key={post.id} className="border rounded-md p-4 bg-white dark:bg-slate-900">
         <div className="flex flex-col space-y-3">
           <div className="flex justify-between items-start">
             <h3 className="font-medium">{post.content_ideas?.title || "Untitled Post"}</h3>
-            <Badge variant="outline" className="ml-2">
-              {post.content_ideas?.status || "Pending"}
-            </Badge>
+            <div className="flex gap-2">
+              {isPastDate && (
+                <Badge variant="outline" className="bg-amber-100 text-amber-800 border-amber-200">
+                  Past Due
+                </Badge>
+              )}
+              <Badge variant="outline" className="ml-2">
+                {post.content_ideas?.status || "Pending"}
+              </Badge>
+            </div>
           </div>
           
           <div className="flex items-center gap-2 text-sm text-muted-foreground">
             <Calendar className="h-4 w-4" />
-            <span className="font-medium">{formatScheduleDate(post.next_run_at, post.timezone || userTimezone)}</span>
+            <span className={`font-medium ${isPastDate ? 'text-amber-600' : ''}`}>
+              {formatScheduleDate(post.next_run_at, post.timezone || userTimezone)}
+            </span>
           </div>
           
           {schedulePattern && (
@@ -163,6 +176,7 @@ export function ScheduledPostsList({
             {renderPostGroup("Tomorrow", groupedPosts.tomorrow)}
             {renderPostGroup("This Week", groupedPosts.thisWeek)}
             {renderPostGroup("Later", groupedPosts.later)}
+            {renderPostGroup("Past Due", groupedPosts.past)}
           </div>
         )}
       </CardContent>

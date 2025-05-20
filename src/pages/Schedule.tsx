@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
@@ -16,6 +15,8 @@ import { useScheduleSettings } from '@/hooks/useScheduleSettings';
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
+import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
+import { AlertCircle } from "lucide-react";
 
 interface SocialConnectionStatus {
   linkedin: boolean;
@@ -209,6 +210,9 @@ const Schedule = () => {
     navigate('/settings?tab=connections');
   };
 
+  // Check for past posts
+  const hasPastPosts = groupedPosts.past && groupedPosts.past.length > 0;
+
   return (
     <main className="flex-1 overflow-y-auto p-6">
       <div className="mb-8">
@@ -217,6 +221,18 @@ const Schedule = () => {
       </div>
       
       <div className="grid grid-cols-1 gap-8">
+        {/* Past Due Posts Alert */}
+        {hasPastPosts && (
+          <Alert className="bg-amber-50 text-amber-800 border-amber-200">
+            <AlertCircle className="h-4 w-4" />
+            <AlertTitle>Past Due Posts</AlertTitle>
+            <AlertDescription>
+              You have {groupedPosts.past.length} post{groupedPosts.past.length !== 1 ? 's' : ''} with dates in the past.
+              These posts have not been published. You can post them manually or update your schedule settings.
+            </AlertDescription>
+          </Alert>
+        )}
+        
         {/* Schedule Settings Section */}
         <div className="mb-6">
           <h2 className="text-xl font-semibold mb-4">Schedule Settings</h2>

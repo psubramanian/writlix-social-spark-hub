@@ -15,14 +15,20 @@ const Index = () => {
   const [isNewsletterPopupOpen, setIsNewsletterPopupOpen] = useState(false);
   const [contentLoaded, setContentLoaded] = useState(false);
   
-  // Start loading the content after a short delay for better initial rendering
+  // Start loading the content immediately but defer rendering for a smoother experience
   useEffect(() => {
-    const timer = setTimeout(() => {
+    if (!isLoading) {
+      // Load content right away if auth is already determined
       setContentLoaded(true);
-    }, 100);
-    
-    return () => clearTimeout(timer);
-  }, []);
+    } else {
+      // Small delay for better loading appearance
+      const timer = setTimeout(() => {
+        setContentLoaded(true);
+      }, 50); // Reduced from 100ms to 50ms for faster loading
+      
+      return () => clearTimeout(timer);
+    }
+  }, [isLoading]);
   
   // Redirect authenticated users to dashboard after auth check is complete
   useEffect(() => {

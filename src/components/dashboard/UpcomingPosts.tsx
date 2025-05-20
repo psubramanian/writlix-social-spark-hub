@@ -7,6 +7,7 @@ import { supabase } from '@/integrations/supabase/client';
 import { getCurrentUser } from '@/utils/supabaseUserUtils';
 import { format, isToday, isTomorrow } from 'date-fns';
 import { formatInTimeZone } from 'date-fns-tz';
+import { Badge } from '@/components/ui/badge';
 
 interface UpcomingPostsProps {
   scheduledPostsCount: number;
@@ -21,19 +22,19 @@ interface UpcomingPost {
 
 export function UpcomingPosts({ scheduledPostsCount }: UpcomingPostsProps) {
   const [upcomingPosts, setUpcomingPosts] = useState<UpcomingPost[]>([]);
+  const [pastDuePosts, setPastDuePosts] = useState<UpcomingPost[]>([]);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    const fetchUpcomingPosts = async () => {
+    const fetchAllPosts = async () => {
       try {
         const user = await getCurrentUser();
         if (!user) return;
 
         const now = new Date();
-        console.log('Fetching upcoming posts after:', now.toISOString());
+        console.log('Fetching all scheduled posts for dashboard');
         
-        // Get posts that are scheduled for the future
-        // Increased limit to 5 instead of 2 to show more posts
+        // Get all posts without the time filter
         const { data, error } = await supabase
           .from('scheduled_posts')
           .select(`
@@ -47,12 +48,10 @@ export function UpcomingPosts({ scheduledPostsCount }: UpcomingPostsProps) {
           `)
           .eq('user_id', user.id)
           .eq('status', 'pending')
-          .gt('next_run_at', now.toISOString()) // Only get future posts
-          .order('next_run_at', { ascending: true })
-          .limit(5); // Show up to 5 posts instead of just 2
+          .order('next_run_at', { ascending: true });
 
         if (error) {
-          console.error('Error fetching upcoming posts:', error);
+          console.error('Error fetching scheduled posts:', error);
           throw error;
         }
 
@@ -60,6 +59,9 @@ export function UpcomingPosts({ scheduledPostsCount }: UpcomingPostsProps) {
           // Improved deduplication by content ID
           const uniquePosts = [];
           const seenContentIds = new Set();
+          const now = new Date();
+          const pastDue = [];
+          const upcoming = [];
           
           for (const post of data) {
             const contentId = post.content_ideas?.id;
@@ -75,34 +77,52 @@ export function UpcomingPosts({ scheduledPostsCount }: UpcomingPostsProps) {
               seenContentIds.add(contentId);
             }
             
-            uniquePosts.push({
+            const formattedPost = {
               id: post.id,
               title: post.content_ideas?.title || 'Untitled Post',
               nextRunAt: post.next_run_at,
               timezone: post.timezone || 'UTC'
-            });
+            };
+            
+            // Sort into past due or upcoming
+            const postDate = new Date(post.next_run_at);
+            if (postDate < now && !isToday(postDate)) {
+              pastDue.push(formattedPost);
+            } else {
+              upcoming.push(formattedPost);
+            }
           }
           
-          console.log('Formatted upcoming posts:', uniquePosts);
-          setUpcomingPosts(uniquePosts);
+          console.log('Formatted upcoming posts:', upcoming);
+          console.log('Formatted past due posts:', pastDue);
+          
+          // Limit upcoming posts display to 3
+          setUpcomingPosts(upcoming.slice(0, 3));
+          // Limit past due posts display to 2
+          setPastDuePosts(pastDue.slice(0, 2));
         } else {
-          console.log('No upcoming posts found');
+          console.log('No posts found');
           setUpcomingPosts([]);
+          setPastDuePosts([]);
         }
       } catch (error) {
-        console.error('Error fetching upcoming posts:', error);
+        console.error('Error fetching posts:', error);
       } finally {
         setLoading(false);
       }
     };
 
-    fetchUpcomingPosts();
+    fetchAllPosts();
   }, []);
 
   const formatScheduleDate = (dateString: string, timezone: string) => {
     try {
       const date = new Date(dateString);
       const userTimezone = timezone || 'UTC';
+      const now = new Date();
+      
+      // Is this date in the past?
+      const isPast = date < now && !isToday(date);
       
       // Use formatInTimeZone to ensure correct timezone display
       // Check if the date is today or tomorrow in the user's timezone
@@ -110,55 +130,78 @@ export function UpcomingPosts({ scheduledPostsCount }: UpcomingPostsProps) {
       const dateInUserTz = formatInTimeZone(date, userTimezone, 'yyyy-MM-dd');
       const tomorrowInUserTz = formatInTimeZone(new Date(new Date().setDate(new Date().getDate() + 1)), userTimezone, 'yyyy-MM-dd');
       
+      let formattedDate;
+      
       if (dateInUserTz === todayInUserTz) {
-        return `today at ${formatInTimeZone(date, userTimezone, 'h:mm a')}`;
+        formattedDate = `today at ${formatInTimeZone(date, userTimezone, 'h:mm a')}`;
+      } else if (dateInUserTz === tomorrowInUserTz) {
+        formattedDate = `tomorrow at ${formatInTimeZone(date, userTimezone, 'h:mm a')}`;
+      } else {
+        formattedDate = `${formatInTimeZone(date, userTimezone, 'MMM d')} at ${formatInTimeZone(date, userTimezone, 'h:mm a')}`;
       }
       
-      if (dateInUserTz === tomorrowInUserTz) {
-        return `tomorrow at ${formatInTimeZone(date, userTimezone, 'h:mm a')}`;
-      }
-      
-      return `${formatInTimeZone(date, userTimezone, 'MMM d')} at ${formatInTimeZone(date, userTimezone, 'h:mm a')}`;
+      return isPast ? `was scheduled for ${formattedDate}` : `scheduled for ${formattedDate}`;
     } catch (error) {
       console.error("Error formatting date:", error, dateString);
       return "Invalid date";
     }
   };
 
+  const renderPost = (post: UpcomingPost, isPast = false) => {
+    return (
+      <div key={post.id} className="border rounded-md p-4">
+        <div className="flex justify-between items-start">
+          <p className="font-medium">{post.title}</p>
+          {isPast && (
+            <Badge variant="outline" className="bg-amber-100 text-amber-800 border-amber-200">
+              Past Due
+            </Badge>
+          )}
+        </div>
+        <p className={`text-sm mt-1 ${isPast ? 'text-amber-600' : 'text-muted-foreground'}`}>
+          {formatScheduleDate(post.nextRunAt, post.timezone)}
+        </p>
+      </div>
+    );
+  };
+
   return (
     <Card className="lg:col-span-1">
       <CardHeader>
-        <CardTitle>Upcoming Posts</CardTitle>
-        <CardDescription>Posts scheduled to be published soon</CardDescription>
+        <CardTitle>Scheduled Posts</CardTitle>
+        <CardDescription>Your upcoming and past-due posts</CardDescription>
       </CardHeader>
       <CardContent>
         {scheduledPostsCount > 0 ? (
           <div className="space-y-4">
             {loading ? (
-              <div className="text-center py-4">Loading upcoming posts...</div>
-            ) : upcomingPosts.length > 0 ? (
+              <div className="text-center py-4">Loading posts...</div>
+            ) : (
               <>
-                {upcomingPosts.map(post => (
-                  <div key={post.id} className="border rounded-md p-4">
-                    <p className="font-medium">{post.title}</p>
-                    <p className="text-sm text-muted-foreground mt-1">
-                      Scheduled for {formatScheduleDate(post.nextRunAt, post.timezone)}
-                    </p>
+                {pastDuePosts.length > 0 && (
+                  <div>
+                    <h3 className="text-sm font-medium text-amber-600 mb-2">Past Due</h3>
+                    <div className="space-y-3 mb-4">
+                      {pastDuePosts.map(post => renderPost(post, true))}
+                    </div>
                   </div>
-                ))}
+                )}
+                
+                {upcomingPosts.length > 0 && (
+                  <div>
+                    <h3 className="text-sm font-medium text-muted-foreground mb-2">Upcoming</h3>
+                    <div className="space-y-3">
+                      {upcomingPosts.map(post => renderPost(post))}
+                    </div>
+                  </div>
+                )}
+                
                 <Link to="/schedule">
                   <Button variant="outline" size="sm" className="w-full mt-2">
-                    View All Scheduled Posts ({scheduledPostsCount})
+                    View All Posts ({scheduledPostsCount})
                   </Button>
                 </Link>
               </>
-            ) : (
-              <div className="text-center py-4">
-                <p className="text-muted-foreground mb-2">No upcoming posts found</p>
-                <Link to="/schedule">
-                  <Button variant="outline" size="sm">View Schedule</Button>
-                </Link>
-              </div>
             )}
           </div>
         ) : (

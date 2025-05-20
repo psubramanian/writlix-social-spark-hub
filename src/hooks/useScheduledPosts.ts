@@ -20,6 +20,7 @@ export interface ScheduledPost {
   next_run_at: string;
   timezone: string;
   user_id: string;
+  status: string;
 }
 
 type TimeframeGroup = 'today' | 'tomorrow' | 'thisWeek' | 'later';
@@ -29,6 +30,7 @@ export interface GroupedPosts {
   tomorrow: ScheduledPost[];
   thisWeek: ScheduledPost[];
   later: ScheduledPost[];
+  past: ScheduledPost[]; // Added past posts group
 }
 
 export function useScheduledPosts() {
@@ -37,7 +39,8 @@ export function useScheduledPosts() {
     today: [],
     tomorrow: [],
     thisWeek: [],
-    later: []
+    later: [],
+    past: [] // Initialize past posts array
   });
   const [loading, setLoading] = useState(true);
   const { toast } = useToast();
@@ -55,9 +58,9 @@ export function useScheduledPosts() {
       }
 
       const now = new Date();
-      console.log('Fetching scheduled posts after:', now.toISOString());
+      console.log('Fetching all scheduled posts');
 
-      // Get posts that are scheduled for the future
+      // Get all posts, not just future ones (removed the .gt filter)
       const { data: postsData, error: postsError } = await supabase
         .from('scheduled_posts')
         .select(`
@@ -71,7 +74,6 @@ export function useScheduledPosts() {
         `)
         .eq('user_id', user.id)
         .eq('status', 'pending')
-        .gt('next_run_at', now.toISOString()) // Only get future posts
         .order('next_run_at', { ascending: true });
 
       if (postsError) throw postsError;
@@ -124,6 +126,7 @@ export function useScheduledPosts() {
     const tomorrow: ScheduledPost[] = [];
     const thisWeek: ScheduledPost[] = [];
     const later: ScheduledPost[] = [];
+    const past: ScheduledPost[] = []; // Added past posts array
     
     const now = new Date();
     const endOfWeek = addDays(now, 7);
@@ -131,7 +134,10 @@ export function useScheduledPosts() {
     posts.forEach(post => {
       const postDate = new Date(post.next_run_at);
       
-      if (isToday(postDate)) {
+      // Check if this is a past post
+      if (isBefore(postDate, now) && !isToday(postDate)) {
+        past.push(post);
+      } else if (isToday(postDate)) {
         today.push(post);
       } else if (isTomorrow(postDate)) {
         tomorrow.push(post);
@@ -146,7 +152,8 @@ export function useScheduledPosts() {
       today,
       tomorrow,
       thisWeek,
-      later
+      later,
+      past
     });
   };
 
