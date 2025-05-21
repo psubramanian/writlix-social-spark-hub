@@ -9,6 +9,7 @@ import { Facebook, Instagram, Linkedin, Loader2 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { format, isSameDay, parseISO } from 'date-fns';
 import { toZonedTime, formatInTimeZone } from 'date-fns-tz';
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 import type { ScheduledPost, GroupedPosts } from '@/hooks/useScheduledPosts';
 
 interface ScheduledPostsCalendarProps {
@@ -76,20 +77,54 @@ export function ScheduledPostsCalendar({
     });
   };
 
-  // Custom day renderer to show post indicators
+  // Custom day renderer to show post titles directly on calendar
   const renderDay = (day: Date) => {
     const postsOnDay = getPostsForDate(day);
     const hasPostsToday = postsOnDay.length > 0;
     
     return (
-      <div className="relative flex h-9 w-9 items-center justify-center p-0">
-        <div className="absolute h-9 w-9 flex items-center justify-center">
-          {day.getDate()}
-        </div>
-        {hasPostsToday && (
-          <div className="absolute bottom-1 w-full flex justify-center">
-            <div className="h-1 w-1 rounded-full bg-primary"></div>
+      <div className="h-full w-full min-h-[80px] p-1">
+        <div className="text-right mb-1 font-medium">{day.getDate()}</div>
+        
+        {hasPostsToday ? (
+          <div className="flex flex-col gap-1 overflow-hidden max-h-[60px]">
+            {postsOnDay.map((post, index) => {
+              // Check if this post is in the past
+              const postDate = parseISO(post.next_run_at);
+              const now = new Date();
+              const isPastDate = postDate < now;
+              
+              return (
+                <TooltipProvider key={post.id}>
+                  <Tooltip>
+                    <TooltipTrigger asChild>
+                      <div 
+                        className={cn(
+                          "text-xs truncate px-1 py-0.5 rounded cursor-pointer",
+                          isPastDate ? "bg-amber-100 text-amber-800" : "bg-primary/10 text-primary-foreground/90"
+                        )}
+                      >
+                        {post.content_ideas?.title || "Untitled"}
+                      </div>
+                    </TooltipTrigger>
+                    <TooltipContent side="right" className="max-w-[300px]">
+                      <p className="font-medium">{post.content_ideas?.title || "Untitled"}</p>
+                      <p className="text-xs text-muted-foreground">
+                        {formatTimeInTimezone(post.next_run_at, post.timezone || userTimezone)}
+                      </p>
+                      {isPastDate && (
+                        <Badge variant="outline" className="mt-1 bg-amber-100 text-amber-800 border-amber-200">
+                          Past Due
+                        </Badge>
+                      )}
+                    </TooltipContent>
+                  </Tooltip>
+                </TooltipProvider>
+              );
+            })}
           </div>
+        ) : (
+          <div className="h-[60px]"></div>
         )}
       </div>
     );
@@ -124,115 +159,120 @@ export function ScheduledPostsCalendar({
           </div>
         ) : (
           <div className="space-y-6">
-            <Calendar
-              mode="single"
-              selected={selectedDate}
-              onSelect={setSelectedDate}
-              onMonthChange={setMonth}
-              month={month}
-              className="border rounded-md p-3 w-full pointer-events-auto"
-              classNames={{
-                day_today: "bg-muted text-muted-foreground font-normal",
-                day_selected: "bg-primary text-primary-foreground font-bold",
-              }}
-              components={{
-                Day: ({ date, ...props }) => renderDay(date)
-              }}
-            />
+            <div className="overflow-x-auto">
+              <Calendar
+                mode="single"
+                selected={selectedDate}
+                onSelect={setSelectedDate}
+                onMonthChange={setMonth}
+                month={month}
+                className="w-full border rounded-md p-3 pointer-events-auto"
+                classNames={{
+                  day_today: "bg-muted text-muted-foreground font-normal",
+                  day_selected: "bg-primary/20 text-primary font-bold",
+                  day: "h-full aspect-square p-0",
+                  cell: "h-[100px] w-full relative p-0 border-t",
+                  head_cell: "text-muted-foreground font-semibold text-xs uppercase",
+                  head_row: "border-b",
+                  row: "flex w-full",
+                  table: "w-full border-collapse",
+                  months: "w-full",
+                  month: "w-full"
+                }}
+                components={{
+                  Day: ({ date, ...props }) => renderDay(date)
+                }}
+              />
+            </div>
             
-            {selectedDate && (
+            {selectedDate && selectedDatePosts.length > 0 && (
               <div>
                 <h3 className="font-medium mb-2">
-                  Posts on {format(selectedDate, 'MMMM d, yyyy')}
+                  Post Details for {format(selectedDate, 'MMMM d, yyyy')}
                 </h3>
-                
-                {selectedDatePosts.length === 0 ? (
-                  <p className="text-sm text-muted-foreground">No posts scheduled for this date.</p>
-                ) : (
-                  <div className="space-y-4">
-                    {selectedDatePosts.map(post => {
-                      // Use the post's timezone if available, otherwise fall back to user timezone
-                      const postTimezone = post.timezone || userTimezone || 'UTC';
-                      const postDate = parseISO(post.next_run_at);
-                      const now = new Date();
-                      const isPastDate = postDate < now;
-                      
-                      return (
-                        <div key={post.id} className={`border rounded-md p-4 ${isPastDate ? 'bg-amber-50 dark:bg-amber-900/20' : 'bg-white dark:bg-slate-900'}`}>
-                          <div className="flex flex-col space-y-3">
-                            <div className="flex justify-between items-start">
-                              <h3 className="font-medium">{post.content_ideas?.title || "Untitled Post"}</h3>
-                              <div className="flex gap-2">
-                                {isPastDate && (
-                                  <Badge variant="outline" className="bg-amber-100 text-amber-800 border-amber-200">
-                                    Past Due
-                                  </Badge>
-                                )}
-                                <Badge variant="outline" className="ml-2">
-                                  {post.content_ideas?.status || "Pending"}
+                <div className="space-y-4">
+                  {selectedDatePosts.map(post => {
+                    // Use the post's timezone if available, otherwise fall back to user timezone
+                    const postTimezone = post.timezone || userTimezone || 'UTC';
+                    const postDate = parseISO(post.next_run_at);
+                    const now = new Date();
+                    const isPastDate = postDate < now;
+                    
+                    return (
+                      <div key={post.id} className={`border rounded-md p-4 ${isPastDate ? 'bg-amber-50 dark:bg-amber-900/20' : 'bg-white dark:bg-slate-900'}`}>
+                        <div className="flex flex-col space-y-3">
+                          <div className="flex justify-between items-start">
+                            <h3 className="font-medium">{post.content_ideas?.title || "Untitled Post"}</h3>
+                            <div className="flex gap-2">
+                              {isPastDate && (
+                                <Badge variant="outline" className="bg-amber-100 text-amber-800 border-amber-200">
+                                  Past Due
                                 </Badge>
-                              </div>
-                            </div>
-                            
-                            <div className="text-sm text-muted-foreground">
-                              {isPastDate ? "Was scheduled for " : "Scheduled for "} 
-                              {formatTimeInTimezone(post.next_run_at, postTimezone)} 
-                              {postTimezone !== 'UTC' ? ` (${postTimezone})` : ''}
-                            </div>
-                            
-                            <div className="flex flex-wrap items-center gap-2 pt-2 border-t">
-                              <span className="text-xs text-muted-foreground mr-2">Post now:</span>
-                              <Button 
-                                variant="outline" 
-                                size="sm"
-                                className="h-8 px-3 flex items-center gap-1"
-                                onClick={() => onPostNow(post.id, 'linkedin')}
-                                disabled={postingId === post.id}
-                              >
-                                {postingId === post.id ? (
-                                  <Loader2 className="h-3 w-3 animate-spin mr-1" />
-                                ) : (
-                                  <Linkedin className="h-3 w-3 mr-1" />
-                                )}
-                                <span>LinkedIn</span>
-                              </Button>
-                              
-                              <Button 
-                                variant="outline" 
-                                size="sm"
-                                className="h-8 px-3 flex items-center gap-1"
-                                onClick={() => onPostNow(post.id, 'facebook')}
-                                disabled={postingId === post.id}
-                              >
-                                {postingId === post.id ? (
-                                  <Loader2 className="h-3 w-3 animate-spin mr-1" />
-                                ) : (
-                                  <Facebook className="h-3 w-3 mr-1" />
-                                )}
-                                <span>Facebook</span>
-                              </Button>
-                              
-                              <Button 
-                                variant="outline" 
-                                size="sm"
-                                className="h-8 px-3 flex items-center gap-1"
-                                onClick={() => onPostNow(post.id, 'instagram')}
-                                disabled={postingId === post.id}
-                              >
-                                {postingId === post.id ? (
-                                  <Loader2 className="h-3 w-3 animate-spin mr-1" />
-                                ) : (
-                                  <Instagram className="h-3 w-3 mr-1" />
-                                )}
-                                <span>Instagram</span>
-                              </Button>
+                              )}
+                              <Badge variant="outline" className="ml-2">
+                                {post.content_ideas?.status || "Pending"}
+                              </Badge>
                             </div>
                           </div>
+                          
+                          <div className="text-sm text-muted-foreground">
+                            {isPastDate ? "Was scheduled for " : "Scheduled for "} 
+                            {formatTimeInTimezone(post.next_run_at, postTimezone)} 
+                            {postTimezone !== 'UTC' ? ` (${postTimezone})` : ''}
+                          </div>
+                          
+                          <div className="flex flex-wrap items-center gap-2 pt-2 border-t">
+                            <span className="text-xs text-muted-foreground mr-2">Post now:</span>
+                            <Button 
+                              variant="outline" 
+                              size="sm"
+                              className="h-8 px-3 flex items-center gap-1"
+                              onClick={() => onPostNow(post.id, 'linkedin')}
+                              disabled={postingId === post.id}
+                            >
+                              {postingId === post.id ? (
+                                <Loader2 className="h-3 w-3 animate-spin mr-1" />
+                              ) : (
+                                <Linkedin className="h-3 w-3 mr-1" />
+                              )}
+                              <span>LinkedIn</span>
+                            </Button>
+                            
+                            <Button 
+                              variant="outline" 
+                              size="sm"
+                              className="h-8 px-3 flex items-center gap-1"
+                              onClick={() => onPostNow(post.id, 'facebook')}
+                              disabled={postingId === post.id}
+                            >
+                              {postingId === post.id ? (
+                                <Loader2 className="h-3 w-3 animate-spin mr-1" />
+                              ) : (
+                                <Facebook className="h-3 w-3 mr-1" />
+                              )}
+                              <span>Facebook</span>
+                            </Button>
+                            
+                            <Button 
+                              variant="outline" 
+                              size="sm"
+                              className="h-8 px-3 flex items-center gap-1"
+                              onClick={() => onPostNow(post.id, 'instagram')}
+                              disabled={postingId === post.id}
+                            >
+                              {postingId === post.id ? (
+                                <Loader2 className="h-3 w-3 animate-spin mr-1" />
+                              ) : (
+                                <Instagram className="h-3 w-3 mr-1" />
+                              )}
+                              <span>Instagram</span>
+                            </Button>
+                          </div>
                         </div>
-                      );
-                    })}
-                  </div>
-                )}
+                      </div>
+                    );
+                  })}
+                </div>
               </div>
             )}
           </div>
