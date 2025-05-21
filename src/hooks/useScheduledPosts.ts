@@ -1,4 +1,3 @@
-
 import { useState, useEffect } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/components/ui/use-toast';
@@ -6,7 +5,7 @@ import { getCurrentUser, useAuthRedirect } from '@/utils/supabaseUserUtils';
 import { useScheduleSettings } from './useScheduleSettings';
 import { usePostOperations } from './usePostOperations';
 import { usePostScheduling } from './usePostScheduling';
-import { format, isToday, isTomorrow, addDays, isBefore, isAfter, parseISO } from 'date-fns';
+import { format, isToday, isTomorrow, addDays, isBefore, isAfter, parseISO, isSameDay } from 'date-fns';
 import { formatInTimeZone, toZonedTime } from 'date-fns-tz';
 
 export interface ScheduledPost {
@@ -241,6 +240,23 @@ export function useScheduledPosts() {
     }
   };
 
+  // Get posts for a specific date (new function for calendar view)
+  const getPostsForDate = (date: Date): ScheduledPost[] => {
+    // Convert to start of day in user's timezone
+    const targetDate = toZonedTime(date, userSettings?.timezone || 'UTC');
+    
+    return posts.filter(post => {
+      try {
+        const postDate = parseISO(post.next_run_at);
+        const postDateInTz = toZonedTime(postDate, post.timezone || userSettings?.timezone || 'UTC');
+        return isSameDay(targetDate, postDateInTz);
+      } catch (error) {
+        console.error("Error filtering posts by date:", error);
+        return false;
+      }
+    });
+  };
+
   useEffect(() => {
     const initialize = async () => {
       await fetchUserSettings();
@@ -266,6 +282,7 @@ export function useScheduledPosts() {
     scheduleContentIdea,
     userSettings,
     formatScheduleDate,
-    getSchedulePattern
+    getSchedulePattern,
+    getPostsForDate
   };
 }

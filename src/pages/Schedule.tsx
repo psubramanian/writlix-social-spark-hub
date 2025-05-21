@@ -2,11 +2,14 @@ import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Separator } from "@/components/ui/separator"; 
+import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group";
+import { Calendar, LayoutList } from "lucide-react";
 import SchedulePostForm from '../components/SchedulePostForm';
 import { useScheduledPosts } from '../hooks/useScheduledPosts';
 import { useToast } from '@/components/ui/use-toast';
 import { CurrentScheduleCard } from '@/components/schedule/CurrentScheduleCard';
 import { ScheduledPostsList } from '@/components/schedule/ScheduledPostsList';
+import { ScheduledPostsCalendar } from '@/components/schedule/ScheduledPostsCalendar';
 import { usePostOperations } from '@/hooks/usePostOperations';
 import { LinkedInWarning } from '@/components/dashboard/LinkedInWarning';
 import { supabase } from '@/integrations/supabase/client';
@@ -24,6 +27,8 @@ interface SocialConnectionStatus {
   instagram: boolean;
 }
 
+type ViewMode = 'list' | 'calendar';
+
 const Schedule = () => {
   const navigate = useNavigate();
   const { 
@@ -39,6 +44,7 @@ const Schedule = () => {
   const { postToLinkedIn, postToFacebook, postToInstagram } = usePostOperations();
   const [postingId, setPostingId] = useState<string | null>(null);
   const [activePlatform, setActivePlatform] = useState<string | null>(null);
+  const [viewMode, setViewMode] = useState<ViewMode>('list');
   const [socialConnections, setSocialConnections] = useState<SocialConnectionStatus>({
     linkedin: false,
     facebook: false,
@@ -256,9 +262,22 @@ const Schedule = () => {
         
         <Separator className="my-4" />
         
-        {/* Scheduled Posts Section */}
+        {/* Scheduled Posts Section with View Toggle */}
         <div>
-          <h2 className="text-xl font-semibold mb-4">Scheduled Posts</h2>
+          <div className="flex justify-between items-center mb-4">
+            <h2 className="text-xl font-semibold">Scheduled Posts</h2>
+            
+            <ToggleGroup type="single" value={viewMode} onValueChange={(value) => value && setViewMode(value as ViewMode)}>
+              <ToggleGroupItem value="list" aria-label="List View">
+                <LayoutList className="h-4 w-4 mr-1" />
+                <span className="hidden sm:inline">List</span>
+              </ToggleGroupItem>
+              <ToggleGroupItem value="calendar" aria-label="Calendar View">
+                <Calendar className="h-4 w-4 mr-1" />
+                <span className="hidden sm:inline">Calendar</span>
+              </ToggleGroupItem>
+            </ToggleGroup>
+          </div>
           
           {!checkingConnection && !socialConnections.linkedin && 
            !socialConnections.facebook && !socialConnections.instagram && (
@@ -267,16 +286,28 @@ const Schedule = () => {
             </div>
           )}
           
-          <ScheduledPostsList
-            posts={scheduledPosts}
-            groupedPosts={groupedPosts}
-            postingId={postingId}
-            onPostNow={handlePostNow}
-            loading={postsLoading}
-            formatScheduleDate={formatScheduleDate}
-            schedulePattern={schedulePattern}
-            userTimezone={userSettings?.timezone}
-          />
+          {viewMode === 'list' ? (
+            <ScheduledPostsList
+              posts={scheduledPosts}
+              groupedPosts={groupedPosts}
+              postingId={postingId}
+              onPostNow={handlePostNow}
+              loading={postsLoading}
+              formatScheduleDate={formatScheduleDate}
+              schedulePattern={schedulePattern}
+              userTimezone={userSettings?.timezone}
+            />
+          ) : (
+            <ScheduledPostsCalendar
+              posts={scheduledPosts}
+              groupedPosts={groupedPosts}
+              postingId={postingId}
+              onPostNow={handlePostNow}
+              loading={postsLoading}
+              formatScheduleDate={formatScheduleDate}
+              userTimezone={userSettings?.timezone}
+            />
+          )}
         </div>
       </div>
       
