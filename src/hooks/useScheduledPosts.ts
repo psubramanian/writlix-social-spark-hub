@@ -242,13 +242,24 @@ export function useScheduledPosts() {
 
   // Get posts for a specific date (new function for calendar view)
   const getPostsForDate = (date: Date): ScheduledPost[] => {
+    if (!date) return [];
+    
     // Convert to start of day in user's timezone
     const targetDate = toZonedTime(date, userSettings?.timezone || 'UTC');
     
+    console.log('Getting posts for date:', format(date, 'yyyy-MM-dd'));
+    console.log('Target date in timezone:', format(targetDate, 'yyyy-MM-dd'));
+    
     return posts.filter(post => {
       try {
+        if (!post.next_run_at) return false;
+        
         const postDate = parseISO(post.next_run_at);
         const postDateInTz = toZonedTime(postDate, post.timezone || userSettings?.timezone || 'UTC');
+        
+        console.log('Post date:', format(postDateInTz, 'yyyy-MM-dd'));
+        console.log('Is same day?', isSameDay(targetDate, postDateInTz));
+        
         return isSameDay(targetDate, postDateInTz);
       } catch (error) {
         console.error("Error filtering posts by date:", error);

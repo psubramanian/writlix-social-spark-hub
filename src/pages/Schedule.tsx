@@ -38,7 +38,8 @@ const Schedule = () => {
     userSettings, 
     fetchPosts,
     formatScheduleDate,
-    getSchedulePattern
+    getSchedulePattern,
+    getPostsForDate
   } = useScheduledPosts();
   
   const { postToLinkedIn, postToFacebook, postToInstagram } = usePostOperations();
@@ -57,6 +58,11 @@ const Schedule = () => {
   const { toast } = useToast();
   const { user } = useAuth();
   const { updateUserSettings, isUpdating } = useScheduleSettings();
+
+  // Debug logging
+  console.log('Schedule page - View mode:', viewMode);
+  console.log('Schedule page - Posts available:', posts.length);
+  console.log('Schedule page - User timezone:', userSettings?.timezone);
 
   useEffect(() => {
     const checkSocialConnections = async () => {
@@ -288,18 +294,18 @@ const Schedule = () => {
           
           {viewMode === 'list' ? (
             <ScheduledPostsList
-              posts={scheduledPosts}
+              posts={posts}
               groupedPosts={groupedPosts}
               postingId={postingId}
               onPostNow={handlePostNow}
               loading={postsLoading}
               formatScheduleDate={formatScheduleDate}
-              schedulePattern={schedulePattern}
+              schedulePattern={userSettings ? getSchedulePattern(userSettings) : undefined}
               userTimezone={userSettings?.timezone}
             />
           ) : (
             <ScheduledPostsCalendar
-              posts={scheduledPosts}
+              posts={posts}
               groupedPosts={groupedPosts}
               postingId={postingId}
               onPostNow={handlePostNow}

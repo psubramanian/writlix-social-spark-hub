@@ -4,7 +4,6 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Calendar } from "@/components/ui/calendar";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Badge } from "@/components/ui/badge";
-import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { Button } from "@/components/ui/button";
 import { Facebook, Instagram, Linkedin, Loader2 } from "lucide-react";
 import { cn } from "@/lib/utils";
@@ -34,6 +33,11 @@ export function ScheduledPostsCalendar({
   const [selectedDate, setSelectedDate] = useState<Date | undefined>(new Date());
   const [month, setMonth] = useState<Date>(new Date());
 
+  // Debug logging to check data
+  console.log('Calendar View - Posts:', posts);
+  console.log('Calendar View - Selected Date:', selectedDate);
+  console.log('Calendar View - User Timezone:', userTimezone);
+
   if (loading) {
     return (
       <Card>
@@ -50,12 +54,20 @@ export function ScheduledPostsCalendar({
   
   // Function to get posts scheduled for a specific date
   const getPostsForDate = (date: Date): ScheduledPost[] => {
+    if (!date) return [];
+    
     return posts.filter(post => {
       try {
+        if (!post.next_run_at) return false;
+        
         const postDate = parseISO(post.next_run_at);
         // Convert to user timezone for accurate comparison
         const postDateInUserTz = toZonedTime(postDate, post.timezone || userTimezone);
         const dateInUserTz = toZonedTime(date, userTimezone);
+        
+        // Debug log for date comparison
+        console.log(`Comparing post date ${format(postDateInUserTz, 'yyyy-MM-dd')} with selected ${format(dateInUserTz, 'yyyy-MM-dd')}`);
+        
         return isSameDay(postDateInUserTz, dateInUserTz);
       } catch (error) {
         console.error("Error comparing dates:", error);
@@ -124,7 +136,7 @@ export function ScheduledPostsCalendar({
                 day_selected: "bg-primary text-primary-foreground font-bold",
               }}
               components={{
-                Day: renderDay
+                Day: ({ date, ...props }) => renderDay(date)
               }}
             />
             
