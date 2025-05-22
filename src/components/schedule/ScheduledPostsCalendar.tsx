@@ -80,52 +80,59 @@ export function ScheduledPostsCalendar({
   // Custom day renderer to show post titles directly on calendar
   const renderDay = (day: Date) => {
     const postsOnDay = getPostsForDate(day);
-    const hasPostsToday = postsOnDay.length > 0;
     
     return (
-      <div className="h-full w-full min-h-[80px] p-1">
+      <div className="h-full w-full p-1 flex flex-col">
         <div className="text-right mb-1 font-medium">{day.getDate()}</div>
         
-        {hasPostsToday ? (
-          <div className="flex flex-col gap-1 overflow-hidden max-h-[60px]">
-            {postsOnDay.map((post, index) => {
-              // Check if this post is in the past
-              const postDate = parseISO(post.next_run_at);
-              const now = new Date();
-              const isPastDate = postDate < now;
-              
-              return (
-                <TooltipProvider key={post.id}>
-                  <Tooltip>
-                    <TooltipTrigger asChild>
-                      <div 
-                        className={cn(
-                          "text-xs truncate px-1 py-0.5 rounded cursor-pointer",
-                          isPastDate ? "bg-amber-100 text-amber-800" : "bg-primary/10 text-primary-foreground/90"
+        <div className="flex-grow">
+          {postsOnDay.length > 0 ? (
+            <div className="space-y-1 overflow-hidden max-h-[60px]">
+              {postsOnDay.slice(0, 3).map((post, index) => {
+                // Check if this post is in the past
+                const postDate = parseISO(post.next_run_at);
+                const now = new Date();
+                const isPastDate = postDate < now;
+                
+                return (
+                  <TooltipProvider key={post.id}>
+                    <Tooltip>
+                      <TooltipTrigger asChild>
+                        <div 
+                          className={cn(
+                            "text-xs p-1 rounded cursor-pointer",
+                            isPastDate ? "bg-amber-100 text-amber-800" : "bg-primary/10 text-primary-foreground/90",
+                            "line-clamp-2 break-words"
+                          )}
+                        >
+                          {post.content_ideas?.title || "Untitled"}
+                        </div>
+                      </TooltipTrigger>
+                      <TooltipContent side="right" className="max-w-[300px]">
+                        <p className="font-medium">{post.content_ideas?.title || "Untitled"}</p>
+                        <p className="text-xs text-muted-foreground">
+                          {formatTimeInTimezone(post.next_run_at, post.timezone || userTimezone)}
+                        </p>
+                        {isPastDate && (
+                          <Badge variant="outline" className="mt-1 bg-amber-100 text-amber-800 border-amber-200">
+                            Past Due
+                          </Badge>
                         )}
-                      >
-                        {post.content_ideas?.title || "Untitled"}
-                      </div>
-                    </TooltipTrigger>
-                    <TooltipContent side="right" className="max-w-[300px]">
-                      <p className="font-medium">{post.content_ideas?.title || "Untitled"}</p>
-                      <p className="text-xs text-muted-foreground">
-                        {formatTimeInTimezone(post.next_run_at, post.timezone || userTimezone)}
-                      </p>
-                      {isPastDate && (
-                        <Badge variant="outline" className="mt-1 bg-amber-100 text-amber-800 border-amber-200">
-                          Past Due
-                        </Badge>
-                      )}
-                    </TooltipContent>
-                  </Tooltip>
-                </TooltipProvider>
-              );
-            })}
-          </div>
-        ) : (
-          <div className="h-[60px]"></div>
-        )}
+                      </TooltipContent>
+                    </Tooltip>
+                  </TooltipProvider>
+                );
+              })}
+              {postsOnDay.length > 3 && (
+                <div className="text-xs text-muted-foreground">
+                  +{postsOnDay.length - 3} more
+                </div>
+              )}
+            </div>
+          ) : (
+            <div className="h-full"></div>
+          )}
+        </div>
       </div>
     );
   };
@@ -171,7 +178,7 @@ export function ScheduledPostsCalendar({
                   day_today: "bg-muted text-muted-foreground font-normal",
                   day_selected: "bg-primary/20 text-primary font-bold",
                   day: "h-full aspect-square p-0",
-                  cell: "h-[100px] w-full relative p-0 border-t",
+                  cell: "h-24 w-full relative p-0 border-t",
                   head_cell: "text-muted-foreground font-semibold text-xs uppercase",
                   head_row: "border-b",
                   row: "flex w-full",
