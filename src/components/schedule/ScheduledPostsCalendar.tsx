@@ -11,6 +11,7 @@ import { format, isSameDay, parseISO } from 'date-fns';
 import { toZonedTime, formatInTimeZone } from 'date-fns-tz';
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 import type { ScheduledPost, GroupedPosts } from '@/hooks/useScheduledPosts';
+import PostPreviewDialog from './PostPreviewDialog';
 
 interface ScheduledPostsCalendarProps {
   posts: ScheduledPost[];
@@ -33,6 +34,8 @@ export function ScheduledPostsCalendar({
 }: ScheduledPostsCalendarProps) {
   const [selectedDate, setSelectedDate] = useState<Date | undefined>(new Date());
   const [month, setMonth] = useState<Date>(new Date());
+  const [selectedPost, setSelectedPost] = useState<ScheduledPost | null>(null);
+  const [isDialogOpen, setIsDialogOpen] = useState(false);
 
   // Debug logging to check data
   console.log('Calendar View - Posts:', posts);
@@ -77,6 +80,99 @@ export function ScheduledPostsCalendar({
     });
   };
 
+  // Handle opening dialog for post preview
+  const handlePostClick = (post: ScheduledPost) => {
+    setSelectedPost(post);
+    setIsDialogOpen(true);
+  };
+
+  // Handle saving post content
+  const handleSavePost = async (postId: string, content: string) => {
+    try {
+      // Here you would implement the API call to update the post content
+      console.log("Saving post content for:", postId, content);
+      
+      // Placeholder for API call
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) {
+        throw new Error("User not authenticated");
+      }
+      
+      // Find the post to get its content_id
+      const post = posts.find(p => p.id === postId);
+      if (!post || !post.content_ideas?.id) {
+        throw new Error("Post not found or missing content ID");
+      }
+      
+      // Update the content in the database
+      const { error } = await supabase
+        .from('content_ideas')
+        .update({ content })
+        .eq('id', post.content_ideas.id);
+        
+      if (error) throw error;
+      
+      // Show success toast
+      toast({
+        title: "Post Updated",
+        description: "Your post content has been updated successfully.",
+      });
+    } catch (error) {
+      console.error("Error saving post:", error);
+      // Show error toast
+      toast({
+        title: "Update Failed",
+        description: "Failed to update post content. Please try again.",
+        variant: "destructive",
+      });
+    }
+  };
+
+  // Handle regenerating post content
+  const handleRegeneratePost = async (postId: string) => {
+    try {
+      // Here you would implement the API call to regenerate content
+      console.log("Regenerating content for post:", postId);
+      
+      // In a real implementation, you would call an API endpoint that uses AI to regenerate content
+      // For now, we'll just simulate a delay and update with placeholder content
+      await new Promise(resolve => setTimeout(resolve, 1500));
+      
+      // Find the post
+      const post = posts.find(p => p.id === postId);
+      if (!post || !post.content_ideas?.id) {
+        throw new Error("Post not found or missing content ID");
+      }
+      
+      const regeneratedContent = `<p>This is AI regenerated content for post: ${post.content_ideas.title}.</p><p>The content has been refreshed with new ideas and insights!</p>`;
+      
+      // Update the post in state to reflect the changes immediately
+      if (selectedPost && selectedPost.id === postId) {
+        setSelectedPost({
+          ...selectedPost,
+          content_ideas: {
+            ...selectedPost.content_ideas,
+            content: regeneratedContent
+          }
+        });
+      }
+      
+      // Show success toast
+      toast({
+        title: "Content Regenerated",
+        description: "Your post content has been refreshed with AI.",
+      });
+    } catch (error) {
+      console.error("Error regenerating content:", error);
+      // Show error toast
+      toast({
+        title: "Regeneration Failed",
+        description: "Failed to regenerate post content. Please try again.",
+        variant: "destructive",
+      });
+    }
+  };
+
   // Custom day renderer to show post titles directly on calendar
   const renderDay = (day: Date) => {
     const postsOnDay = getPostsForDate(day);
@@ -104,6 +200,11 @@ export function ScheduledPostsCalendar({
                             isPastDate ? "bg-amber-100 text-amber-800" : "bg-primary/10 text-primary-foreground/90",
                             "line-clamp-2 break-words"
                           )}
+                          onClick={(e) => {
+                            e.preventDefault(); 
+                            e.stopPropagation(); 
+                            handlePostClick(post);
+                          }}
                         >
                           {post.content_ideas?.title || "Untitled"}
                         </div>
@@ -206,10 +307,18 @@ export function ScheduledPostsCalendar({
                     const isPastDate = postDate < now;
                     
                     return (
-                      <div key={post.id} className={`border rounded-md p-4 ${isPastDate ? 'bg-amber-50 dark:bg-amber-900/20' : 'bg-white dark:bg-slate-900'}`}>
+                      <div 
+                        key={post.id} 
+                        className={`border rounded-md p-4 ${isPastDate ? 'bg-amber-50 dark:bg-amber-900/20' : 'bg-white dark:bg-slate-900'}`}
+                      >
                         <div className="flex flex-col space-y-3">
                           <div className="flex justify-between items-start">
-                            <h3 className="font-medium">{post.content_ideas?.title || "Untitled Post"}</h3>
+                            <h3 
+                              className="font-medium cursor-pointer hover:text-primary hover:underline" 
+                              onClick={() => handlePostClick(post)}
+                            >
+                              {post.content_ideas?.title || "Untitled Post"}
+                            </h3>
                             <div className="flex gap-2">
                               {isPastDate && (
                                 <Badge variant="outline" className="bg-amber-100 text-amber-800 border-amber-200">
@@ -285,6 +394,18 @@ export function ScheduledPostsCalendar({
           </div>
         )}
       </CardContent>
+      
+      {/* Post Preview Dialog */}
+      <PostPreviewDialog
+        post={selectedPost}
+        isOpen={isDialogOpen}
+        onClose={() => {
+          setIsDialogOpen(false);
+          setSelectedPost(null);
+        }}
+        onSave={handleSavePost}
+        onRegenerate={handleRegeneratePost}
+      />
     </Card>
   );
 }
