@@ -15,6 +15,7 @@ interface PostPreviewDialogProps {
   onClose: () => void;
   onSave: (postId: string, content: string) => Promise<void>;
   onRegenerate: (postId: string) => Promise<void>;
+  isRegenerating?: boolean;
 }
 
 const PostPreviewDialog = ({ 
@@ -22,10 +23,10 @@ const PostPreviewDialog = ({
   isOpen, 
   onClose, 
   onSave, 
-  onRegenerate 
+  onRegenerate,
+  isRegenerating = false
 }: PostPreviewDialogProps) => {
   const [content, setContent] = useState<string>("");
-  const [isRegenerating, setIsRegenerating] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
 
   // Update content when post changes
@@ -51,15 +52,7 @@ const PostPreviewDialog = ({
 
   const handleRegenerate = async () => {
     if (!post) return;
-    
-    setIsRegenerating(true);
-    try {
-      await onRegenerate(post.id);
-    } catch (error) {
-      console.error("Error regenerating content:", error);
-    } finally {
-      setIsRegenerating(false);
-    }
+    await onRegenerate(post.id);
   };
   
   // Format time in the proper timezone
@@ -107,6 +100,7 @@ const PostPreviewDialog = ({
               content={content} 
               onChange={setContent}
               placeholder="Post content will appear here"
+              disabled={isRegenerating}
             />
           </div>
           
@@ -114,7 +108,7 @@ const PostPreviewDialog = ({
             <Button variant="outline" onClick={onClose}>
               Cancel
             </Button>
-            <Button onClick={handleSave} disabled={isSaving}>
+            <Button onClick={handleSave} disabled={isSaving || isRegenerating}>
               {isSaving ? (
                 <>
                   <Loader2 className="mr-2 h-4 w-4 animate-spin" />

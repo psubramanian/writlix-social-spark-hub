@@ -12,6 +12,8 @@ import { toZonedTime, formatInTimeZone } from 'date-fns-tz';
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 import type { ScheduledPost, GroupedPosts } from '@/hooks/useScheduledPosts';
 import PostPreviewDialog from './PostPreviewDialog';
+import { supabase } from '@/integrations/supabase/client';
+import { toast } from "@/components/ui/use-toast";
 
 interface ScheduledPostsCalendarProps {
   posts: ScheduledPost[];
@@ -36,6 +38,7 @@ export function ScheduledPostsCalendar({
   const [month, setMonth] = useState<Date>(new Date());
   const [selectedPost, setSelectedPost] = useState<ScheduledPost | null>(null);
   const [isDialogOpen, setIsDialogOpen] = useState(false);
+  const [isRegenerating, setIsRegenerating] = useState(false);
 
   // Debug logging to check data
   console.log('Calendar View - Posts:', posts);
@@ -131,28 +134,52 @@ export function ScheduledPostsCalendar({
   // Handle regenerating post content
   const handleRegeneratePost = async (postId: string) => {
     try {
-      // Here you would implement the API call to regenerate content
+      setIsRegenerating(true);
       console.log("Regenerating content for post:", postId);
       
-      // In a real implementation, you would call an API endpoint that uses AI to regenerate content
-      // For now, we'll just simulate a delay and update with placeholder content
-      await new Promise(resolve => setTimeout(resolve, 1500));
-      
-      // Find the post
+      // Find the post to get its content_ideas
       const post = posts.find(p => p.id === postId);
       if (!post || !post.content_ideas?.id) {
         throw new Error("Post not found or missing content ID");
       }
       
-      const regeneratedContent = `<p>This is AI regenerated content for post: ${post.content_ideas.title}.</p><p>The content has been refreshed with new ideas and insights!</p>`;
+      // Use the post title as the topic for generation
+      const topic = post.content_ideas.title;
       
-      // Update the post in state to reflect the changes immediately
+      // Call the generate-content function to regenerate content
+      const { data: generatedContent, error: generationError } = await supabase.functions.invoke('generate-content', {
+        body: {
+          topic: topic,
+          quantity: 1,
+        },
+      });
+      
+      if (generationError) throw generationError;
+      
+      if (!generatedContent || !Array.isArray(generatedContent) || generatedContent.length === 0) {
+        throw new Error("No content was generated");
+      }
+      
+      // Get the first (and only) generated content item
+      const newContent = generatedContent[0].content;
+      
+      // Update the post in database
+      const { error: updateError } = await supabase
+        .from('content_ideas')
+        .update({ 
+          content: newContent
+        })
+        .eq('id', post.content_ideas.id);
+      
+      if (updateError) throw updateError;
+      
+      // Update the selected post in state to reflect changes immediately
       if (selectedPost && selectedPost.id === postId) {
         setSelectedPost({
           ...selectedPost,
           content_ideas: {
             ...selectedPost.content_ideas,
-            content: regeneratedContent
+            content: newContent
           }
         });
       }
@@ -167,9 +194,11 @@ export function ScheduledPostsCalendar({
       // Show error toast
       toast({
         title: "Regeneration Failed",
-        description: "Failed to regenerate post content. Please try again.",
+        description: error instanceof Error ? error.message : "Failed to regenerate post content. Please try again.",
         variant: "destructive",
       });
+    } finally {
+      setIsRegenerating(false);
     }
   };
 
@@ -280,10 +309,10 @@ export function ScheduledPostsCalendar({
                   day_selected: "bg-primary/20 text-primary font-bold",
                   day: "h-full aspect-square p-0",
                   cell: "h-24 w-full relative p-0 border-t",
-                  head_cell: "text-muted-foreground font-semibold text-xs uppercase",
-                  head_row: "border-b",
+                  head_cell: "text-muted-foreground font-semibold text-xs uppercase text-center",
+                  head_row: "flex w-full border-b",
                   row: "flex w-full",
-                  table: "w-full border-collapse",
+                  table: "w-full border-collapse table-fixed",
                   months: "w-full",
                   month: "w-full"
                 }}
@@ -405,6 +434,7 @@ export function ScheduledPostsCalendar({
         }}
         onSave={handleSavePost}
         onRegenerate={handleRegeneratePost}
+        isRegenerating={isRegenerating}
       />
     </Card>
   );
