@@ -309,7 +309,7 @@ export function ScheduledPostsCalendar({
                   day_selected: "bg-primary/20 text-primary font-bold",
                   day: "h-full aspect-square p-0",
                   cell: "h-24 w-full relative p-0 border-t",
-                  head_cell: "text-muted-foreground font-semibold text-xs uppercase text-center",
+                  head_cell: "text-muted-foreground font-semibold text-xs uppercase text-center w-full",
                   head_row: "flex w-full border-b",
                   row: "flex w-full",
                   table: "w-full border-collapse table-fixed",

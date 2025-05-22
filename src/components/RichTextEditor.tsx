@@ -13,30 +13,36 @@ interface RichTextEditorProps {
   onChange: (content: string) => void;
   readOnly?: boolean;
   placeholder?: string;
+  disabled?: boolean;
 }
 
-const RichTextEditor = ({ content, onChange, readOnly = false, placeholder }: RichTextEditorProps) => {
+const RichTextEditor = ({ content, onChange, readOnly = false, placeholder, disabled = false }: RichTextEditorProps) => {
   const [showToolbar, setShowToolbar] = useState(true);
   const [editorContent, setEditorContent] = useState(content);
+  const editorRef = React.useRef<HTMLDivElement>(null);
 
   // Update editor content when props change
   useEffect(() => {
     setEditorContent(content);
+    if (editorRef.current) {
+      editorRef.current.innerHTML = content;
+    }
   }, [content]);
 
   const handleCommand = (command: string, value: string | null = null) => {
-    if (readOnly) return;
+    if (readOnly || disabled) return;
     
     document.execCommand(command, false, value);
     // Get the updated content from the contentEditable div
-    const editorElement = document.getElementById('rich-text-editor');
-    if (editorElement) {
-      onChange(editorElement.innerHTML);
+    if (editorRef.current) {
+      const newContent = editorRef.current.innerHTML;
+      setEditorContent(newContent);
+      onChange(newContent);
     }
   };
 
   const handleLinkInsert = () => {
-    if (readOnly) return;
+    if (readOnly || disabled) return;
 
     const url = prompt('Enter URL:', 'https://');
     if (url) {
@@ -45,22 +51,23 @@ const RichTextEditor = ({ content, onChange, readOnly = false, placeholder }: Ri
   };
 
   const handleContentChange = (e: React.FormEvent<HTMLDivElement>) => {
-    if (!readOnly) {
+    if (!readOnly && !disabled) {
       const newContent = e.currentTarget.innerHTML;
       setEditorContent(newContent);
+      onChange(newContent);
     }
   };
 
-  const handleBlur = (e: React.FocusEvent<HTMLDivElement>) => {
-    if (!readOnly) {
-      const newContent = e.currentTarget.innerHTML;
+  const handleBlur = () => {
+    if (!readOnly && !disabled && editorRef.current) {
+      const newContent = editorRef.current.innerHTML;
       onChange(newContent);
     }
   };
 
   return (
     <div className="w-full border rounded-md">
-      {showToolbar && !readOnly && (
+      {showToolbar && !readOnly && !disabled && (
         <div className="flex flex-wrap gap-1 p-2 border-b bg-muted/20">
           <Button
             type="button"
@@ -149,27 +156,29 @@ const RichTextEditor = ({ content, onChange, readOnly = false, placeholder }: Ri
       )}
       
       <ScrollArea className="h-[320px] w-full">
-        <div
-          id="rich-text-editor"
-          className={cn(
-            "w-full p-4 focus:outline-none min-h-[320px]",
-            "prose prose-sm max-w-none",
-            "focus:ring-0",
-            readOnly ? "bg-muted/10 cursor-default" : "",
-            "relative"
+        <div className="relative w-full min-h-[320px]">
+          <div
+            ref={editorRef}
+            id="rich-text-editor"
+            className={cn(
+              "w-full p-4 focus:outline-none min-h-[320px]",
+              "prose prose-sm max-w-none",
+              "focus:ring-0 text-left",
+              (readOnly || disabled) ? "bg-muted/10 cursor-default" : ""
+            )}
+            contentEditable={!readOnly && !disabled}
+            dangerouslySetInnerHTML={{ __html: editorContent }}
+            onInput={handleContentChange}
+            onBlur={handleBlur}
+            suppressContentEditableWarning
+            dir="ltr"
+          />
+          {!editorContent && placeholder && (
+            <div className="absolute top-4 left-4 pointer-events-none text-gray-400">
+              {placeholder}
+            </div>
           )}
-          contentEditable={!readOnly}
-          dangerouslySetInnerHTML={{ __html: editorContent }}
-          onInput={handleContentChange}
-          onBlur={handleBlur}
-          suppressContentEditableWarning
-          data-placeholder={placeholder}
-        />
-        {!editorContent && placeholder && (
-          <div className="absolute top-4 left-4 pointer-events-none text-gray-400">
-            {placeholder}
-          </div>
-        )}
+        </div>
       </ScrollArea>
     </div>
   );
