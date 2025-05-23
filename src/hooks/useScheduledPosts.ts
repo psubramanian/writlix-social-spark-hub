@@ -79,12 +79,13 @@ export function useScheduledPosts() {
 
       console.log('Fetched scheduled posts:', postsData);
       
-      // Further filter out any posts where content status is Published
+      // Filter to only include posts where content_ideas status is 'Scheduled'
+      // This is the key change to fix the issue
       const filteredPosts = postsData ? postsData.filter(post => 
-        post.content_ideas && post.content_ideas.status !== 'Published'
+        post.content_ideas && post.content_ideas.status === 'Scheduled'
       ) : [];
       
-      console.log('After filtering published content:', filteredPosts);
+      console.log('After filtering for Scheduled status:', filteredPosts);
       
       // Improved deduplication: Consider both date and content ID
       const uniquePosts = [];
