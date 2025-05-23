@@ -4,7 +4,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Badge } from "@/components/ui/badge";
-import { Calendar, Clock, Loader2 } from "lucide-react";
+import { Calendar, Clock, Loader2, Eye } from "lucide-react";
 import { Facebook, Instagram, Linkedin } from "lucide-react";
 import type { ScheduledPost } from '@/hooks/useScheduledPosts';
 import { formatInTimeZone } from 'date-fns-tz';
@@ -24,6 +24,7 @@ interface ScheduledPostsListProps {
   loading: boolean;
   postingId: string | null;
   onPostNow: (postId: string, platform: string, imageUrl?: string) => void;
+  onOpenPostPreview: (post: ScheduledPost) => void;
   formatScheduleDate: (dateString: string, timezone: string) => string;
   schedulePattern?: string;
   userTimezone?: string;
@@ -35,6 +36,7 @@ export function ScheduledPostsList({
   loading,
   postingId,
   onPostNow,
+  onOpenPostPreview,
   formatScheduleDate,
   schedulePattern,
   userTimezone = 'UTC'
@@ -99,7 +101,18 @@ export function ScheduledPostsList({
       <div key={post.id} className={`border rounded-md p-4 ${isPastDate ? 'bg-amber-50 dark:bg-amber-900/20' : 'bg-white dark:bg-slate-900'}`}>
         <div className="flex flex-col space-y-3">
           <div className="flex justify-between items-start">
-            <h3 className="font-medium">{post.content_ideas?.title || "Untitled Post"}</h3>
+            <div className="flex items-center gap-2">
+              <h3 className="font-medium">{post.content_ideas?.title || "Untitled Post"}</h3>
+              <Button 
+                variant="ghost" 
+                size="icon"
+                className="h-6 w-6" 
+                onClick={() => onOpenPostPreview(post)}
+                title="Preview post"
+              >
+                <Eye className="h-4 w-4" />
+              </Button>
+            </div>
             <div className="flex gap-2">
               {isPastDate && (
                 <Badge variant="outline" className="bg-amber-100 text-amber-800 border-amber-200">

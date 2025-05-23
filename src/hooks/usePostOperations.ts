@@ -1,160 +1,202 @@
 
+import { useState } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/components/ui/use-toast';
 import { getCurrentUser } from '@/utils/supabaseUserUtils';
 
 export function usePostOperations() {
   const { toast } = useToast();
+  const [isRegenerating, setIsRegenerating] = useState(false);
 
-  const postToLinkedIn = async (postId: string) => {
+  const savePostContent = async (postId: string, content: string) => {
     try {
-      console.log(`Attempting to post content with ID: ${postId} to LinkedIn`);
-      
       const user = await getCurrentUser();
-      if (!user) {
-        throw new Error("Authentication required");
-      }
+      if (!user) throw new Error('User not authenticated');
       
-      // Check if the user has LinkedIn tokens
-      const { data: credentials, error: tokensError } = await supabase
-        .from('user_linkedin_credentials')
-        .select('access_token')
+      // First get the scheduled post to find the content_id
+      const { data: postData, error: postError } = await supabase
+        .from('scheduled_posts')
+        .select('content_id, user_id')
+        .eq('id', postId)
         .eq('user_id', user.id)
         .maybeSingle();
-        
-      if (tokensError) {
-        console.error('Error checking LinkedIn tokens:', tokensError);
-        throw new Error("Error checking LinkedIn connection");
+      
+      if (postError || !postData) {
+        throw new Error('Failed to fetch post data');
       }
       
-      if (!credentials?.access_token) {
-        throw new Error("LinkedIn account not connected. Please connect your LinkedIn account in Settings.");
+      // Verify user owns this post
+      if (postData.user_id !== user.id) {
+        throw new Error('Not authorized to update this post');
       }
       
+      // Now update the content without changing the status
+      const { error: updateError } = await supabase
+        .from('content_ideas')
+        .update({ content })
+        .eq('id', postData.content_id);
+      
+      if (updateError) {
+        throw updateError;
+      }
+      
+      toast({
+        title: "Content Updated",
+        description: "Your post content has been saved successfully."
+      });
+      
+      return true;
+    } catch (error: any) {
+      console.error('Error saving post content:', error);
+      toast({
+        title: "Update Failed",
+        description: error.message,
+        variant: "destructive"
+      });
+      return false;
+    }
+  };
+
+  const regenerateContent = async (postId: string) => {
+    try {
+      setIsRegenerating(true);
+      const user = await getCurrentUser();
+      if (!user) throw new Error('User not authenticated');
+      
+      // Get the post content and title
+      const { data: post, error: postError } = await supabase
+        .from('scheduled_posts')
+        .select(`
+          content_id,
+          user_id,
+          content_ideas (
+            title
+          )
+        `)
+        .eq('id', postId)
+        .eq('user_id', user.id)
+        .maybeSingle();
+      
+      if (postError || !post || !post.content_ideas) {
+        throw new Error('Failed to fetch post data');
+      }
+      
+      // Verify user owns this post
+      if (post.user_id !== user.id) {
+        throw new Error('Not authorized to update this post');
+      }
+      
+      const title = post.content_ideas.title;
+      
+      // Call the generate-content function with the title as prompt
+      const { data: generatedContent, error: generationError } = await supabase.functions.invoke(
+        'generate-content',
+        {
+          body: {
+            prompt: title,
+            count: 1
+          }
+        }
+      );
+      
+      if (generationError || !generatedContent || !generatedContent[0]) {
+        throw new Error('Failed to generate new content');
+      }
+      
+      // Update the content without changing status
+      const { error: updateError } = await supabase
+        .from('content_ideas')
+        .update({ content: generatedContent[0].content })
+        .eq('id', post.content_id);
+      
+      if (updateError) {
+        throw updateError;
+      }
+      
+      toast({
+        title: "Content Regenerated",
+        description: "Your post content has been refreshed."
+      });
+      
+      // Return the new content
+      return generatedContent[0].content;
+    } catch (error: any) {
+      console.error('Error regenerating content:', error);
+      toast({
+        title: "Regeneration Failed",
+        description: error.message,
+        variant: "destructive"
+      });
+      return null;
+    } finally {
+      setIsRegenerating(false);
+    }
+  };
+  
+  const postToLinkedIn = async (postId: string) => {
+    try {
+      const user = await getCurrentUser();
+      if (!user) throw new Error('User not authenticated');
+
       const { data, error } = await supabase.functions.invoke('post-to-linkedin', {
         body: { postId, userId: user.id }
       });
 
-      if (error) {
-        console.error('Edge function error:', error);
-        throw new Error(error.message || 'Error posting to LinkedIn');
-      }
-
-      if (!data || !data.success) {
-        console.error('Post was not successful:', data);
+      if (error || !data.success) {
         throw new Error(data?.error || 'Failed to post to LinkedIn');
       }
 
-      console.log('LinkedIn post response:', data);
-      
-      return data;
+      return true;
     } catch (error: any) {
       console.error('Error posting to LinkedIn:', error);
-      throw error; // Re-throw the error for the calling component to handle
+      throw error;
     }
   };
-
+  
   const postToFacebook = async (postId: string) => {
     try {
-      console.log(`Attempting to post content with ID: ${postId} to Facebook`);
-      
       const user = await getCurrentUser();
-      if (!user) {
-        throw new Error("Authentication required");
-      }
-      
-      // Check if the user has Facebook tokens
-      const { data: credentials, error: tokensError } = await supabase
-        .from('user_facebook_credentials')
-        .select('access_token, long_lived_token')
-        .eq('user_id', user.id)
-        .maybeSingle();
-        
-      if (tokensError) {
-        console.error('Error checking Facebook tokens:', tokensError);
-        throw new Error("Error checking Facebook connection");
-      }
-      
-      if (!credentials?.access_token && !credentials?.long_lived_token) {
-        throw new Error("Facebook account not connected. Please connect your Facebook account in Settings.");
-      }
-      
+      if (!user) throw new Error('User not authenticated');
+
       const { data, error } = await supabase.functions.invoke('post-to-facebook', {
         body: { postId, userId: user.id }
       });
 
-      if (error) {
-        console.error('Edge function error:', error);
-        throw new Error(error.message || 'Error posting to Facebook');
-      }
-
-      if (!data || !data.success) {
-        console.error('Post was not successful:', data);
+      if (error || !data.success) {
         throw new Error(data?.error || 'Failed to post to Facebook');
       }
 
-      console.log('Facebook post response:', data);
-      
-      return data;
+      return true;
     } catch (error: any) {
       console.error('Error posting to Facebook:', error);
       throw error;
     }
   };
-
+  
   const postToInstagram = async (postId: string, imageUrl: string) => {
     try {
-      console.log(`Attempting to post content with ID: ${postId} to Instagram`);
-      
       const user = await getCurrentUser();
-      if (!user) {
-        throw new Error("Authentication required");
-      }
-      
-      // Check if the user has Instagram tokens
-      const { data: credentials, error: tokensError } = await supabase
-        .from('user_instagram_credentials')
-        .select('access_token, long_lived_token')
-        .eq('user_id', user.id)
-        .maybeSingle();
-        
-      if (tokensError) {
-        console.error('Error checking Instagram tokens:', tokensError);
-        throw new Error("Error checking Instagram connection");
-      }
-      
-      if (!credentials?.access_token && !credentials?.long_lived_token) {
-        throw new Error("Instagram account not connected. Please connect your Instagram account in Settings.");
-      }
-      
-      if (!imageUrl) {
-        throw new Error("Instagram posts require an image. Please provide an image URL.");
-      }
-      
+      if (!user) throw new Error('User not authenticated');
+
       const { data, error } = await supabase.functions.invoke('post-to-instagram', {
         body: { postId, userId: user.id, imageUrl }
       });
 
-      if (error) {
-        console.error('Edge function error:', error);
-        throw new Error(error.message || 'Error posting to Instagram');
-      }
-
-      if (!data || !data.success) {
-        console.error('Post was not successful:', data);
+      if (error || !data.success) {
         throw new Error(data?.error || 'Failed to post to Instagram');
       }
 
-      console.log('Instagram post response:', data);
-      
-      return data;
+      return true;
     } catch (error: any) {
       console.error('Error posting to Instagram:', error);
       throw error;
     }
   };
 
-  return {
+  return { 
+    savePostContent,
+    regenerateContent,
+    isRegenerating,
     postToLinkedIn,
     postToFacebook,
     postToInstagram

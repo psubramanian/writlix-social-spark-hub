@@ -1,5 +1,5 @@
 
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import { Loader2, RefreshCw } from "lucide-react";
@@ -30,7 +30,7 @@ const PostPreviewDialog = ({
   const [isSaving, setIsSaving] = useState(false);
 
   // Update content when post changes
-  React.useEffect(() => {
+  useEffect(() => {
     if (post?.content_ideas?.content) {
       setContent(post.content_ideas.content);
     }

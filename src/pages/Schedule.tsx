@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
@@ -10,7 +11,6 @@ import { useToast } from '@/components/ui/use-toast';
 import { CurrentScheduleCard } from '@/components/schedule/CurrentScheduleCard';
 import { ScheduledPostsList } from '@/components/schedule/ScheduledPostsList';
 import { ScheduledPostsCalendar } from '@/components/schedule/ScheduledPostsCalendar';
-import { usePostOperations } from '@/hooks/usePostOperations';
 import { LinkedInWarning } from '@/components/dashboard/LinkedInWarning';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '../contexts/AuthContext';
@@ -21,6 +21,8 @@ import { Button } from "@/components/ui/button";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { AlertCircle } from "lucide-react";
 import { toast } from "@/components/ui/use-toast";
+import PostPreviewDialog from '@/components/schedule/PostPreviewDialog';
+import type { ScheduledPost } from '@/hooks/useScheduledPosts';
 
 interface SocialConnectionStatus {
   linkedin: boolean;
@@ -38,12 +40,17 @@ const Schedule = () => {
     loading: postsLoading, 
     userSettings, 
     fetchPosts,
+    savePostContent,
+    regenerateContent,
+    isRegenerating,
     formatScheduleDate,
     getSchedulePattern,
-    getPostsForDate
+    getPostsForDate,
+    postToLinkedIn,
+    postToFacebook, 
+    postToInstagram
   } = useScheduledPosts();
   
-  const { postToLinkedIn, postToFacebook, postToInstagram } = usePostOperations();
   const [postingId, setPostingId] = useState<string | null>(null);
   const [activePlatform, setActivePlatform] = useState<string | null>(null);
   const [viewMode, setViewMode] = useState<ViewMode>('list');
@@ -59,6 +66,10 @@ const Schedule = () => {
   const { toast } = useToast();
   const { user } = useAuth();
   const { updateUserSettings, isUpdating } = useScheduleSettings();
+  
+  // Add state for post preview dialog
+  const [previewDialogOpen, setPreviewDialogOpen] = useState(false);
+  const [selectedPost, setSelectedPost] = useState<ScheduledPost | null>(null);
 
   // Debug logging
   console.log('Schedule page - View mode:', viewMode);
@@ -128,7 +139,10 @@ const Schedule = () => {
     console.log('Schedule pattern:', schedulePattern);
   }, [user, userSettings]);
 
-  const scheduledPosts = posts.filter(post => post.content_ideas?.status !== 'Published');
+  const scheduledPosts = posts.filter(post => 
+    post.content_ideas?.status !== 'Published'
+  );
+  
   const schedulePattern = userSettings ? getSchedulePattern(userSettings) : undefined;
 
   const handleScheduleSubmit = async (settings: any) => {
@@ -189,6 +203,9 @@ const Schedule = () => {
           title: `${platform.charAt(0).toUpperCase() + platform.slice(1)} Post Sent`,
           description: `Your content has been posted to ${platform} successfully.`,
         });
+        
+        // Refresh posts list after successful posting
+        await fetchPosts();
       }
     } catch (error: any) {
       console.error(`Error in ${platform} post handler:`, error);
@@ -225,6 +242,32 @@ const Schedule = () => {
   
   const handleConnectSocial = () => {
     navigate('/settings?tab=connections');
+  };
+  
+  const handleOpenPostPreview = (post: ScheduledPost) => {
+    setSelectedPost(post);
+    setPreviewDialogOpen(true);
+  };
+  
+  const handleSavePostContent = async (postId: string, content: string) => {
+    const success = await savePostContent(postId, content);
+    if (success) {
+      await fetchPosts();
+    }
+  };
+  
+  const handleRegenerateContent = async (postId: string) => {
+    const newContent = await regenerateContent(postId);
+    if (newContent && selectedPost) {
+      setSelectedPost({
+        ...selectedPost,
+        content_ideas: {
+          ...selectedPost.content_ideas,
+          content: newContent
+        }
+      });
+    }
+    await fetchPosts();
   };
 
   // Check for past posts
@@ -299,6 +342,7 @@ const Schedule = () => {
               groupedPosts={groupedPosts}
               postingId={postingId}
               onPostNow={handlePostNow}
+              onOpenPostPreview={handleOpenPostPreview}
               loading={postsLoading}
               formatScheduleDate={formatScheduleDate}
               schedulePattern={userSettings ? getSchedulePattern(userSettings) : undefined}
@@ -310,6 +354,7 @@ const Schedule = () => {
               groupedPosts={groupedPosts}
               postingId={postingId}
               onPostNow={handlePostNow}
+              onOpenPostPreview={handleOpenPostPreview}
               loading={postsLoading}
               formatScheduleDate={formatScheduleDate}
               userTimezone={userSettings?.timezone}
@@ -317,6 +362,16 @@ const Schedule = () => {
           )}
         </div>
       </div>
+      
+      {/* Post Preview Dialog */}
+      <PostPreviewDialog
+        post={selectedPost}
+        isOpen={previewDialogOpen}
+        onClose={() => setPreviewDialogOpen(false)}
+        onSave={handleSavePostContent}
+        onRegenerate={handleRegenerateContent}
+        isRegenerating={isRegenerating}
+      />
       
       {/* Dialog for Instagram image URL input */}
       <Dialog open={instagramDialogOpen} onOpenChange={setInstagramDialogOpen}>

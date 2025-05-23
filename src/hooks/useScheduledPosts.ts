@@ -1,3 +1,4 @@
+
 import { useState, useEffect } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/components/ui/use-toast';
@@ -45,7 +46,7 @@ export function useScheduledPosts() {
   const { toast } = useToast();
   const { redirectToLogin } = useAuthRedirect();
   const { userSettings, fetchUserSettings } = useScheduleSettings();
-  const { postToLinkedIn } = usePostOperations();
+  const { savePostContent, regenerateContent, isRegenerating, postToLinkedIn, postToFacebook, postToInstagram } = usePostOperations();
   const { scheduleContentIdea } = usePostScheduling();
 
   const fetchPosts = async () => {
@@ -58,7 +59,7 @@ export function useScheduledPosts() {
 
       console.log('Fetching all scheduled posts');
 
-      // Get all posts, not just future ones (removed the .gt filter)
+      // Only get pending posts, not published ones
       const { data: postsData, error: postsError } = await supabase
         .from('scheduled_posts')
         .select(`
@@ -78,27 +79,32 @@ export function useScheduledPosts() {
 
       console.log('Fetched scheduled posts:', postsData);
       
+      // Further filter out any posts where content status is Published
+      const filteredPosts = postsData ? postsData.filter(post => 
+        post.content_ideas && post.content_ideas.status !== 'Published'
+      ) : [];
+      
+      console.log('After filtering published content:', filteredPosts);
+      
       // Improved deduplication: Consider both date and content ID
       const uniquePosts = [];
       const seenContentIds = new Set();
       
-      if (postsData) {
-        for (const post of postsData) {
-          const contentId = post.content_ideas?.id;
-          
-          // Skip this post if we've already seen this content ID
-          if (contentId && seenContentIds.has(contentId)) {
-            console.log(`Skipping duplicate post for content ID: ${contentId}`);
-            continue;
-          }
-          
-          // Add this content ID to our tracking set if it exists
-          if (contentId) {
-            seenContentIds.add(contentId);
-          }
-          
-          uniquePosts.push(post);
+      for (const post of filteredPosts) {
+        const contentId = post.content_ideas?.id;
+        
+        // Skip this post if we've already seen this content ID
+        if (contentId && seenContentIds.has(contentId)) {
+          console.log(`Skipping duplicate post for content ID: ${contentId}`);
+          continue;
         }
+        
+        // Add this content ID to our tracking set if it exists
+        if (contentId) {
+          seenContentIds.add(contentId);
+        }
+        
+        uniquePosts.push(post);
       }
 
       const postsArray = uniquePosts as ScheduledPost[];
@@ -288,7 +294,12 @@ export function useScheduledPosts() {
     posts,
     groupedPosts,
     loading,
+    savePostContent,
+    regenerateContent,
+    isRegenerating,
     postToLinkedIn,
+    postToFacebook,
+    postToInstagram,
     fetchPosts,
     scheduleContentIdea,
     userSettings,

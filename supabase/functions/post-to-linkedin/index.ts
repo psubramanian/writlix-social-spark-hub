@@ -115,6 +115,19 @@ serve(async (req) => {
     
     if (updateError) {
       console.error('Error updating post status:', updateError);
+      // If the function doesn't exist, update content status directly
+      const { data: postData } = await supabase
+        .from('scheduled_posts')
+        .select('content_id')
+        .eq('id', postId)
+        .single();
+        
+      if (postData) {
+        await supabase
+          .from('content_ideas')
+          .update({ status: 'Published' })
+          .eq('id', postData.content_id);
+      }
     }
     
     console.log('Successfully posted to LinkedIn:', responseData);
