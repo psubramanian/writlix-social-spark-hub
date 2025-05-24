@@ -51,12 +51,12 @@ export const calculateNextRunTime = (settings: {
       console.log('Time already passed today, scheduling for tomorrow:', nextRun.toISOString());
     }
     
-    console.log('Base next run time (before applying frequency):', nextRun.toISOString());
+    console.log('Base next run time (before applying frequency and offset):', nextRun.toISOString());
     
-    // Apply frequency specific adjustments
+    // Apply frequency specific adjustments with offset
     switch (settings.frequency) {
       case "daily":
-        // For daily frequency, simply add the offset in days
+        // For daily frequency, add the offset in days
         nextRun.setDate(nextRun.getDate() + daysOffset);
         console.log('Daily schedule with offset:', daysOffset, 'days, result:', nextRun.toISOString());
         break;
@@ -66,19 +66,18 @@ export const calculateNextRunTime = (settings: {
           // Get current day of week (0-6, where 0 is Sunday)
           const currentDay = nextRun.getDay();
           // Calculate days until target day of week
-          const daysUntilTarget = (settings.dayOfWeek - currentDay + 7) % 7;
+          let daysUntilTarget = (settings.dayOfWeek - currentDay + 7) % 7;
           
-          // If the target day is today but time has passed, add a week
+          // If we're already on the target day but the time has passed, schedule for next week
           if (daysUntilTarget === 0 && nextRun <= now) {
-            nextRun.setDate(nextRun.getDate() + 7);
-            console.log('Target day is today but time passed, adding a week:', nextRun.toISOString());
-          } else {
-            // Otherwise adjust to the target day
-            nextRun.setDate(nextRun.getDate() + daysUntilTarget);
-            console.log('Adjusted to target day of week:', settings.dayOfWeek, 'result:', nextRun.toISOString());
+            daysUntilTarget = 7;
           }
           
-          // Add offset in weeks
+          // Adjust to the target day
+          nextRun.setDate(nextRun.getDate() + daysUntilTarget);
+          console.log('Adjusted to target day of week:', settings.dayOfWeek, 'result:', nextRun.toISOString());
+          
+          // Add offset in weeks (each offset represents one week)
           if (daysOffset > 0) {
             nextRun.setDate(nextRun.getDate() + (daysOffset * 7));
             console.log('Added week offset:', daysOffset, 'result:', nextRun.toISOString());
@@ -92,7 +91,6 @@ export const calculateNextRunTime = (settings: {
       case "monthly":
         if (settings.dayOfMonth !== undefined && settings.dayOfMonth >= 1 && settings.dayOfMonth <= 31) {
           // First, set to the specified day of the current month
-          const originalDate = nextRun.getDate();
           const daysInCurrentMonth = getDaysInMonth(nextRun.getFullYear(), nextRun.getMonth() + 1);
           
           // Make sure we don't exceed the days in the month
@@ -108,7 +106,7 @@ export const calculateNextRunTime = (settings: {
             console.log('Target day is in the past, moved to next month:', nextRun.toISOString());
           }
           
-          // Add offset months
+          // Add offset months (each offset represents one month)
           if (daysOffset > 0) {
             nextRun.setMonth(nextRun.getMonth() + daysOffset);
             // Again, ensure valid date when changing months
@@ -134,7 +132,7 @@ export const calculateNextRunTime = (settings: {
       console.error('Invalid date calculated:', nextRun);
       // Return a safe default (tomorrow at 9am) if calculation failed
       const fallback = new Date();
-      fallback.setDate(fallback.getDate() + 1);
+      fallback.setDate(fallback.getDate() + 1 + daysOffset);
       fallback.setHours(9, 0, 0, 0);
       console.log('Using fallback date:', fallback.toISOString());
       return fallback;
@@ -145,7 +143,7 @@ export const calculateNextRunTime = (settings: {
     console.error('Error calculating next run time:', error);
     // Return a safe default (tomorrow at 9am) if calculation failed
     const fallback = new Date();
-    fallback.setDate(fallback.getDate() + 1);
+    fallback.setDate(fallback.getDate() + 1 + daysOffset);
     fallback.setHours(9, 0, 0, 0);
     console.log('Using fallback date after error:', fallback.toISOString());
     return fallback;

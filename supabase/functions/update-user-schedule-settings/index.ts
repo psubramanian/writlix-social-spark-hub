@@ -1,3 +1,4 @@
+
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.38.4";
 
@@ -55,21 +56,21 @@ serve(async (req) => {
     
     const supabase = createClient(supabaseUrl, supabaseKey);
 
-    // First, calculate the new next_run_at time based on settings
-    const nextRunTime = calculateNextRunTime({
+    // First, calculate the initial next_run_at time based on settings
+    const initialNextRunTime = calculateNextRunTime({
       frequency,
       timeOfDay: time_of_day,
       dayOfWeek: day_of_week,
       dayOfMonth: day_of_month,
       timezone: timezone || 'UTC'
-    });
+    }, 0);
 
     // Validate calculated time
-    if (!nextRunTime || isNaN(nextRunTime.getTime())) {
-      throw new Error("Failed to calculate a valid next run time");
+    if (!initialNextRunTime || isNaN(initialNextRunTime.getTime())) {
+      throw new Error("Failed to calculate a valid initial next run time");
     }
 
-    console.log('Calculated next run time for settings:', nextRunTime.toISOString());
+    console.log('Calculated initial next run time for settings:', initialNextRunTime.toISOString());
 
     // Prepare the settings data with validated next_run_at
     const settingsData = {
@@ -79,7 +80,7 @@ serve(async (req) => {
       day_of_week,
       day_of_month,
       timezone: timezone || 'UTC',
-      next_run_at: nextRunTime.toISOString(),
+      next_run_at: initialNextRunTime.toISOString(),
       updated_at: new Date().toISOString()
     };
 
@@ -99,7 +100,7 @@ serve(async (req) => {
     console.log('Settings updated successfully');
 
     try {
-      // Get all pending scheduled posts for this user
+      // Get all pending scheduled posts for this user, ordered by creation date
       const { data: pendingPosts, error: postsError } = await supabase
         .from('scheduled_posts')
         .select('id, created_at')
@@ -119,6 +120,8 @@ serve(async (req) => {
         const post = pendingPosts[i];
         
         // Calculate next run time based on post position and new settings
+        // For the first post (i=0), use offset 0 (starts from initialNextRunTime)
+        // For subsequent posts, use the index as offset to spread them across intervals
         const postRunTime = calculateNextRunTime({
           frequency,
           timeOfDay: time_of_day,
@@ -134,7 +137,7 @@ serve(async (req) => {
         }
 
         const postRunTimeString = postRunTime.toISOString();
-        console.log(`Updating post ${post.id} with next run time: ${postRunTimeString}`);
+        console.log(`Updating post ${post.id} (position ${i}) with next run time: ${postRunTimeString}`);
 
         // Update the post
         const { error: updateError } = await supabase
@@ -153,7 +156,8 @@ serve(async (req) => {
 
       console.log('All posts updated successfully');
 
-      // After updating all posts, update the settings with the next available slot
+      // After updating all posts, calculate the next available slot for new posts
+      // This should be after the last scheduled post
       const nextAvailableSlot = calculateNextRunTime({
         frequency,
         timeOfDay: time_of_day,
@@ -193,7 +197,7 @@ serve(async (req) => {
       JSON.stringify({ 
         success: true, 
         message: "Settings updated successfully",
-        next_run_at: nextRunTime.toISOString() 
+        next_run_at: initialNextRunTime.toISOString() 
       }),
       { 
         status: 200, 
@@ -278,15 +282,15 @@ function calculateNextRunTime(settings: {
           // Get current day of week (0-6, where 0 is Sunday)
           const currentDay = nextRun.getDay();
           // Calculate days until target day of week
-          const daysUntilTarget = (settings.dayOfWeek - currentDay + 7) % 7;
+          let daysUntilTarget = (settings.dayOfWeek - currentDay + 7) % 7;
           
           // If the target day is today but time has passed, add a week
           if (daysUntilTarget === 0 && nextRun <= now) {
-            nextRun.setDate(nextRun.getDate() + 7);
-          } else {
-            // Otherwise adjust to the target day
-            nextRun.setDate(nextRun.getDate() + daysUntilTarget);
+            daysUntilTarget = 7;
           }
+          
+          // Adjust to the target day
+          nextRun.setDate(nextRun.getDate() + daysUntilTarget);
           
           // Add offset in weeks
           if (offset > 0) {
@@ -335,7 +339,7 @@ function calculateNextRunTime(settings: {
       console.error('Invalid date calculated:', nextRun);
       // Return a safe default (tomorrow at 9am) if calculation failed
       const fallback = new Date();
-      fallback.setDate(fallback.getDate() + 1);
+      fallback.setDate(fallback.getDate() + 1 + offset);
       fallback.setHours(9, 0, 0, 0);
       return fallback;
     }
@@ -345,7 +349,7 @@ function calculateNextRunTime(settings: {
     console.error('Error calculating next run time:', error);
     // Return a safe default (tomorrow at 9am) if calculation failed
     const fallback = new Date();
-    fallback.setDate(fallback.getDate() + 1);
+    fallback.setDate(fallback.getDate() + 1 + offset);
     fallback.setHours(9, 0, 0, 0);
     return fallback;
   }
