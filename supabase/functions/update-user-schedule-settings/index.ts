@@ -56,7 +56,22 @@ serve(async (req) => {
     
     const supabase = createClient(supabaseUrl, supabaseKey);
 
-    // First, calculate the initial next_run_at time based on settings
+    // First, get all pending scheduled posts for this user, ordered by creation date
+    const { data: pendingPosts, error: postsError } = await supabase
+      .from('scheduled_posts')
+      .select('id, created_at')
+      .eq('user_id', user_id)
+      .eq('status', 'pending')
+      .order('created_at', { ascending: true });
+
+    if (postsError) {
+      console.error('Error fetching pending posts:', postsError);
+      throw postsError;
+    }
+
+    console.log(`Found ${pendingPosts?.length || 0} pending posts to update`);
+
+    // Calculate initial next run time based on settings
     const initialNextRunTime = calculateNextRunTime({
       frequency,
       timeOfDay: time_of_day,
@@ -65,14 +80,7 @@ serve(async (req) => {
       timezone: timezone || 'UTC'
     }, 0);
 
-    // Validate calculated time
-    if (!initialNextRunTime || isNaN(initialNextRunTime.getTime())) {
-      throw new Error("Failed to calculate a valid initial next run time");
-    }
-
-    console.log('Calculated initial next run time for settings:', initialNextRunTime.toISOString());
-
-    // Prepare the settings data with validated next_run_at
+    // Update settings with the initial time
     const settingsData = {
       user_id,
       frequency,
@@ -86,7 +94,6 @@ serve(async (req) => {
 
     console.log('Upserting schedule settings:', settingsData);
 
-    // Update or insert user settings with the new next_run_at time
     const { error: settingsError } = await supabase.from('schedule_settings')
       .upsert(settingsData, {
         onConflict: 'user_id'
@@ -99,105 +106,72 @@ serve(async (req) => {
 
     console.log('Settings updated successfully');
 
-    try {
-      // Get all pending scheduled posts for this user, ordered by creation date
-      const { data: pendingPosts, error: postsError } = await supabase
-        .from('scheduled_posts')
-        .select('id, created_at')
-        .eq('user_id', user_id)
-        .eq('status', 'pending')
-        .order('created_at', { ascending: true });
-
-      if (postsError) {
-        console.error('Error fetching pending posts:', postsError);
-        throw postsError;
-      }
-
-      console.log(`Found ${pendingPosts?.length || 0} pending posts to update`);
-
-      // Update all pending posts with new scheduling
-      for (let i = 0; i < (pendingPosts?.length || 0); i++) {
-        const post = pendingPosts[i];
-        
-        // Calculate next run time based on post position and new settings
-        // For the first post (i=0), use offset 0 (starts from initialNextRunTime)
-        // For subsequent posts, use the index as offset to spread them across intervals
-        const postRunTime = calculateNextRunTime({
-          frequency,
-          timeOfDay: time_of_day,
-          dayOfWeek: day_of_week,
-          dayOfMonth: day_of_month,
-          timezone: timezone || 'UTC'
-        }, i);
-
-        // Validate the calculated time
-        if (!postRunTime || isNaN(postRunTime.getTime())) {
-          console.error(`Invalid run time calculated for post ${post.id}`);
-          continue; // Skip this post rather than failing the entire operation
-        }
-
-        const postRunTimeString = postRunTime.toISOString();
-        console.log(`Updating post ${post.id} (position ${i}) with next run time: ${postRunTimeString}`);
-
-        // Update the post
-        const { error: updateError } = await supabase
-          .from('scheduled_posts')
-          .update({
-            next_run_at: postRunTimeString,
-            timezone: timezone || 'UTC'
-          })
-          .eq('id', post.id);
-
-        if (updateError) {
-          console.error(`Error updating post ${post.id}:`, updateError);
-          // Continue with other posts rather than failing everything
-        }
-      }
-
-      console.log('All posts updated successfully');
-
-      // After updating all posts, calculate the next available slot for new posts
-      // This should be after the last scheduled post
-      const nextAvailableSlot = calculateNextRunTime({
+    // Update all pending posts with new scheduling (consecutive dates)
+    for (let i = 0; i < (pendingPosts?.length || 0); i++) {
+      const post = pendingPosts[i];
+      
+      // Calculate next run time for each post with proper offset
+      const postRunTime = calculateNextRunTime({
         frequency,
         timeOfDay: time_of_day,
         dayOfWeek: day_of_week,
         dayOfMonth: day_of_month,
         timezone: timezone || 'UTC'
-      }, pendingPosts?.length || 0);
+      }, i); // Use index as offset for consecutive scheduling
 
       // Validate the calculated time
-      if (!nextAvailableSlot || isNaN(nextAvailableSlot.getTime())) {
-        throw new Error("Failed to calculate a valid next available slot");
+      if (!postRunTime || isNaN(postRunTime.getTime())) {
+        console.error(`Invalid run time calculated for post ${post.id}`);
+        continue;
       }
 
-      const nextSlotString = nextAvailableSlot.toISOString();
-      console.log('Updating settings with next available slot:', nextSlotString);
+      const postRunTimeString = postRunTime.toISOString();
+      console.log(`Updating post ${post.id} (position ${i}) with next run time: ${postRunTimeString}`);
 
-      // Update settings with the next available slot
-      const { error: finalUpdateError } = await supabase
-        .from('schedule_settings')
+      // Update the post
+      const { error: updateError } = await supabase
+        .from('scheduled_posts')
         .update({
-          next_run_at: nextSlotString
+          next_run_at: postRunTimeString,
+          timezone: timezone || 'UTC'
         })
-        .eq('user_id', user_id);
+        .eq('id', post.id);
 
-      if (finalUpdateError) {
-        console.error('Error updating settings with next available slot:', finalUpdateError);
-        throw finalUpdateError;
+      if (updateError) {
+        console.error(`Error updating post ${post.id}:`, updateError);
       }
-
-    } catch (innerError) {
-      // Log but don't throw - we want to return success if the settings were updated
-      // even if post updating had issues
-      console.error('Error updating posts:', innerError);
     }
+
+    // Calculate the next available slot for new posts
+    const nextAvailableSlot = calculateNextRunTime({
+      frequency,
+      timeOfDay: time_of_day,
+      dayOfWeek: day_of_week,
+      dayOfMonth: day_of_month,
+      timezone: timezone || 'UTC'
+    }, pendingPosts?.length || 0);
+
+    // Update settings with the next available slot
+    const { error: finalUpdateError } = await supabase
+      .from('schedule_settings')
+      .update({
+        next_run_at: nextAvailableSlot.toISOString()
+      })
+      .eq('user_id', user_id);
+
+    if (finalUpdateError) {
+      console.error('Error updating settings with next available slot:', finalUpdateError);
+      throw finalUpdateError;
+    }
+
+    console.log('All posts updated successfully with consecutive scheduling');
 
     return new Response(
       JSON.stringify({ 
         success: true, 
         message: "Settings updated successfully",
-        next_run_at: initialNextRunTime.toISOString() 
+        next_run_at: initialNextRunTime.toISOString(),
+        updatedPostsCount: pendingPosts?.length || 0
       }),
       { 
         status: 200, 
@@ -227,7 +201,7 @@ serve(async (req) => {
   }
 });
 
-// Helper function to calculate next run time with robust error handling
+// Helper function to calculate next run time
 function calculateNextRunTime(settings: {
   frequency: string;
   timeOfDay: string;
@@ -235,10 +209,10 @@ function calculateNextRunTime(settings: {
   dayOfMonth?: number;
   timezone: string;
 }, offset = 0): Date {
-  console.log('Calculating next run time with settings:', settings, 'and offset:', offset);
+  console.log('Edge function - Calculating next run time with settings:', settings, 'and offset:', offset);
   
   try {
-    // Parse the time of day with validation
+    // Parse the time of day
     let hours = 9, minutes = 0;
     
     if (settings.timeOfDay && typeof settings.timeOfDay === 'string') {
@@ -252,8 +226,6 @@ function calculateNextRunTime(settings: {
             parsedMinutes >= 0 && parsedMinutes <= 59) {
           hours = parsedHours;
           minutes = parsedMinutes;
-        } else {
-          console.warn('Invalid time format:', settings.timeOfDay, 'using default 9:00');
         }
       }
     }
@@ -265,79 +237,69 @@ function calculateNextRunTime(settings: {
     // Set the time components
     nextRun.setHours(hours, minutes, 0, 0);
     
-    // If the time has already passed today, start from tomorrow
-    if (nextRun <= now) {
+    // For the first post (offset 0), if time has passed today, use tomorrow
+    if (offset === 0 && nextRun <= now) {
       nextRun.setDate(nextRun.getDate() + 1);
     }
     
-    // Apply frequency specific adjustments
+    // Apply frequency and offset
     switch (settings.frequency) {
       case 'daily':
-        // For daily, simply add the offset in days
         nextRun.setDate(nextRun.getDate() + offset);
+        console.log(`Daily: Added ${offset} days, result:`, nextRun.toISOString());
         break;
         
       case 'weekly':
         if (settings.dayOfWeek !== undefined && settings.dayOfWeek >= 0 && settings.dayOfWeek <= 6) {
-          // Get current day of week (0-6, where 0 is Sunday)
-          const currentDay = nextRun.getDay();
-          // Calculate days until target day of week
-          let daysUntilTarget = (settings.dayOfWeek - currentDay + 7) % 7;
-          
-          // If the target day is today but time has passed, add a week
-          if (daysUntilTarget === 0 && nextRun <= now) {
-            daysUntilTarget = 7;
-          }
-          
-          // Adjust to the target day
-          nextRun.setDate(nextRun.getDate() + daysUntilTarget);
-          
-          // Add offset in weeks
-          if (offset > 0) {
+          if (offset === 0) {
+            // First post: find next occurrence of target day
+            const currentDay = nextRun.getDay();
+            let daysUntilTarget = (settings.dayOfWeek - currentDay + 7) % 7;
+            if (daysUntilTarget === 0 && nextRun <= now) {
+              daysUntilTarget = 7;
+            }
+            nextRun.setDate(nextRun.getDate() + daysUntilTarget);
+          } else {
+            // Subsequent posts: add weeks
             nextRun.setDate(nextRun.getDate() + (offset * 7));
           }
         } else {
-          // Invalid day of week, just add offset weeks from today
           nextRun.setDate(nextRun.getDate() + (offset * 7));
         }
+        console.log(`Weekly: offset ${offset}, result:`, nextRun.toISOString());
         break;
         
       case 'monthly':
         if (settings.dayOfMonth !== undefined && settings.dayOfMonth >= 1 && settings.dayOfMonth <= 31) {
-          // Set to the specified day of the current month
-          const daysInCurrentMonth = getDaysInMonth(nextRun.getFullYear(), nextRun.getMonth() + 1);
-          nextRun.setDate(Math.min(settings.dayOfMonth, daysInCurrentMonth));
-          
-          // If this date is in the past, move to next month
-          if (nextRun <= now) {
-            nextRun.setMonth(nextRun.getMonth() + 1);
-            const nextMonthDays = getDaysInMonth(nextRun.getFullYear(), nextRun.getMonth() + 1);
-            nextRun.setDate(Math.min(settings.dayOfMonth, nextMonthDays));
-          }
-          
-          // Add offset months
-          if (offset > 0) {
+          if (offset === 0) {
+            // First post: find next occurrence of target day
+            const daysInMonth = getDaysInMonth(nextRun.getFullYear(), nextRun.getMonth() + 1);
+            nextRun.setDate(Math.min(settings.dayOfMonth, daysInMonth));
+            if (nextRun <= now) {
+              nextRun.setMonth(nextRun.getMonth() + 1);
+              const nextMonthDays = getDaysInMonth(nextRun.getFullYear(), nextRun.getMonth() + 1);
+              nextRun.setDate(Math.min(settings.dayOfMonth, nextMonthDays));
+            }
+          } else {
+            // Subsequent posts: add months
             nextRun.setMonth(nextRun.getMonth() + offset);
             const futureMonthDays = getDaysInMonth(nextRun.getFullYear(), nextRun.getMonth() + 1);
             nextRun.setDate(Math.min(settings.dayOfMonth, futureMonthDays));
           }
         } else {
-          // Invalid day of month, just add offset months from today
           nextRun.setMonth(nextRun.getMonth() + offset);
         }
+        console.log(`Monthly: offset ${offset}, result:`, nextRun.toISOString());
         break;
         
       default:
-        // Unknown frequency, default to daily
         nextRun.setDate(nextRun.getDate() + offset);
     }
     
-    console.log('Calculated next run time:', nextRun.toISOString());
+    console.log('Edge function - Final calculated time:', nextRun.toISOString());
     
-    // Final validation check
     if (isNaN(nextRun.getTime())) {
       console.error('Invalid date calculated:', nextRun);
-      // Return a safe default (tomorrow at 9am) if calculation failed
       const fallback = new Date();
       fallback.setDate(fallback.getDate() + 1 + offset);
       fallback.setHours(9, 0, 0, 0);
@@ -347,7 +309,6 @@ function calculateNextRunTime(settings: {
     return nextRun;
   } catch (error) {
     console.error('Error calculating next run time:', error);
-    // Return a safe default (tomorrow at 9am) if calculation failed
     const fallback = new Date();
     fallback.setDate(fallback.getDate() + 1 + offset);
     fallback.setHours(9, 0, 0, 0);
@@ -355,7 +316,6 @@ function calculateNextRunTime(settings: {
   }
 }
 
-// Helper function to get the number of days in a month
 function getDaysInMonth(year: number, month: number): number {
   return new Date(year, month, 0).getDate();
 }
