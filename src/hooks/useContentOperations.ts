@@ -132,49 +132,8 @@ export const useContentOperations = (setGeneratedContent: React.Dispatch<React.S
           throw updateError;
         }
         
-        // If status is changing to "Review", remove from scheduled_posts if present
-        if (newStatus === 'Review') {
-          console.log('Status changed to Review, checking for scheduled posts to remove');
-          
-          // Find and delete any scheduled post entries for this content
-          const { data: scheduledPost, error: findError } = await supabase
-            .from('scheduled_posts')
-            .select('id')
-            .eq('content_id', currentItem.db_id)
-            .maybeSingle();
-            
-          if (findError && findError.code !== 'PGRST116') {
-            console.error('Error finding scheduled post:', findError);
-          }
-          
-          if (scheduledPost) {
-            console.log('Found scheduled post to remove:', scheduledPost.id);
-            
-            // Delete any schedule settings for this post
-            const { error: settingsError } = await supabase
-              .from('schedule_settings')
-              .delete()
-              .eq('post_id', scheduledPost.id);
-              
-            if (settingsError) {
-              console.error('Error deleting schedule settings:', settingsError);
-            }
-            
-            // Delete the scheduled post itself
-            const { error: deleteError } = await supabase
-              .from('scheduled_posts')
-              .delete()
-              .eq('id', scheduledPost.id);
-              
-            if (deleteError) {
-              console.error('Error deleting scheduled post:', deleteError);
-            } else {
-              console.log('Successfully removed scheduled post');
-            }
-          } else {
-            console.log('No scheduled post found for this content');
-          }
-        }
+        // The database trigger will automatically handle scheduled_posts cleanup
+        // when status changes from 'Scheduled' to something else
       }
 
       setGeneratedContent(prev =>
@@ -242,38 +201,8 @@ export const useContentOperations = (setGeneratedContent: React.Dispatch<React.S
       }
       
       if (itemToDelete.db_id) {
-        if (itemToDelete.status === 'Scheduled') {
-          console.log('Removing scheduled post for content_id:', itemToDelete.db_id);
-          const { data: scheduledPost, error: findError } = await supabase
-            .from('scheduled_posts')
-            .select('id')
-            .eq('content_id', itemToDelete.db_id)
-            .maybeSingle();
-            
-          if (findError && findError.code !== 'PGRST116') {
-            console.error('Error finding scheduled post:', findError);
-          }
-          
-          if (scheduledPost) {
-            const { error: settingsError } = await supabase
-              .from('schedule_settings')
-              .delete()
-              .eq('post_id', scheduledPost.id);
-              
-            if (settingsError) {
-              console.error('Error deleting schedule settings:', settingsError);
-            }
-            
-            const { error: deleteScheduleError } = await supabase
-              .from('scheduled_posts')
-              .delete()
-              .eq('id', scheduledPost.id);
-              
-            if (deleteScheduleError) {
-              console.error('Error deleting scheduled post:', deleteScheduleError);
-            }
-          }
-        }
+        // The database trigger will automatically handle scheduled_posts cleanup
+        // when the content_ideas record is deleted
         
         console.log('Deleting content with db_id:', itemToDelete.db_id);
         const { error: deleteError } = await supabase

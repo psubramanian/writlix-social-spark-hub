@@ -422,6 +422,10 @@ export type Database = {
       [_ in never]: never
     }
     Functions: {
+      cleanup_scheduled_posts_inconsistencies: {
+        Args: Record<PropertyKey, never>
+        Returns: undefined
+      }
       trigger_linkedin_post: {
         Args: { post_id: string }
         Returns: undefined

@@ -10,7 +10,7 @@ import { useScheduledPosts } from '../hooks/useScheduledPosts';
 import { useToast } from '@/components/ui/use-toast';
 import { CurrentScheduleCard } from '@/components/schedule/CurrentScheduleCard';
 import { ScheduledPostsList } from '@/components/schedule/ScheduledPostsList';
-import { ScheduledPostsCalendar } from '@/components/schedule/ScheduledPostsCalendar';
+import OutlookCalendar from '@/components/schedule/OutlookCalendar';
 import { LinkedInWarning } from '@/components/dashboard/LinkedInWarning';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '../contexts/AuthContext';
@@ -67,11 +67,9 @@ const Schedule = () => {
   const { user } = useAuth();
   const { updateUserSettings, isUpdating } = useScheduleSettings();
   
-  // Add state for post preview dialog
   const [previewDialogOpen, setPreviewDialogOpen] = useState(false);
   const [selectedPost, setSelectedPost] = useState<ScheduledPost | null>(null);
 
-  // Debug logging
   console.log('Schedule page - View mode:', viewMode);
   console.log('Schedule page - Posts available:', posts.length);
   console.log('Schedule page - User timezone:', userSettings?.timezone);
@@ -134,7 +132,6 @@ const Schedule = () => {
     
     checkSocialConnections();
     
-    // Add debug logging for timezone issues
     console.log('Schedule page user timezone:', userSettings?.timezone);
     console.log('Schedule pattern:', schedulePattern);
   }, [user, userSettings]);
@@ -153,14 +150,12 @@ const Schedule = () => {
   };
 
   const handlePostNow = async (postId: string, platform: string, imgUrl?: string) => {
-    // For Instagram posts, we need an image URL
     if (platform === 'instagram' && !imgUrl) {
       setCurrentPostId(postId);
       setInstagramDialogOpen(true);
       return;
     }
     
-    // Check if the selected platform is connected
     if (!socialConnections[platform as keyof SocialConnectionStatus]) {
       toast({
         title: `${platform.charAt(0).toUpperCase() + platform.slice(1)} not connected`,
@@ -204,7 +199,6 @@ const Schedule = () => {
           description: `Your content has been posted to ${platform} successfully.`,
         });
         
-        // Refresh posts list after successful posting
         await fetchPosts();
       }
     } catch (error: any) {
@@ -270,7 +264,6 @@ const Schedule = () => {
     await fetchPosts();
   };
 
-  // Check for past posts
   const hasPastPosts = groupedPosts.past && groupedPosts.past.length > 0;
 
   return (
@@ -281,7 +274,6 @@ const Schedule = () => {
       </div>
       
       <div className="grid grid-cols-1 gap-8">
-        {/* Past Due Posts Alert */}
         {hasPastPosts && (
           <Alert className="bg-amber-50 text-amber-800 border-amber-200">
             <AlertCircle className="h-4 w-4" />
@@ -293,7 +285,6 @@ const Schedule = () => {
           </Alert>
         )}
         
-        {/* Schedule Settings Section */}
         <div className="mb-6">
           <h2 className="text-xl font-semibold mb-4">Schedule Settings</h2>
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
@@ -312,7 +303,6 @@ const Schedule = () => {
         
         <Separator className="my-4" />
         
-        {/* Scheduled Posts Section with View Toggle */}
         <div>
           <div className="flex justify-between items-center mb-4">
             <h2 className="text-xl font-semibold">Scheduled Posts</h2>
@@ -349,21 +339,18 @@ const Schedule = () => {
               userTimezone={userSettings?.timezone}
             />
           ) : (
-            <ScheduledPostsCalendar
+            <OutlookCalendar
               posts={posts}
-              groupedPosts={groupedPosts}
-              postingId={postingId}
+              onPostClick={handleOpenPostPreview}
               onPostNow={handlePostNow}
-              onOpenPostPreview={handleOpenPostPreview}
-              loading={postsLoading}
+              userTimezone={userSettings?.timezone || 'UTC'}
               formatScheduleDate={formatScheduleDate}
-              userTimezone={userSettings?.timezone}
+              loading={postsLoading}
             />
           )}
         </div>
       </div>
       
-      {/* Post Preview Dialog */}
       <PostPreviewDialog
         post={selectedPost}
         isOpen={previewDialogOpen}
@@ -373,7 +360,6 @@ const Schedule = () => {
         isRegenerating={isRegenerating}
       />
       
-      {/* Dialog for Instagram image URL input */}
       <Dialog open={instagramDialogOpen} onOpenChange={setInstagramDialogOpen}>
         <DialogContent>
           <DialogHeader>

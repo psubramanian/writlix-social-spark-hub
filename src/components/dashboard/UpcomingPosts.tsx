@@ -27,7 +27,6 @@ export function UpcomingPosts({ scheduledPostsCount }: UpcomingPostsProps) {
   const [userTimezone, setUserTimezone] = useState<string>('UTC');
 
   useEffect(() => {
-    // First, fetch the user's timezone from schedule settings
     const fetchUserTimezone = async () => {
       try {
         const user = await getCurrentUser();
@@ -56,27 +55,28 @@ export function UpcomingPosts({ scheduledPostsCount }: UpcomingPostsProps) {
         const user = await getCurrentUser();
         if (!user) return;
 
-        // Get user timezone first
         const timezone = await fetchUserTimezone();
         setUserTimezone(timezone);
         console.log('User timezone for dashboard posts:', timezone);
 
         console.log('Fetching all scheduled posts for dashboard');
         
-        // Get all posts without the time filter
+        // Get posts with proper join to ensure content_ideas status is 'Scheduled'
         const { data, error } = await supabase
           .from('scheduled_posts')
           .select(`
             id,
             next_run_at,
             timezone,
-            content_ideas (
+            content_ideas!inner(
               title,
-              id
+              id,
+              status
             )
           `)
           .eq('user_id', user.id)
           .eq('status', 'pending')
+          .eq('content_ideas.status', 'Scheduled')
           .order('next_run_at', { ascending: true });
 
         if (error) {
@@ -110,7 +110,7 @@ export function UpcomingPosts({ scheduledPostsCount }: UpcomingPostsProps) {
               id: post.id,
               title: post.content_ideas?.title || 'Untitled Post',
               nextRunAt: post.next_run_at,
-              timezone: post.timezone || timezone // Use post timezone or default to user timezone
+              timezone: post.timezone || timezone
             };
             
             // Sort into past due or upcoming
@@ -128,9 +128,7 @@ export function UpcomingPosts({ scheduledPostsCount }: UpcomingPostsProps) {
           console.log('Formatted upcoming posts:', upcoming);
           console.log('Formatted past due posts:', pastDue);
           
-          // Limit upcoming posts display to 3
           setUpcomingPosts(upcoming.slice(0, 3));
-          // Limit past due posts display to 2
           setPastDuePosts(pastDue.slice(0, 2));
         } else {
           console.log('No posts found');
@@ -153,20 +151,15 @@ export function UpcomingPosts({ scheduledPostsCount }: UpcomingPostsProps) {
       const postTimezone = timezone || userTimezone || 'UTC';
       const now = new Date();
       
-      // Convert dates to correct timezone for comparison
       const dateInTz = toZonedTime(date, postTimezone);
       const nowInTz = toZonedTime(now, postTimezone);
       
-      // Debug timezone conversion
       console.log('Dashboard post date:', dateString);
       console.log('Using timezone:', postTimezone);
       console.log('Converted date (zoned):', dateInTz.toString());
       console.log('Current time (zoned):', nowInTz.toString());
       
-      // Is this date in the past?
       const isPast = dateInTz < nowInTz;
-      
-      // Format date considering timezone with explicit AM/PM for 12-hour time
       const formattedDate = formatInTimeZone(date, postTimezone, 'MMM d at h:mm a');
       
       return isPast ? `was scheduled for ${formattedDate}` : `scheduled for ${formattedDate}`;

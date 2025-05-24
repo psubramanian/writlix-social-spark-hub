@@ -40,13 +40,17 @@ export function useDashboardStats(selectedMonth: Date) {
         .gte('created_at', monthStart.toISOString())
         .lte('created_at', monthEnd.toISOString());
 
-      // Count all scheduled posts (only future ones, with no duplicates by content_id)
+      // Count scheduled posts by joining with content_ideas to ensure both conditions are met
       const { data: scheduledPostsData, error: scheduledPostsError } = await supabase
         .from('scheduled_posts')
-        .select('content_id')
+        .select(`
+          content_id,
+          content_ideas!inner(status)
+        `)
         .eq('user_id', user.id)
         .eq('status', 'pending')
-        .gt('next_run_at', now.toISOString()); // Only count future posts
+        .eq('content_ideas.status', 'Scheduled')
+        .gt('next_run_at', now.toISOString());
 
       if (scheduledPostsError) throw scheduledPostsError;
       
@@ -62,6 +66,7 @@ export function useDashboardStats(selectedMonth: Date) {
       }
       
       const scheduledCount = uniqueContentIds.size;
+      console.log('Scheduled posts count (deduplicated):', scheduledCount);
 
       // Count published posts for the current month
       const { count: publishedCount, error: publishedError } = await supabase
