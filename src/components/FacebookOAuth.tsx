@@ -34,7 +34,7 @@ const FacebookOAuth = () => {
         const { data, error } = await supabase
           .from('user_facebook_credentials')
           .select('client_id, access_token, facebook_profile_data, redirect_uri')
-          .eq('user_id', user.id)
+          .eq('user_id', user.id as any)
           .maybeSingle();
           
         if (error) {
@@ -120,7 +120,7 @@ const FacebookOAuth = () => {
           const { data: credentials } = await supabase
             .from('user_facebook_credentials')
             .select('redirect_uri')
-            .eq('user_id', user.id)
+            .eq('user_id', user.id as any)
             .maybeSingle();
             
           const finalRedirectUri = (credentials && credentials.redirect_uri) || 
@@ -180,7 +180,7 @@ const FacebookOAuth = () => {
       const { data: credentials, error: credentialsError } = await supabase
         .from('user_facebook_credentials')
         .select('client_id, redirect_uri')
-        .eq('user_id', user.id)
+        .eq('user_id', user.id as any)
         .maybeSingle();
         
       if (credentialsError) {
@@ -230,8 +230,8 @@ const FacebookOAuth = () => {
           expires_at: null,
           facebook_user_id: null,
           facebook_profile_data: null
-        })
-        .eq('user_id', user.id);
+        } as any)
+        .eq('user_id', user.id as any);
         
       if (error) throw error;
       

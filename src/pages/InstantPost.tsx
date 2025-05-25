@@ -1,3 +1,4 @@
+
 import { useState, useCallback } from 'react';
 import { useDropzone } from 'react-dropzone';
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
@@ -66,7 +67,7 @@ const InstantPost = () => {
         const { data: linkedInData } = await supabase
           .from('user_linkedin_credentials')
           .select('access_token')
-          .eq('user_id', user.id)
+          .eq('user_id', user.id as any)
           .maybeSingle();
           
         setSocialConnections(prev => ({
@@ -78,7 +79,7 @@ const InstantPost = () => {
         const { data: facebookData } = await supabase
           .from('user_facebook_credentials')
           .select('access_token, long_lived_token')
-          .eq('user_id', user.id)
+          .eq('user_id', user.id as any)
           .maybeSingle();
           
         setSocialConnections(prev => ({
@@ -90,7 +91,7 @@ const InstantPost = () => {
         const { data: instagramData } = await supabase
           .from('user_instagram_credentials')
           .select('access_token, long_lived_token')
-          .eq('user_id', user.id)
+          .eq('user_id', user.id as any)
           .maybeSingle();
           
         setSocialConnections(prev => ({

@@ -30,21 +30,21 @@ export function useSocialPreview() {
       const { data: linkedinData } = await supabase
         .from('user_linkedin_credentials')
         .select('linkedin_profile_data')
-        .eq('user_id', user.id)
+        .eq('user_id', user.id as any)
         .maybeSingle();
 
       // Fetch Facebook profile
       const { data: facebookData } = await supabase
         .from('user_facebook_credentials')
         .select('facebook_profile_data')
-        .eq('user_id', user.id)
+        .eq('user_id', user.id as any)
         .maybeSingle();
 
       // Fetch Instagram profile
       const { data: instagramData } = await supabase
         .from('user_instagram_credentials')
         .select('instagram_profile_data')
-        .eq('user_id', user.id)
+        .eq('user_id', user.id as any)
         .maybeSingle();
 
       const newProfiles: SocialProfiles = {};

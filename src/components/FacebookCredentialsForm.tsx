@@ -37,7 +37,7 @@ const FacebookCredentialsForm = () => {
       const { data, error } = await supabase
         .from('user_facebook_credentials')
         .select('client_id, client_secret, redirect_uri')
-        .eq('user_id', user.id)
+        .eq('user_id', user.id as any)
         .maybeSingle();
 
       if (error) {
@@ -76,8 +76,8 @@ const FacebookCredentialsForm = () => {
             client_id: clientId,
             client_secret: clientSecret,
             redirect_uri: redirectUri,
-          })
-          .eq('user_id', user.id);
+          } as any)
+          .eq('user_id', user.id as any);
         
         if (updateError) throw updateError;
       } else {
@@ -88,7 +88,7 @@ const FacebookCredentialsForm = () => {
             client_id: clientId,
             client_secret: clientSecret,
             redirect_uri: redirectUri,
-          });
+          } as any);
         
         if (insertError) throw insertError;
       }
