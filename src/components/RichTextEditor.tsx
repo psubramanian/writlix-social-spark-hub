@@ -11,12 +11,20 @@ import { cn } from "@/lib/utils";
 interface RichTextEditorProps {
   content: string;
   onChange: (content: string) => void;
+  onContentChange?: (html: string, text: string) => void; // Legacy support
   readOnly?: boolean;
   placeholder?: string;
   disabled?: boolean;
 }
 
-const RichTextEditor = ({ content, onChange, readOnly = false, placeholder, disabled = false }: RichTextEditorProps) => {
+const RichTextEditor = ({ 
+  content, 
+  onChange, 
+  onContentChange, 
+  readOnly = false, 
+  placeholder, 
+  disabled = false 
+}: RichTextEditorProps) => {
   const [showToolbar, setShowToolbar] = useState(true);
   const [editorContent, setEditorContent] = useState(content);
   const editorRef = React.useRef<HTMLDivElement>(null);
@@ -37,7 +45,15 @@ const RichTextEditor = ({ content, onChange, readOnly = false, placeholder, disa
     if (editorRef.current) {
       const newContent = editorRef.current.innerHTML;
       setEditorContent(newContent);
-      onChange(newContent);
+      
+      // Call the appropriate onChange handler
+      if (onChange) {
+        onChange(newContent);
+      }
+      if (onContentChange) {
+        const textContent = editorRef.current.innerText || '';
+        onContentChange(newContent, textContent);
+      }
     }
   };
 
@@ -54,14 +70,30 @@ const RichTextEditor = ({ content, onChange, readOnly = false, placeholder, disa
     if (!readOnly && !disabled) {
       const newContent = e.currentTarget.innerHTML;
       setEditorContent(newContent);
-      onChange(newContent);
+      
+      // Call the appropriate onChange handler
+      if (onChange) {
+        onChange(newContent);
+      }
+      if (onContentChange) {
+        const textContent = e.currentTarget.innerText || '';
+        onContentChange(newContent, textContent);
+      }
     }
   };
 
   const handleBlur = () => {
     if (!readOnly && !disabled && editorRef.current) {
       const newContent = editorRef.current.innerHTML;
-      onChange(newContent);
+      
+      // Call the appropriate onChange handler
+      if (onChange) {
+        onChange(newContent);
+      }
+      if (onContentChange) {
+        const textContent = editorRef.current.innerText || '';
+        onContentChange(newContent, textContent);
+      }
     }
   };
 

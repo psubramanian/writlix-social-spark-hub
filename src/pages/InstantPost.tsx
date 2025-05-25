@@ -190,6 +190,11 @@ const InstantPost = () => {
     setPreviewDialogOpen(true);
   };
 
+  const handleContentChange = (newContent: string) => {
+    setContentPlain(newContent);
+    setContentHtml(newContent);
+  };
+
   const handlePostToLinkedIn = async () => {
     try {
       await postToLinkedIn(contentPlain);
@@ -465,6 +470,7 @@ const InstantPost = () => {
         onPostToInstagram={handlePostToInstagram}
         isPosting={isPosting}
         postingPlatform={postingPlatform}
+        onContentChange={handleContentChange}
       />
       
       {/* Dialog for Instagram image URL input */}
