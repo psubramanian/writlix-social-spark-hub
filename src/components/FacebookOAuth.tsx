@@ -6,9 +6,7 @@ import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { Loader2 } from "lucide-react";
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/contexts/auth';
-import { Json } from '@/integrations/supabase/types';
 
-// Define types for Facebook profile data
 interface FacebookProfileData {
   name?: string;
   id?: string;
@@ -33,7 +31,6 @@ const FacebookOAuth = () => {
       }
       
       try {
-        // Check if we have Facebook credentials stored
         const { data, error } = await supabase
           .from('user_facebook_credentials')
           .select('client_id, access_token, facebook_profile_data, redirect_uri')
@@ -45,8 +42,7 @@ const FacebookOAuth = () => {
           throw error;
         }
         
-        // Only access data properties if data exists
-        if (data && typeof data === 'object') {
+        if (data) {
           setCredentialsPresent(!!data.client_id);
           
           if (data.redirect_uri) {
@@ -59,7 +55,6 @@ const FacebookOAuth = () => {
             setIsConnected(true);
             
             if (data.facebook_profile_data) {
-              // Safely access facebook_profile_data
               const profileData = data.facebook_profile_data as FacebookProfileData;
               if (profileData && typeof profileData === 'object' && profileData.name) {
                 setProfileName(profileData.name);
@@ -120,23 +115,19 @@ const FacebookOAuth = () => {
       if (code && state && savedState && state === savedState && user?.id) {
         setConnecting(true);
         try {
-          // Clear the state from session storage
           sessionStorage.removeItem('facebook_state');
           
-          // Get user's configured redirect URI
           const { data: credentials } = await supabase
             .from('user_facebook_credentials')
             .select('redirect_uri')
             .eq('user_id', user.id)
             .maybeSingle();
             
-          // Use custom redirect URI if available, otherwise use default
           const finalRedirectUri = (credentials && credentials.redirect_uri) || 
             (window.location.origin + window.location.pathname);
             
           console.log('Using redirect URI:', finalRedirectUri);
           
-          // Exchange the code for an access token
           const { data, error } = await supabase.functions.invoke('facebook-oauth', {
             body: { 
               code,
@@ -186,7 +177,6 @@ const FacebookOAuth = () => {
         return;
       }
       
-      // Get user's Facebook credentials
       const { data: credentials, error: credentialsError } = await supabase
         .from('user_facebook_credentials')
         .select('client_id, redirect_uri')
@@ -198,7 +188,6 @@ const FacebookOAuth = () => {
         throw credentialsError;
       }
       
-      // Check if credentials exist and have a client_id
       if (!credentials || !credentials.client_id) {
         toast({
           title: "Facebook Credentials Missing",
@@ -208,18 +197,14 @@ const FacebookOAuth = () => {
         return;
       }
       
-      // Generate and store state parameter for security
       const state = generateRandomString();
       sessionStorage.setItem('facebook_state', state);
       
-      // Use custom redirect URI if available, default to current page otherwise
       const finalRedirectUri = credentials.redirect_uri || (window.location.origin + window.location.pathname);
       
-      // Get the redirect URI
       const encodedRedirectUri = encodeURIComponent(finalRedirectUri);
       console.log('Using redirect URI:', finalRedirectUri);      
       
-      // Redirect to Facebook authorization page
       const facebookAuthUrl = `https://www.facebook.com/v18.0/dialog/oauth?client_id=${credentials.client_id}&redirect_uri=${encodedRedirectUri}&state=${state}&scope=pages_show_list,pages_read_engagement,pages_manage_posts,public_profile`;
       
       window.location.href = facebookAuthUrl;
@@ -237,7 +222,6 @@ const FacebookOAuth = () => {
     try {
       if (!user?.id) return;
       
-      // Update Facebook credentials to remove access token
       const { error } = await supabase
         .from('user_facebook_credentials')
         .update({ 
@@ -268,7 +252,6 @@ const FacebookOAuth = () => {
     }
   };
 
-  // Generate a random string for the state parameter
   const generateRandomString = (length = 20) => {
     const charset = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789';
     let result = '';

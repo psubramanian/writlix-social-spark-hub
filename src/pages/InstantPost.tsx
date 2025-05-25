@@ -8,7 +8,7 @@ import { useToast } from "@/components/ui/use-toast";
 import { useInstantPost } from '../hooks/useInstantPost';
 import { Loader2, ImageIcon, Upload, AlertCircle } from "lucide-react";
 import RichTextEditor from '../components/RichTextEditor';
-import { useAuth } from '../contexts/AuthContext';
+import { useAuth } from '@/contexts/auth';
 import { supabase } from '@/integrations/supabase/client';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 import { Facebook, Instagram, Linkedin } from "lucide-react";
@@ -114,13 +114,11 @@ const InstantPost = () => {
     
     const file = acceptedFiles[0];
     
-    // Check file size
     if (file.size > MAX_FILE_SIZE) {
       setDropError(`File is too large. Maximum size is ${MAX_FILE_SIZE / (1024 * 1024)}MB.`);
       return;
     }
     
-    // Check file type
     if (!file.type.startsWith('image/')) {
       setDropError('Only image files are accepted.');
       return;
@@ -128,11 +126,9 @@ const InstantPost = () => {
     
     setSelectedImage(file);
     
-    // Create preview
     const objectUrl = URL.createObjectURL(file);
     setPreviewUrl(objectUrl);
     
-    // Clean up the preview URL when component unmounts
     return () => URL.revokeObjectURL(objectUrl);
   }, []);
   
@@ -158,7 +154,6 @@ const InstantPost = () => {
       const content = await generateContentFromImage(selectedImage);
       setContentHtml(content);
       
-      // Create plain text version by removing HTML tags
       const plainText = content.replace(/<[^>]*>?/gm, '');
       setContentPlain(plainText);
       

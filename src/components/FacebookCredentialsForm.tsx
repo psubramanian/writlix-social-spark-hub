@@ -7,7 +7,6 @@ import { Label } from "@/components/ui/label";
 import { useToast } from "@/components/ui/use-toast";
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/contexts/auth';
-import { TablesInsert, TablesUpdate } from '@/integrations/supabase/types';
 import { HelpCircle } from 'lucide-react';
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 
@@ -46,7 +45,7 @@ const FacebookCredentialsForm = () => {
         return;
       }
 
-      if (data && typeof data === 'object' && 'client_id' in data) {
+      if (data) {
         console.log('Found Facebook credentials', { hasClientId: !!data.client_id });
         setClientId(data.client_id || '');
         setClientSecret(data.client_secret || '');
@@ -71,31 +70,25 @@ const FacebookCredentialsForm = () => {
       }
 
       if (hasCredentials) {
-        // For update operation
-        const credentials: TablesUpdate<'user_facebook_credentials'> = {
-          client_id: clientId,
-          client_secret: clientSecret,
-          redirect_uri: redirectUri,
-        };
-        
         const { error: updateError } = await supabase
           .from('user_facebook_credentials')
-          .update(credentials)
+          .update({
+            client_id: clientId,
+            client_secret: clientSecret,
+            redirect_uri: redirectUri,
+          })
           .eq('user_id', user.id);
         
         if (updateError) throw updateError;
       } else {
-        // For insert operation
-        const credentials: TablesInsert<'user_facebook_credentials'> = {
-          user_id: user.id,
-          client_id: clientId,
-          client_secret: clientSecret,
-          redirect_uri: redirectUri,
-        };
-        
         const { error: insertError } = await supabase
           .from('user_facebook_credentials')
-          .insert(credentials);
+          .insert({
+            user_id: user.id,
+            client_id: clientId,
+            client_secret: clientSecret,
+            redirect_uri: redirectUri,
+          });
         
         if (insertError) throw insertError;
       }
