@@ -6,7 +6,7 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { useToast } from '@/components/ui/use-toast';
 import { supabase } from '@/integrations/supabase/client';
-import { useAuth } from '@/contexts/AuthContext';
+import { useAuth } from '@/contexts/auth';
 import { Loader2 } from 'lucide-react';
 
 interface ProfileData {
@@ -16,7 +16,7 @@ interface ProfileData {
   mobile_number: string;
 }
 
-const AccountSettingsForm = () => {
+export const AccountSettingsForm = () => {
   const { user } = useAuth();
   const { toast } = useToast();
   const [loading, setLoading] = useState(false);
@@ -180,5 +180,3 @@ const AccountSettingsForm = () => {
     </Card>
   );
 };
-
-export default AccountSettingsForm;
