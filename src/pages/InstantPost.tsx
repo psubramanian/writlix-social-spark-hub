@@ -1,4 +1,3 @@
-
 import { useState, useCallback } from 'react';
 import { useDropzone } from 'react-dropzone';
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
@@ -16,6 +15,7 @@ import { Facebook, Instagram, Linkedin } from "lucide-react";
 import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group";
 import { Input } from '@/components/ui/input';
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import SocialMediaPreviewDialog from '../components/SocialMediaPreviewDialog';
 
 interface SocialConnectionStatus {
   linkedin: boolean;
@@ -41,6 +41,7 @@ const InstantPost = () => {
   });
   const [loading, setLoading] = useState(false);
   const [instagramDialogOpen, setInstagramDialogOpen] = useState(false);
+  const [previewDialogOpen, setPreviewDialogOpen] = useState(false);
   const [imageUrl, setImageUrl] = useState('');
   
   const { toast } = useToast();
@@ -176,7 +177,7 @@ const InstantPost = () => {
     }
   };
 
-  const handlePost = async () => {
+  const handlePreviewAndPost = () => {
     if (!contentPlain.trim()) {
       toast({
         title: "No content",
@@ -186,66 +187,70 @@ const InstantPost = () => {
       return;
     }
     
-    // For Instagram, we need an image
-    if (selectedPlatforms.includes('instagram') && !previewUrl && !imageUrl) {
+    setPreviewDialogOpen(true);
+  };
+
+  const handlePostToLinkedIn = async () => {
+    try {
+      await postToLinkedIn(contentPlain);
+      toast({
+        title: "Posted to LinkedIn",
+        description: "Your post has been shared on LinkedIn.",
+      });
+      setPreviewDialogOpen(false);
+      resetForm();
+    } catch (error: any) {
+      toast({
+        title: "LinkedIn Posting Failed",
+        description: error.message || "Failed to post to LinkedIn.",
+        variant: "destructive",
+      });
+    }
+  };
+
+  const handlePostToFacebook = async () => {
+    try {
+      await postToFacebook(contentPlain);
+      toast({
+        title: "Posted to Facebook",
+        description: "Your post has been shared on Facebook.",
+      });
+      setPreviewDialogOpen(false);
+      resetForm();
+    } catch (error: any) {
+      toast({
+        title: "Facebook Posting Failed",
+        description: error.message || "Failed to post to Facebook.",
+        variant: "destructive",
+      });
+    }
+  };
+
+  const handlePostToInstagram = async () => {
+    const imgUrl = previewUrl || imageUrl;
+    if (!imgUrl) {
       setInstagramDialogOpen(true);
       return;
     }
     
-    setLoading(true);
-    
     try {
-      const postPromises = selectedPlatforms.map(platform => {
-        switch(platform) {
-          case 'linkedin':
-            if (!socialConnections.linkedin) {
-              throw new Error("LinkedIn account not connected. Please connect your LinkedIn account in Settings.");
-            }
-            return postToLinkedIn(contentPlain);
-          case 'facebook':
-            if (!socialConnections.facebook) {
-              throw new Error("Facebook account not connected. Please connect your Facebook account in Settings.");
-            }
-            return postToFacebook(contentPlain);
-          case 'instagram':
-            if (!socialConnections.instagram) {
-              throw new Error("Instagram account not connected. Please connect your Instagram account in Settings.");
-            }
-            const imgUrl = previewUrl || imageUrl;
-            if (!imgUrl) {
-              throw new Error("Instagram requires an image. Please upload or provide an image URL.");
-            }
-            return postToInstagram(contentPlain, imgUrl);
-          default:
-            return Promise.resolve();
-        }
-      });
-      
-      await Promise.all(postPromises);
-      
+      await postToInstagram(contentPlain, imgUrl);
       toast({
-        title: "Posted Successfully",
-        description: `Your post has been shared on ${selectedPlatforms.map(p => p.charAt(0).toUpperCase() + p.slice(1)).join(', ')}.`,
+        title: "Posted to Instagram",
+        description: "Your post has been shared on Instagram.",
       });
-      
-      // Reset the form
-      setContentHtml('');
-      setContentPlain('');
-      setSelectedImage(null);
-      setPreviewUrl(null);
-      setImageUrl('');
+      setPreviewDialogOpen(false);
+      setInstagramDialogOpen(false);
+      resetForm();
     } catch (error: any) {
-      console.error('Error posting content:', error);
       toast({
-        title: "Posting Failed",
-        description: error.message || "Failed to post content.",
+        title: "Instagram Posting Failed",
+        description: error.message || "Failed to post to Instagram.",
         variant: "destructive",
       });
-    } finally {
-      setLoading(false);
     }
   };
-  
+
   const handleInstagramDialogSubmit = () => {
     if (!imageUrl.trim()) {
       toast({
@@ -257,7 +262,15 @@ const InstantPost = () => {
     }
     
     setInstagramDialogOpen(false);
-    handlePost();
+    handlePostToInstagram();
+  };
+
+  const resetForm = () => {
+    setContentHtml('');
+    setContentPlain('');
+    setSelectedImage(null);
+    setPreviewUrl(null);
+    setImageUrl('');
   };
   
   const isDisabled = isGenerating || isPosting || loading;
@@ -428,26 +441,31 @@ const InstantPost = () => {
             
             <div className="pt-4">
               <Button
-                onClick={handlePost}
+                onClick={handlePreviewAndPost}
                 disabled={!contentPlain.trim() || selectedPlatforms.length === 0 || isDisabled || 
                          (!socialConnections.linkedin && !socialConnections.facebook && !socialConnections.instagram)}
                 className="w-full"
               >
-                {isPosting || loading ? (
-                  <>
-                    <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                    Posting to {postingPlatform || 'social media'}...
-                  </>
-                ) : (
-                  <>
-                    Post Now
-                  </>
-                )}
+                Preview & Post
               </Button>
             </div>
           </CardContent>
         </Card>
       </div>
+      
+      {/* Social Media Preview Dialog */}
+      <SocialMediaPreviewDialog
+        open={previewDialogOpen}
+        onOpenChange={setPreviewDialogOpen}
+        content={contentPlain}
+        imageUrl={previewUrl || undefined}
+        selectedPlatforms={selectedPlatforms}
+        onPostToLinkedIn={handlePostToLinkedIn}
+        onPostToFacebook={handlePostToFacebook}
+        onPostToInstagram={handlePostToInstagram}
+        isPosting={isPosting}
+        postingPlatform={postingPlatform}
+      />
       
       {/* Dialog for Instagram image URL input */}
       <Dialog open={instagramDialogOpen} onOpenChange={setInstagramDialogOpen}>
