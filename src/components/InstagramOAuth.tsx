@@ -6,7 +6,6 @@ import { Loader2 } from "lucide-react";
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/contexts/auth';
 
-// Define types for Instagram profile data
 interface InstagramProfileData {
   username?: string;
   id?: string;
@@ -21,12 +20,7 @@ interface InstagramCredentialRow {
 }
 
 function isInstagramCredentialData(obj: any): obj is InstagramCredentialRow {
-  return (
-    obj &&
-    typeof obj === 'object' &&
-    'client_id' in obj &&
-    typeof obj.client_id === 'string'
-  );
+  return obj && typeof obj === 'object' && 'client_id' in obj && typeof obj.client_id === 'string';
 }
 
 const InstagramOAuth = () => {
@@ -53,10 +47,7 @@ const InstagramOAuth = () => {
           .eq('user_id', user.id as string)
           .maybeSingle();
 
-        if (error) {
-          console.error('Error checking Instagram connection:', error);
-          throw error;
-        }
+        if (error) throw error;
 
         if (isInstagramCredentialData(data)) {
           setCredentialsPresent(!!data.client_id);
@@ -64,7 +55,6 @@ const InstagramOAuth = () => {
 
           if (data.access_token) {
             setIsConnected(true);
-
             const profileData = data.instagram_profile_data;
             if (profileData && typeof profileData === 'object' && profileData.username) {
               setProfileName(profileData.username);
@@ -130,18 +120,16 @@ const InstagramOAuth = () => {
             .eq('user_id', user.id as string)
             .maybeSingle();
 
-          const finalRedirectUri = (credentials && credentials.redirect_uri) ||
+          const finalRedirectUri = (credentials && 'redirect_uri' in credentials ? credentials.redirect_uri : null) || 
             (window.location.origin + window.location.pathname);
-
-          console.log('Using redirect URI:', finalRedirectUri);
 
           const { data, error } = await supabase.functions.invoke('instagram-oauth', {
             body: {
               code,
               state,
               user_id: user.id,
-              redirect_uri: finalRedirectUri
-            }
+              redirect_uri: finalRedirectUri,
+            },
           });
 
           if (error) throw error;
@@ -190,10 +178,7 @@ const InstagramOAuth = () => {
         .eq('user_id', user.id as string)
         .maybeSingle();
 
-      if (credentialsError) {
-        console.error('Error fetching Instagram credentials:', credentialsError);
-        throw credentialsError;
-      }
+      if (credentialsError) throw credentialsError;
 
       if (!isInstagramCredentialData(credentials)) {
         toast({
@@ -209,8 +194,6 @@ const InstagramOAuth = () => {
 
       const finalRedirectUri = credentials.redirect_uri || (window.location.origin + window.location.pathname);
       const encodedRedirectUri = encodeURIComponent(finalRedirectUri);
-
-      console.log('Using redirect URI:', finalRedirectUri);
 
       const instagramAuthUrl = `https://api.instagram.com/oauth/authorize?client_id=${credentials.client_id}&redirect_uri=${encodedRedirectUri}&scope=user_profile,user_media&response_type=code&state=${state}`;
 
@@ -231,13 +214,15 @@ const InstagramOAuth = () => {
 
       const { error } = await supabase
         .from('user_instagram_credentials')
-        .update({ access_token: null, 
-                  long_lived_token: null, 
-                  expires_at: null, 
-                  instagram_user_id: null, 
-                  instagram_profile_data: null 
-                } as any)
-        .eq('user_id', user.id as string)
+        .update({
+          access_token: null,
+          long_lived_token: null,
+          expires_at: null,
+          instagram_user_id: null,
+          instagram_profile_data: null,
+        } as any)
+        .eq('user_id', user.id as string);
+
       if (error) throw error;
 
       setIsConnected(false);
@@ -259,11 +244,7 @@ const InstagramOAuth = () => {
 
   const generateRandomString = (length = 20) => {
     const charset = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789';
-    let result = '';
-    for (let i = 0; i < length; i++) {
-      result += charset.charAt(Math.floor(Math.random() * charset.length));
-    }
-    return result;
+    return Array.from({ length }, () => charset[Math.floor(Math.random() * charset.length)]).join('');
   };
 
   if (loading) {
