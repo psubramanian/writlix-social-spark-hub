@@ -37,7 +37,7 @@ export const AccountSettingsForm = () => {
         const { data, error } = await supabase
           .from('profiles')
           .select('email, first_name, last_name, mobile_number')
-          .eq('id', user.id as string)
+          .eq('id', user.id)
           .maybeSingle();
 
         if (error) {
@@ -45,7 +45,7 @@ export const AccountSettingsForm = () => {
           return;
         }
 
-        if (data && 'email' in data) {
+        if (data) {
           setFormData({
             email: data.email || '',
             first_name: data.first_name || '',
