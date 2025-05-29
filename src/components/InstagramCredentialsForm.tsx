@@ -9,6 +9,24 @@ import { HelpCircle } from 'lucide-react';
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 import { credentialsOperations } from '@/utils/supabaseHelpers';
 
+function isInstagramCredentialData(
+  obj: any
+): obj is {
+  client_id: string;
+  client_secret: string;
+  redirect_uri: string;
+  access_token?: string;
+  instagram_profile_data?: any;
+} {
+  return (
+    obj &&
+    typeof obj === "object" &&
+    "client_id" in obj &&
+    "client_secret" in obj &&
+    "redirect_uri" in obj
+  );
+}
+
 const InstagramCredentialsForm = () => {
   const [clientId, setClientId] = useState('');
   const [clientSecret, setClientSecret] = useState('');
@@ -17,8 +35,9 @@ const InstagramCredentialsForm = () => {
   const [hasCredentials, setHasCredentials] = useState(false);
   const { toast } = useToast();
   const { user } = useAuth();
-  const defaultRedirectUri = typeof window !== "undefined" ? 
-    window.location.origin + window.location.pathname : "";
+  const defaultRedirectUri = typeof window !== "undefined"
+    ? window.location.origin + window.location.pathname
+    : "";
 
   useEffect(() => {
     fetchCredentials();
@@ -30,12 +49,12 @@ const InstagramCredentialsForm = () => {
         console.error('No user ID available for fetching credentials');
         return;
       }
-      
+
       console.log('Fetching Instagram credentials for user ID:', user.id);
 
       const data = await credentialsOperations.instagram.fetch(user.id);
 
-      if (data) {
+      if (isInstagramCredentialData(data)) {
         console.log('Found Instagram credentials', { hasClientId: !!data.client_id });
         setClientId(data.client_id || '');
         setClientSecret(data.client_secret || '');
@@ -68,14 +87,14 @@ const InstagramCredentialsForm = () => {
         },
         hasCredentials
       );
-      
+
       if (error) throw error;
 
       toast({
         title: "Success",
         description: `Instagram credentials ${hasCredentials ? 'updated' : 'saved'} successfully.`,
       });
-      
+
       setHasCredentials(true);
       toast({
         title: "Next Step",
@@ -113,7 +132,7 @@ const InstagramCredentialsForm = () => {
               required
             />
           </div>
-          
+
           <div className="space-y-2">
             <Label htmlFor="clientSecret">App Secret</Label>
             <Input
