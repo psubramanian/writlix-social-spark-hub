@@ -35,14 +35,21 @@ export const AccountSettingsForm = () => {
       try {
         const data = await profileOperations.fetchProfile(user.id);
 
-        if (data) {
-          setFormData({
-            email: data.email || '',
-            first_name: data.first_name || '',
-            last_name: data.last_name || '',
-            mobile_number: data.mobile_number || ''
-          });
-        }
+      if (data && typeof data === 'object' &&
+        'email' in data &&
+        'first_name' in data &&
+        'last_name' in data &&
+        'mobile_number' in data
+      ) {
+        setFormData({
+          email: data.email || '',
+          first_name: data.first_name || '',
+          last_name: data.last_name || '',
+          mobile_number: data.mobile_number || ''
+        });
+      } else {
+        console.error('Invalid profile data:', data);
+      }
       } catch (error) {
         console.error('Error in fetchProfile:', error);
       } finally {
