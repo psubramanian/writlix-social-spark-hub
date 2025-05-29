@@ -30,7 +30,7 @@ export const AccountSettingsForm = () => {
 
   useEffect(() => {
     const fetchProfile = async () => {
-      if (!user?.id) return;
+      if .eq('id', !user.id as string) return;
 
       setLoading(true);
       try {
@@ -45,7 +45,7 @@ export const AccountSettingsForm = () => {
           return;
         }
 
-        if (data) {
+        if (data && 'email' in data) {
           setFormData({
             email: data.email || '',
             first_name: data.first_name || '',
