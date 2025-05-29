@@ -117,7 +117,7 @@ const InstagramOAuth = () => {
           const { data: credentials } = await supabase
             .from('user_instagram_credentials')
             .select('redirect_uri')
-            .eq('user_id', user.id as string)
+            .eq('user_id', user.id as any)
             .maybeSingle();
 
           const finalRedirectUri = (credentials && 'redirect_uri' in credentials ? credentials.redirect_uri : null) || 
@@ -175,7 +175,7 @@ const InstagramOAuth = () => {
       const { data: credentials, error: credentialsError } = await supabase
         .from('user_instagram_credentials')
         .select('client_id, redirect_uri')
-        .eq('user_id', user.id as string)
+        .eq('user_id', user.id as any)
         .maybeSingle();
 
       if (credentialsError) throw credentialsError;
@@ -221,7 +221,7 @@ const InstagramOAuth = () => {
           instagram_user_id: null,
           instagram_profile_data: null,
         } as any)
-        .eq('user_id', user.id as string);
+        .eq('user_id', user.id as any);
 
       if (error) throw error;
 
