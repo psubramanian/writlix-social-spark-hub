@@ -5,6 +5,9 @@ import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { Loader2 } from "lucide-react";
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/contexts/auth';
+import type { Database } from '@/integrations/supabase/types';
+
+type UserIdType = Database['public']['Tables']['user_linkedin_credentials']['Row']['user_id'];
 
 // LinkedIn profile structure
 interface LinkedInProfileData {
@@ -185,7 +188,7 @@ const LinkedInOAuth = () => {
       const { data: credentials, error: credentialsError } = await supabase
         .from('user_linkedin_credentials')
         .select('client_id, redirect_uri')
-        .eq('user_id', user.id)
+        .eq('user_id', user.id as UserIdType)
         .maybeSingle();
 
       if (credentialsError) throw credentialsError;
