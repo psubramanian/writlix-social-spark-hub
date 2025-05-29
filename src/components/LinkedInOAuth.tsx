@@ -133,8 +133,9 @@ const LinkedInOAuth = () => {
             .eq('user_id', user.id as any)
             .maybeSingle();
 
-          const finalRedirectUri = (credentials && credentials.redirect_uri) ||
-            (window.location.origin + window.location.pathname);
+          if (credentials && 'redirect_uri' in credentials) {
+            const finalRedirectUri = credentials.redirect_uri || (window.location.origin + window.location.pathname);
+          }
 
           const { data, error } = await supabase.functions.invoke('linkedin-oauth', {
             body: {
