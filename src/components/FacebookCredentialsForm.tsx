@@ -9,6 +9,24 @@ import { HelpCircle } from 'lucide-react';
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 import { credentialsOperations } from '@/utils/supabaseHelpers';
 
+function isFacebookCredentialData(
+  obj: any
+): obj is {
+  client_id: string;
+  client_secret: string;
+  redirect_uri: string;
+  access_token: string;
+  facebook_profile_data: any;
+} {
+  return (
+    obj &&
+    typeof obj === "object" &&
+    "client_id" in obj &&
+    "client_secret" in obj &&
+    "redirect_uri" in obj
+  );
+}
+
 const FacebookCredentialsForm = () => {
   const [clientId, setClientId] = useState('');
   const [clientSecret, setClientSecret] = useState('');
@@ -35,7 +53,7 @@ const FacebookCredentialsForm = () => {
 
       const data = await credentialsOperations.facebook.fetch(user.id);
 
-      if (data) {
+      if (isFacebookCredentialData(data)) {
         console.log('Found Facebook credentials', { hasClientId: !!data.client_id });
         setClientId(data.client_id || '');
         setClientSecret(data.client_secret || '');
