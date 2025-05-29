@@ -1,14 +1,13 @@
-
 import { useState, useEffect } from 'react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { useToast } from "@/components/ui/use-toast";
-import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/contexts/auth';
 import { HelpCircle } from 'lucide-react';
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
+import { credentialsOperations } from '@/utils/supabaseHelpers';
 
 const FacebookCredentialsForm = () => {
   const [clientId, setClientId] = useState('');
@@ -34,16 +33,7 @@ const FacebookCredentialsForm = () => {
       
       console.log('Fetching Facebook credentials for user ID:', user.id);
 
-      const { data, error } = await supabase
-        .from('user_facebook_credentials')
-        .select('client_id, client_secret, redirect_uri')
-        .eq('user_id', user.id as any)
-        .maybeSingle();
-
-      if (error) {
-        console.error('Error fetching Facebook credentials:', error);
-        return;
-      }
+      const data = await credentialsOperations.facebook.fetch(user.id);
 
       if (data) {
         console.log('Found Facebook credentials', { hasClientId: !!data.client_id });
@@ -69,29 +59,17 @@ const FacebookCredentialsForm = () => {
         throw new Error('User not authenticated');
       }
 
-      if (hasCredentials) {
-        const { error: updateError } = await supabase
-          .from('user_facebook_credentials')
-          .update({
-            client_id: clientId,
-            client_secret: clientSecret,
-            redirect_uri: redirectUri,
-          } as any)
-          .eq('user_id', user.id as any);
-        
-        if (updateError) throw updateError;
-      } else {
-        const { error: insertError } = await supabase
-          .from('user_facebook_credentials')
-          .insert({
-            user_id: user.id,
-            client_id: clientId,
-            client_secret: clientSecret,
-            redirect_uri: redirectUri,
-          } as any);
-        
-        if (insertError) throw insertError;
-      }
+      const { error } = await credentialsOperations.facebook.upsert(
+        user.id,
+        {
+          client_id: clientId,
+          client_secret: clientSecret,
+          redirect_uri: redirectUri,
+        },
+        hasCredentials
+      );
+      
+      if (error) throw error;
 
       toast({
         title: "Success",

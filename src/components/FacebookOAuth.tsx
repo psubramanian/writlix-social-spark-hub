@@ -1,11 +1,10 @@
-
 import { useState, useEffect } from 'react';
 import { Button } from '@/components/ui/button';
 import { useToast } from '@/components/ui/use-toast';
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { Loader2 } from "lucide-react";
-import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/contexts/auth';
+import { credentialsOperations } from '@/utils/supabaseHelpers';
 
 interface FacebookProfileData {
   name?: string;
@@ -31,17 +30,8 @@ const FacebookOAuth = () => {
       }
       
       try {
-        const { data, error } = await supabase
-          .from('user_facebook_credentials')
-          .select('client_id, access_token, facebook_profile_data, redirect_uri')
-          .eq('user_id', user.id as any)
-          .maybeSingle();
+        const data = await credentialsOperations.facebook.fetch(user.id);
           
-        if (error) {
-          console.error('Error checking Facebook connection:', error);
-          throw error;
-        }
-        
         if (data) {
           setCredentialsPresent(!!data.client_id);
           
@@ -117,25 +107,24 @@ const FacebookOAuth = () => {
         try {
           sessionStorage.removeItem('facebook_state');
           
-          const { data: credentials } = await supabase
-            .from('user_facebook_credentials')
-            .select('redirect_uri')
-            .eq('user_id', user.id as any)
-            .maybeSingle();
+          const credentials = await credentialsOperations.facebook.fetch(user.id);
             
           const finalRedirectUri = (credentials && credentials.redirect_uri) || 
             (window.location.origin + window.location.pathname);
             
           console.log('Using redirect URI:', finalRedirectUri);
           
-          const { data, error } = await supabase.functions.invoke('facebook-oauth', {
-            body: { 
+          // Make edge function call here - keeping existing logic
+          const { data, error } = await fetch('/api/facebook-oauth', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
               code,
               state,
               user_id: user.id,
               redirect_uri: finalRedirectUri
-            }
-          });
+            })
+          }).then(res => res.json());
           
           if (error) throw error;
           
@@ -177,17 +166,8 @@ const FacebookOAuth = () => {
         return;
       }
       
-      const { data: credentials, error: credentialsError } = await supabase
-        .from('user_facebook_credentials')
-        .select('client_id, redirect_uri')
-        .eq('user_id', user.id as any)
-        .maybeSingle();
+      const credentials = await credentialsOperations.facebook.fetch(user.id);
         
-      if (credentialsError) {
-        console.error('Error fetching Facebook credentials:', credentialsError);
-        throw credentialsError;
-      }
-      
       if (!credentials || !credentials.client_id) {
         toast({
           title: "Facebook Credentials Missing",
@@ -222,16 +202,13 @@ const FacebookOAuth = () => {
     try {
       if (!user?.id) return;
       
-      const { error } = await supabase
-        .from('user_facebook_credentials')
-        .update({ 
-          access_token: null,
-          long_lived_token: null,
-          expires_at: null,
-          facebook_user_id: null,
-          facebook_profile_data: null
-        } as any)
-        .eq('user_id', user.id as any);
+      const { error } = await credentialsOperations.facebook.updateTokens(user.id, {
+        access_token: null,
+        long_lived_token: null,
+        expires_at: null,
+        facebook_user_id: null,
+        facebook_profile_data: null
+      });
         
       if (error) throw error;
       

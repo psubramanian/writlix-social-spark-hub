@@ -1,15 +1,13 @@
-
 import { useState, useEffect } from 'react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { useToast } from "@/components/ui/use-toast";
-import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/contexts/auth';
-import { TablesInsert, TablesUpdate } from '@/integrations/supabase/types';
 import { HelpCircle } from 'lucide-react';
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
+import { credentialsOperations } from '@/utils/supabaseHelpers';
 
 const LinkedInCredentialsForm = () => {
   const [clientId, setClientId] = useState('');
@@ -35,20 +33,10 @@ const LinkedInCredentialsForm = () => {
       
       console.log('Fetching LinkedIn credentials for user ID:', user.id);
 
-      const { data, error } = await supabase
-        .from('user_linkedin_credentials')
-        .select('client_id, client_secret, redirect_uri')
-        .eq('user_id', user.id)
-        .maybeSingle();
+      const data = await credentialsOperations.linkedin.fetch(user.id);
 
-      if (error) {
-        console.error('Error fetching LinkedIn credentials:', error);
-        return;
-      }
-
-      if (data && typeof data === 'object' && 'client_id' in data) {
+      if (data) {
         console.log('Found LinkedIn credentials', { hasClientId: !!data.client_id });
-        // Type-safe access to properties
         setClientId(data.client_id || '');
         setClientSecret(data.client_secret || '');
         setRedirectUri(data.redirect_uri || defaultRedirectUri);
@@ -71,35 +59,17 @@ const LinkedInCredentialsForm = () => {
         throw new Error('User not authenticated');
       }
 
-      if (hasCredentials) {
-        // For update operation
-        const credentials: TablesUpdate<'user_linkedin_credentials'> = {
+      const { error } = await credentialsOperations.linkedin.upsert(
+        user.id,
+        {
           client_id: clientId,
           client_secret: clientSecret,
           redirect_uri: redirectUri,
-        };
-        
-        const { error: updateError } = await supabase
-          .from('user_linkedin_credentials')
-          .update(credentials)
-          .eq('user_id', user.id);
-        
-        if (updateError) throw updateError;
-      } else {
-        // For insert operation
-        const credentials: TablesInsert<'user_linkedin_credentials'> = {
-          user_id: user.id,
-          client_id: clientId,
-          client_secret: clientSecret,
-          redirect_uri: redirectUri,
-        };
-        
-        const { error: insertError } = await supabase
-          .from('user_linkedin_credentials')
-          .insert(credentials);
-        
-        if (insertError) throw insertError;
-      }
+        },
+        hasCredentials
+      );
+      
+      if (error) throw error;
 
       toast({
         title: "Success",

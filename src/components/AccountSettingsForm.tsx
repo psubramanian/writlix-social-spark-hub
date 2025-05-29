@@ -1,13 +1,12 @@
-
 import React, { useState, useEffect } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { useToast } from '@/components/ui/use-toast';
-import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/contexts/auth';
 import { Loader2 } from 'lucide-react';
+import { profileOperations } from '@/utils/supabaseHelpers';
 
 interface ProfileData {
   email: string;
@@ -34,16 +33,7 @@ export const AccountSettingsForm = () => {
 
       setLoading(true);
       try {
-        const { data, error } = await supabase
-          .from('profiles')
-          .select('email, first_name, last_name, mobile_number')
-          .eq('id', user.id)
-          .maybeSingle();
-
-        if (error) {
-          console.error('Error fetching profile:', error);
-          return;
-        }
+        const data = await profileOperations.fetchProfile(user.id);
 
         if (data) {
           setFormData({
@@ -69,16 +59,13 @@ export const AccountSettingsForm = () => {
 
     setSaving(true);
     try {
-      const { error } = await supabase
-        .from('profiles')
-        .update({
-          first_name: formData.first_name,
-          last_name: formData.last_name,
-          email: formData.email,
-          mobile_number: formData.mobile_number,
-          profile_completed: true
-        })
-        .eq('id', user.id);
+      const { error } = await profileOperations.updateProfile(user.id, {
+        first_name: formData.first_name,
+        last_name: formData.last_name,
+        email: formData.email,
+        mobile_number: formData.mobile_number,
+        profile_completed: true
+      });
 
       if (error) throw error;
 

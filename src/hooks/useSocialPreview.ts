@@ -1,7 +1,7 @@
 
 import { useState, useEffect } from 'react';
-import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/contexts/auth';
+import { credentialsOperations } from '@/utils/supabaseHelpers';
 
 interface SocialProfile {
   name: string;
@@ -27,25 +27,13 @@ export function useSocialPreview() {
     setLoading(true);
     try {
       // Fetch LinkedIn profile
-      const { data: linkedinData } = await supabase
-        .from('user_linkedin_credentials')
-        .select('linkedin_profile_data')
-        .eq('user_id', user.id as any)
-        .maybeSingle();
+      const linkedinData = await credentialsOperations.linkedin.fetch(user.id);
 
       // Fetch Facebook profile
-      const { data: facebookData } = await supabase
-        .from('user_facebook_credentials')
-        .select('facebook_profile_data')
-        .eq('user_id', user.id as any)
-        .maybeSingle();
+      const facebookData = await credentialsOperations.facebook.fetch(user.id);
 
       // Fetch Instagram profile
-      const { data: instagramData } = await supabase
-        .from('user_instagram_credentials')
-        .select('instagram_profile_data')
-        .eq('user_id', user.id as any)
-        .maybeSingle();
+      const instagramData = await credentialsOperations.instagram.fetch(user.id);
 
       const newProfiles: SocialProfiles = {};
 
