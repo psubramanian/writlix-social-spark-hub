@@ -30,14 +30,14 @@ export const AccountSettingsForm = () => {
 
   useEffect(() => {
     const fetchProfile = async () => {
-      if .eq('id', !user.id as string) return;
+      if (!user?.id) return;
 
       setLoading(true);
       try {
         const { data, error } = await supabase
           .from('profiles')
           .select('email, first_name, last_name, mobile_number')
-          .eq('id', user.id)
+          .eq('id', user.id as string)
           .maybeSingle();
 
         if (error) {
