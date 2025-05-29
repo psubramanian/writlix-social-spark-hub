@@ -16,7 +16,7 @@ export type Database = {
           id: number
           status: string
           title: string
-          user_id: uuid
+          user_id: string
         }
         Insert: {
           content: string
@@ -24,7 +24,7 @@ export type Database = {
           id?: number
           status: string
           title: string
-          user_id: uuid
+          user_id: string
         }
         Update: {
           content?: string
@@ -32,7 +32,7 @@ export type Database = {
           id?: number
           status?: string
           title?: string
-          user_id?: uuid
+          user_id?: string
         }
         Relationships: []
       }
@@ -120,7 +120,7 @@ export type Database = {
           time_of_day: string
           timezone: string | null
           updated_at: string
-          user_id: uuid | null
+          user_id: string | null
         }
         Insert: {
           created_at?: string
@@ -133,7 +133,7 @@ export type Database = {
           time_of_day: string
           timezone?: string | null
           updated_at?: string
-          user_id?: uuid | null
+          user_id?: string | null
         }
         Update: {
           created_at?: string
@@ -146,7 +146,7 @@ export type Database = {
           time_of_day?: string
           timezone?: string | null
           updated_at?: string
-          user_id?: uuid | null
+          user_id?: string | null
         }
         Relationships: [
           {
@@ -168,7 +168,7 @@ export type Database = {
           status: string
           timezone: string | null
           updated_at: string
-          user_id: uuid
+          user_id: string
         }
         Insert: {
           content_id?: number | null
@@ -179,7 +179,7 @@ export type Database = {
           status?: string
           timezone?: string | null
           updated_at?: string
-          user_id: uuid
+          user_id: string
         }
         Update: {
           content_id?: number | null
@@ -190,7 +190,7 @@ export type Database = {
           status?: string
           timezone?: string | null
           updated_at?: string
-          user_id?: uuid
+          user_id?: string
         }
         Relationships: [
           {
@@ -240,12 +240,12 @@ export type Database = {
           created_at: string | null
           expires_at: string | null
           facebook_profile_data: Json | null
-          facebook_user_id: uuid | null
+          facebook_user_id: string | null
           id: string
           long_lived_token: string | null
           redirect_uri: string | null
           updated_at: string | null
-          user_id: uuid
+          user_id: string
         }
         Insert: {
           access_token?: string | null
@@ -254,12 +254,12 @@ export type Database = {
           created_at?: string | null
           expires_at?: string | null
           facebook_profile_data?: Json | null
-          facebook_user_id?: uuid | null
+          facebook_user_id?: string | null
           id?: string
           long_lived_token?: string | null
           redirect_uri?: string | null
           updated_at?: string | null
-          user_id: uuid
+          user_id: string
         }
         Update: {
           access_token?: string | null
@@ -268,12 +268,12 @@ export type Database = {
           created_at?: string | null
           expires_at?: string | null
           facebook_profile_data?: Json | null
-          facebook_user_id?: uuid | null
+          facebook_user_id?: string | null
           id?: string
           long_lived_token?: string | null
           redirect_uri?: string | null
           updated_at?: string | null
-          user_id?: uuid
+          user_id?: string
         }
         Relationships: []
       }
@@ -286,11 +286,11 @@ export type Database = {
           expires_at: string | null
           id: string
           instagram_profile_data: Json | null
-          instagram_user_id: uuid | null
+          instagram_user_id: string | null
           long_lived_token: string | null
           redirect_uri: string | null
           updated_at: string | null
-          user_id: uuid
+          user_id: string
         }
         Insert: {
           access_token?: string | null
@@ -300,11 +300,11 @@ export type Database = {
           expires_at?: string | null
           id?: string
           instagram_profile_data?: Json | null
-          instagram_user_id?: uuid | null
+          instagram_user_id?: string | null
           long_lived_token?: string | null
           redirect_uri?: string | null
           updated_at?: string | null
-          user_id: uuid
+          user_id: string
         }
         Update: {
           access_token?: string | null
@@ -314,11 +314,11 @@ export type Database = {
           expires_at?: string | null
           id?: string
           instagram_profile_data?: Json | null
-          instagram_user_id?: uuid | null
+          instagram_user_id?: string | null
           long_lived_token?: string | null
           redirect_uri?: string | null
           updated_at?: string | null
-          user_id?: uuid
+          user_id?: string
         }
         Relationships: []
       }
@@ -335,7 +335,7 @@ export type Database = {
           redirect_uri: string | null
           refresh_token: string | null
           updated_at: string | null
-          user_id: uuid
+          user_id: string
         }
         Insert: {
           access_token?: string | null
@@ -349,7 +349,7 @@ export type Database = {
           redirect_uri?: string | null
           refresh_token?: string | null
           updated_at?: string | null
-          user_id: uuid
+          user_id: string
         }
         Update: {
           access_token?: string | null
@@ -363,7 +363,7 @@ export type Database = {
           redirect_uri?: string | null
           refresh_token?: string | null
           updated_at?: string | null
-          user_id?: uuid
+          user_id?: string
         }
         Relationships: []
       }
@@ -379,7 +379,7 @@ export type Database = {
           plan_id: string | null
           status: string
           updated_at: string
-          user_id: uuid
+          user_id: string
         }
         Insert: {
           active_till: string
@@ -392,7 +392,7 @@ export type Database = {
           plan_id?: string | null
           status?: string
           updated_at?: string
-          user_id: uuid
+          user_id: string
         }
         Update: {
           active_till?: string
@@ -405,7 +405,7 @@ export type Database = {
           plan_id?: string | null
           status?: string
           updated_at?: string
-          user_id?: uuid
+          user_id?: string
         }
         Relationships: [
           {
