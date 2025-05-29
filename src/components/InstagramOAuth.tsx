@@ -44,7 +44,7 @@ const InstagramOAuth = () => {
         const { data, error } = await supabase
           .from('user_instagram_credentials')
           .select('client_id, access_token, instagram_profile_data, redirect_uri')
-          .eq('user_id', user.id as string)
+          .eq('user_id', user.id as any)
           .maybeSingle();
 
         if (error) throw error;
