@@ -50,7 +50,7 @@ const InstagramOAuth = () => {
         const { data, error } = await supabase
           .from('user_instagram_credentials')
           .select('client_id, access_token, instagram_profile_data, redirect_uri')
-          .eq('user_id', user.id)
+          .eq('user_id', user.id as string)
           .maybeSingle();
 
         if (error) {
@@ -127,7 +127,7 @@ const InstagramOAuth = () => {
           const { data: credentials } = await supabase
             .from('user_instagram_credentials')
             .select('redirect_uri')
-            .eq('user_id', user.id)
+            .eq('user_id', user.id as string)
             .maybeSingle();
 
           const finalRedirectUri = (credentials && credentials.redirect_uri) ||
@@ -187,7 +187,7 @@ const InstagramOAuth = () => {
       const { data: credentials, error: credentialsError } = await supabase
         .from('user_instagram_credentials')
         .select('client_id, redirect_uri')
-        .eq('user_id', user.id)
+        .eq('user_id', user.id as string)
         .maybeSingle();
 
       if (credentialsError) {
@@ -231,15 +231,13 @@ const InstagramOAuth = () => {
 
       const { error } = await supabase
         .from('user_instagram_credentials')
-        .update({
-          access_token: null,
-          long_lived_token: null,
-          expires_at: null,
-          instagram_user_id: null,
-          instagram_profile_data: null
-        })
-        .eq('user_id', user.id);
-
+        .update({ access_token: null, 
+                  long_lived_token: null, 
+                  expires_at: null, 
+                  instagram_user_id: null, 
+                  instagram_profile_data: null 
+                } as any)
+        .eq('user_id', user.id as string)
       if (error) throw error;
 
       setIsConnected(false);
