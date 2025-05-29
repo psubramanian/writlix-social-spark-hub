@@ -12,6 +12,24 @@ interface FacebookProfileData {
   [key: string]: any;
 }
 
+function isFacebookCredentialData(
+  obj: any
+): obj is {
+  client_id: string;
+  client_secret: string;
+  redirect_uri: string;
+  access_token: string;
+  facebook_profile_data: any;
+} {
+  return (
+    obj &&
+    typeof obj === "object" &&
+    "client_id" in obj &&
+    "client_secret" in obj &&
+    "redirect_uri" in obj
+  );
+}
+
 const FacebookOAuth = () => {
   const [isConnected, setIsConnected] = useState(false);
   const [loading, setLoading] = useState(true);
@@ -21,29 +39,24 @@ const FacebookOAuth = () => {
   const { user } = useAuth();
   const [credentialsPresent, setCredentialsPresent] = useState(false);
   const [redirectUri, setRedirectUri] = useState('');
-  
+
   useEffect(() => {
     const checkConnection = async () => {
       if (!user?.id) {
         setLoading(false);
         return;
       }
-      
+
       try {
         const data = await credentialsOperations.facebook.fetch(user.id);
-          
-        if (data) {
+
+        if (isFacebookCredentialData(data)) {
           setCredentialsPresent(!!data.client_id);
-          
-          if (data.redirect_uri) {
-            setRedirectUri(data.redirect_uri);
-          } else {
-            setRedirectUri(window.location.origin + window.location.pathname);
-          }
-          
+          setRedirectUri(data.redirect_uri || (window.location.origin + window.location.pathname));
+
           if (data.access_token) {
             setIsConnected(true);
-            
+
             if (data.facebook_profile_data) {
               const profileData = data.facebook_profile_data as FacebookProfileData;
               if (profileData && typeof profileData === 'object' && profileData.name) {
@@ -66,24 +79,22 @@ const FacebookOAuth = () => {
         setLoading(false);
       }
     };
-    
+
     checkConnection();
   }, [user, toast]);
-  
+
   useEffect(() => {
-    // Handle the OAuth callback
     const handleOAuthCallback = async () => {
       const url = new URL(window.location.href);
       const code = url.searchParams.get('code');
       const state = url.searchParams.get('state');
       const error = url.searchParams.get('error');
       const savedState = sessionStorage.getItem('facebook_state');
-      
-      // Clean up URL after processing
+
       if (code || error) {
         window.history.replaceState({}, document.title, window.location.pathname);
       }
-      
+
       if (error) {
         toast({
           title: "Facebook Connection Failed",
@@ -92,7 +103,7 @@ const FacebookOAuth = () => {
         });
         return;
       }
-      
+
       if (code && state && (!savedState || state !== savedState)) {
         toast({
           title: "OAuth State Mismatch",
@@ -101,20 +112,21 @@ const FacebookOAuth = () => {
         });
         return;
       }
-      
+
       if (code && state && savedState && state === savedState && user?.id) {
         setConnecting(true);
         try {
           sessionStorage.removeItem('facebook_state');
-          
+
           const credentials = await credentialsOperations.facebook.fetch(user.id);
-            
-          const finalRedirectUri = (credentials && credentials.redirect_uri) || 
-            (window.location.origin + window.location.pathname);
-            
+
+          const finalRedirectUri =
+            isFacebookCredentialData(credentials) && credentials.redirect_uri
+              ? credentials.redirect_uri
+              : window.location.origin + window.location.pathname;
+
           console.log('Using redirect URI:', finalRedirectUri);
-          
-          // Make edge function call here - keeping existing logic
+
           const { data, error } = await fetch('/api/facebook-oauth', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
@@ -125,13 +137,13 @@ const FacebookOAuth = () => {
               redirect_uri: finalRedirectUri
             })
           }).then(res => res.json());
-          
+
           if (error) throw error;
-          
+
           if (data.success) {
             setIsConnected(true);
             setProfileName(data.profile.name);
-            
+
             toast({
               title: "Facebook Connected",
               description: "Your Facebook account has been successfully connected",
@@ -151,10 +163,10 @@ const FacebookOAuth = () => {
         }
       }
     };
-    
+
     handleOAuthCallback();
   }, [toast, user]);
-  
+
   const handleConnect = async () => {
     try {
       if (!user?.id) {
@@ -165,10 +177,10 @@ const FacebookOAuth = () => {
         });
         return;
       }
-      
+
       const credentials = await credentialsOperations.facebook.fetch(user.id);
-        
-      if (!credentials || !credentials.client_id) {
+
+      if (!isFacebookCredentialData(credentials)) {
         toast({
           title: "Facebook Credentials Missing",
           description: "Please add your Facebook API credentials in the Settings page first",
@@ -176,17 +188,17 @@ const FacebookOAuth = () => {
         });
         return;
       }
-      
+
       const state = generateRandomString();
       sessionStorage.setItem('facebook_state', state);
-      
+
       const finalRedirectUri = credentials.redirect_uri || (window.location.origin + window.location.pathname);
-      
       const encodedRedirectUri = encodeURIComponent(finalRedirectUri);
-      console.log('Using redirect URI:', finalRedirectUri);      
-      
+
+      console.log('Using redirect URI:', finalRedirectUri);
+
       const facebookAuthUrl = `https://www.facebook.com/v18.0/dialog/oauth?client_id=${credentials.client_id}&redirect_uri=${encodedRedirectUri}&state=${state}&scope=pages_show_list,pages_read_engagement,pages_manage_posts,public_profile`;
-      
+
       window.location.href = facebookAuthUrl;
     } catch (error: any) {
       console.error('Error initiating Facebook connection:', error);
@@ -197,11 +209,11 @@ const FacebookOAuth = () => {
       });
     }
   };
-  
+
   const handleDisconnect = async () => {
     try {
       if (!user?.id) return;
-      
+
       const { error } = await credentialsOperations.facebook.updateTokens(user.id, {
         access_token: null,
         long_lived_token: null,
@@ -209,12 +221,12 @@ const FacebookOAuth = () => {
         facebook_user_id: null,
         facebook_profile_data: null
       });
-        
+
       if (error) throw error;
-      
+
       setIsConnected(false);
       setProfileName('');
-      
+
       toast({
         title: "Facebook Disconnected",
         description: "Your Facebook account has been disconnected",
@@ -245,7 +257,7 @@ const FacebookOAuth = () => {
       </div>
     );
   }
-  
+
   if (connecting) {
     return (
       <div className="space-y-4">
@@ -270,14 +282,14 @@ const FacebookOAuth = () => {
               Your Facebook account ({profileName || 'Facebook User'}) is successfully connected to Writlix.
             </AlertDescription>
           </Alert>
-          
+
           <div className="flex items-center justify-between p-4 border rounded-md">
             <div>
               <h3 className="font-medium">Facebook</h3>
               <p className="text-sm text-muted-foreground">Connected account</p>
             </div>
-            <Button 
-              variant="outline" 
+            <Button
+              variant="outline"
               onClick={handleDisconnect}
               className="text-red-500 hover:text-red-700 hover:border-red-200"
             >
@@ -291,11 +303,11 @@ const FacebookOAuth = () => {
             To connect your Facebook account, you'll need to authorize Writlix to post on your behalf.
             After clicking the button below, you'll be redirected to Facebook to complete the authorization.
           </p>
-          
+
           <Button onClick={handleConnect} disabled={!credentialsPresent}>
             Connect Facebook Account
           </Button>
-          
+
           <p className="text-xs text-muted-foreground mt-4">
             By connecting your Facebook account, you authorize Writlix to post content on your behalf.
             You can revoke this access at any time.
