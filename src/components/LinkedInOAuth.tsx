@@ -1,4 +1,3 @@
-
 import { useState, useEffect } from 'react';
 import { Button } from '@/components/ui/button';
 import { useToast } from '@/components/ui/use-toast';
@@ -6,13 +5,30 @@ import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { Loader2 } from "lucide-react";
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/contexts/auth';
-import { Json } from '@/integrations/supabase/types';
 
-// Define types for LinkedIn profile data to avoid TypeScript errors
+// LinkedIn profile structure
 interface LinkedInProfileData {
   localizedFirstName?: string;
   localizedLastName?: string;
   [key: string]: any;
+}
+
+// Supabase row structure
+interface LinkedInCredentialRow {
+  client_id: string;
+  redirect_uri?: string;
+  access_token?: string;
+  linkedin_profile_data?: LinkedInProfileData;
+}
+
+// Type guard
+function isLinkedInCredentialData(obj: any): obj is LinkedInCredentialRow {
+  return (
+    obj &&
+    typeof obj === "object" &&
+    "client_id" in obj &&
+    typeof obj.client_id === "string"
+  );
 }
 
 const LinkedInOAuth = () => {
@@ -24,46 +40,34 @@ const LinkedInOAuth = () => {
   const { user } = useAuth();
   const [credentialsPresent, setCredentialsPresent] = useState(false);
   const [redirectUri, setRedirectUri] = useState('');
-  
+
   useEffect(() => {
     const checkConnection = async () => {
       if (!user?.id) {
         setLoading(false);
         return;
       }
-      
+
       try {
-        // Check if we have LinkedIn credentials stored
         const { data, error } = await supabase
           .from('user_linkedin_credentials')
           .select('client_id, access_token, linkedin_profile_data, redirect_uri')
           .eq('user_id', user.id)
           .maybeSingle();
-          
-        if (error) {
-          console.error('Error checking LinkedIn connection:', error);
-          throw error;
-        }
-        
-        // Only access data properties if data exists and is not an error
-        if (data && typeof data === 'object') {
+
+        if (error) throw error;
+
+        if (isLinkedInCredentialData(data)) {
           setCredentialsPresent(!!data.client_id);
-          
-          if (data.redirect_uri) {
-            setRedirectUri(data.redirect_uri);
-          } else {
-            setRedirectUri(window.location.origin + window.location.pathname);
-          }
-          
+          setRedirectUri(data.redirect_uri || (window.location.origin + window.location.pathname));
+
           if (data.access_token) {
             setIsConnected(true);
-            
-            if (data.linkedin_profile_data) {
-              // Safely access linkedin_profile_data
-              const profileData = data.linkedin_profile_data as LinkedInProfileData;
-              if (profileData && typeof profileData === 'object' && profileData.localizedFirstName) {
-                setProfileName(`${profileData.localizedFirstName} ${profileData.localizedLastName || ''}`);
-              }
+
+            const profile = data.linkedin_profile_data;
+            if (profile && typeof profile === 'object') {
+              const name = `${profile.localizedFirstName || ''} ${profile.localizedLastName || ''}`.trim();
+              setProfileName(name || 'LinkedIn User');
             }
           }
         } else {
@@ -81,24 +85,22 @@ const LinkedInOAuth = () => {
         setLoading(false);
       }
     };
-    
+
     checkConnection();
   }, [user, toast]);
-  
+
   useEffect(() => {
-    // Handle the OAuth callback
     const handleOAuthCallback = async () => {
       const url = new URL(window.location.href);
       const code = url.searchParams.get('code');
       const state = url.searchParams.get('state');
       const error = url.searchParams.get('error');
       const savedState = sessionStorage.getItem('linkedin_state');
-      
-      // Clean up URL after processing
+
       if (code || error) {
         window.history.replaceState({}, document.title, window.location.pathname);
       }
-      
+
       if (error) {
         toast({
           title: "LinkedIn Connection Failed",
@@ -107,7 +109,7 @@ const LinkedInOAuth = () => {
         });
         return;
       }
-      
+
       if (code && state && (!savedState || state !== savedState)) {
         toast({
           title: "OAuth State Mismatch",
@@ -116,42 +118,36 @@ const LinkedInOAuth = () => {
         });
         return;
       }
-      
+
       if (code && state && savedState && state === savedState && user?.id) {
         setConnecting(true);
         try {
-          // Clear the state from session storage
           sessionStorage.removeItem('linkedin_state');
-          
-          // Get user's configured redirect URI
+
           const { data: credentials } = await supabase
             .from('user_linkedin_credentials')
             .select('redirect_uri')
             .eq('user_id', user.id)
             .maybeSingle();
-            
-          // Use custom redirect URI if available, otherwise use default
-          const finalRedirectUri = (credentials && credentials.redirect_uri) || 
+
+          const finalRedirectUri = (credentials && credentials.redirect_uri) ||
             (window.location.origin + window.location.pathname);
-            
-          console.log('Using redirect URI:', finalRedirectUri);
-          
-          // Exchange the code for an access token
+
           const { data, error } = await supabase.functions.invoke('linkedin-oauth', {
-            body: { 
+            body: {
               code,
               state,
               user_id: user.id,
               redirect_uri: finalRedirectUri
             }
           });
-          
+
           if (error) throw error;
-          
+
           if (data.success) {
             setIsConnected(true);
             setProfileName(data.profile.name);
-            
+
             toast({
               title: "LinkedIn Connected",
               description: "Your LinkedIn account has been successfully connected",
@@ -171,10 +167,10 @@ const LinkedInOAuth = () => {
         }
       }
     };
-    
+
     handleOAuthCallback();
   }, [toast, user]);
-  
+
   const handleConnect = async () => {
     try {
       if (!user?.id) {
@@ -185,21 +181,16 @@ const LinkedInOAuth = () => {
         });
         return;
       }
-      
-      // Get user's LinkedIn credentials
+
       const { data: credentials, error: credentialsError } = await supabase
         .from('user_linkedin_credentials')
         .select('client_id, redirect_uri')
         .eq('user_id', user.id)
         .maybeSingle();
-        
-      if (credentialsError) {
-        console.error('Error fetching LinkedIn credentials:', credentialsError);
-        throw credentialsError;
-      }
-      
-      // Check if credentials exist and have a client_id
-      if (!credentials || !credentials.client_id) {
+
+      if (credentialsError) throw credentialsError;
+
+      if (!isLinkedInCredentialData(credentials)) {
         toast({
           title: "LinkedIn Credentials Missing",
           description: "Please add your LinkedIn API credentials in the Settings page first",
@@ -207,21 +198,15 @@ const LinkedInOAuth = () => {
         });
         return;
       }
-      
-      // Generate and store state parameter for security
+
       const state = generateRandomString();
       sessionStorage.setItem('linkedin_state', state);
-      
-      // Use custom redirect URI if available, default to current page otherwise
+
       const finalRedirectUri = credentials.redirect_uri || (window.location.origin + window.location.pathname);
-      
-      // Get the redirect URI
       const encodedRedirectUri = encodeURIComponent(finalRedirectUri);
-      console.log('Using redirect URI:', finalRedirectUri);
-      
-      // Redirect to LinkedIn authorization page
+
       const linkedInAuthUrl = `https://www.linkedin.com/oauth/v2/authorization?response_type=code&client_id=${credentials.client_id}&redirect_uri=${encodedRedirectUri}&state=${state}&scope=r_liteprofile%20r_emailaddress%20w_member_social`;
-      
+
       window.location.href = linkedInAuthUrl;
     } catch (error: any) {
       console.error('Error initiating LinkedIn connection:', error);
@@ -232,15 +217,14 @@ const LinkedInOAuth = () => {
       });
     }
   };
-  
+
   const handleDisconnect = async () => {
     try {
       if (!user?.id) return;
-      
-      // Update LinkedIn credentials to remove access token
+
       const { error } = await supabase
         .from('user_linkedin_credentials')
-        .update({ 
+        .update({
           access_token: null,
           refresh_token: null,
           expires_at: null,
@@ -248,12 +232,12 @@ const LinkedInOAuth = () => {
           linkedin_profile_data: null
         })
         .eq('user_id', user.id);
-        
+
       if (error) throw error;
-      
+
       setIsConnected(false);
       setProfileName('');
-      
+
       toast({
         title: "LinkedIn Disconnected",
         description: "Your LinkedIn account has been disconnected",
@@ -268,7 +252,6 @@ const LinkedInOAuth = () => {
     }
   };
 
-  // Generate a random string for the state parameter
   const generateRandomString = (length = 20) => {
     const charset = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789';
     let result = '';
@@ -285,7 +268,7 @@ const LinkedInOAuth = () => {
       </div>
     );
   }
-  
+
   if (connecting) {
     return (
       <div className="space-y-4">
@@ -310,14 +293,14 @@ const LinkedInOAuth = () => {
               Your LinkedIn account ({profileName || 'LinkedIn User'}) is successfully connected to Writlix.
             </AlertDescription>
           </Alert>
-          
+
           <div className="flex items-center justify-between p-4 border rounded-md">
             <div>
               <h3 className="font-medium">LinkedIn</h3>
               <p className="text-sm text-muted-foreground">Connected account</p>
             </div>
-            <Button 
-              variant="outline" 
+            <Button
+              variant="outline"
               onClick={handleDisconnect}
               className="text-red-500 hover:text-red-700 hover:border-red-200"
             >
@@ -331,11 +314,11 @@ const LinkedInOAuth = () => {
             To connect your LinkedIn account, you'll need to authorize Writlix to post on your behalf.
             After clicking the button below, you'll be redirected to LinkedIn to complete the authorization.
           </p>
-          
+
           <Button onClick={handleConnect} disabled={!credentialsPresent}>
             Connect LinkedIn Account
           </Button>
-          
+
           <p className="text-xs text-muted-foreground mt-4">
             By connecting your LinkedIn account, you authorize Writlix to post content on your behalf.
             You can revoke this access at any time.
