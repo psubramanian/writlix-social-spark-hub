@@ -52,7 +52,7 @@ const LinkedInOAuth = () => {
         const { data, error } = await supabase
           .from('user_linkedin_credentials')
           .select('client_id, access_token, linkedin_profile_data, redirect_uri')
-          .eq('user_id', user.id)
+          .eq('user_id', user.id as any)
           .maybeSingle();
 
         if (error) throw error;
@@ -127,7 +127,7 @@ const LinkedInOAuth = () => {
           const { data: credentials } = await supabase
             .from('user_linkedin_credentials')
             .select('redirect_uri')
-            .eq('user_id', user.id)
+            .eq('user_id', user.id as any)
             .maybeSingle();
 
           const finalRedirectUri = (credentials && credentials.redirect_uri) ||

@@ -16,7 +16,7 @@ export type Database = {
           id: number
           status: string
           title: string
-          user_id: string
+          user_id: uuid
         }
         Insert: {
           content: string
@@ -24,7 +24,7 @@ export type Database = {
           id?: number
           status: string
           title: string
-          user_id: string
+          user_id: uuid
         }
         Update: {
           content?: string
@@ -120,7 +120,7 @@ export type Database = {
           time_of_day: string
           timezone: string | null
           updated_at: string
-          user_id: string | null
+          user_id: uuid | null
         }
         Insert: {
           created_at?: string
@@ -168,7 +168,7 @@ export type Database = {
           status: string
           timezone: string | null
           updated_at: string
-          user_id: string
+          user_id: uuid
         }
         Insert: {
           content_id?: number | null
@@ -179,7 +179,7 @@ export type Database = {
           status?: string
           timezone?: string | null
           updated_at?: string
-          user_id: string
+          user_id: uuid
         }
         Update: {
           content_id?: number | null
@@ -240,12 +240,12 @@ export type Database = {
           created_at: string | null
           expires_at: string | null
           facebook_profile_data: Json | null
-          facebook_user_id: string | null
+          facebook_user_id: uuid | null
           id: string
           long_lived_token: string | null
           redirect_uri: string | null
           updated_at: string | null
-          user_id: string
+          user_id: uuid
         }
         Insert: {
           access_token?: string | null
@@ -259,7 +259,7 @@ export type Database = {
           long_lived_token?: string | null
           redirect_uri?: string | null
           updated_at?: string | null
-          user_id: string
+          user_id: uuid
         }
         Update: {
           access_token?: string | null
@@ -286,11 +286,11 @@ export type Database = {
           expires_at: string | null
           id: string
           instagram_profile_data: Json | null
-          instagram_user_id: string | null
+          instagram_user_id: uuid | null
           long_lived_token: string | null
           redirect_uri: string | null
           updated_at: string | null
-          user_id: string
+          user_id: uuid
         }
         Insert: {
           access_token?: string | null
@@ -304,7 +304,7 @@ export type Database = {
           long_lived_token?: string | null
           redirect_uri?: string | null
           updated_at?: string | null
-          user_id: string
+          user_id: uuid
         }
         Update: {
           access_token?: string | null
@@ -335,7 +335,7 @@ export type Database = {
           redirect_uri: string | null
           refresh_token: string | null
           updated_at: string | null
-          user_id: string
+          user_id: uuid
         }
         Insert: {
           access_token?: string | null
@@ -349,7 +349,7 @@ export type Database = {
           redirect_uri?: string | null
           refresh_token?: string | null
           updated_at?: string | null
-          user_id: string
+          user_id: uuid
         }
         Update: {
           access_token?: string | null
@@ -379,7 +379,7 @@ export type Database = {
           plan_id: string | null
           status: string
           updated_at: string
-          user_id: string
+          user_id: uuid
         }
         Insert: {
           active_till: string
@@ -392,7 +392,7 @@ export type Database = {
           plan_id?: string | null
           status?: string
           updated_at?: string
-          user_id: string
+          user_id: uuid
         }
         Update: {
           active_till?: string
