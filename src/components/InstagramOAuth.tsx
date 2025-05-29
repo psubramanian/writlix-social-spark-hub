@@ -1,4 +1,3 @@
-
 import { useState, useEffect } from 'react';
 import { Button } from '@/components/ui/button';
 import { useToast } from '@/components/ui/use-toast';
@@ -6,13 +5,28 @@ import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { Loader2 } from "lucide-react";
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/contexts/auth';
-import { Json } from '@/integrations/supabase/types';
 
 // Define types for Instagram profile data
 interface InstagramProfileData {
   username?: string;
   id?: string;
   [key: string]: any;
+}
+
+interface InstagramCredentialRow {
+  client_id: string;
+  redirect_uri?: string;
+  access_token?: string;
+  instagram_profile_data?: InstagramProfileData;
+}
+
+function isInstagramCredentialData(obj: any): obj is InstagramCredentialRow {
+  return (
+    obj &&
+    typeof obj === 'object' &&
+    'client_id' in obj &&
+    typeof obj.client_id === 'string'
+  );
 }
 
 const InstagramOAuth = () => {
@@ -24,46 +38,36 @@ const InstagramOAuth = () => {
   const { user } = useAuth();
   const [credentialsPresent, setCredentialsPresent] = useState(false);
   const [redirectUri, setRedirectUri] = useState('');
-  
+
   useEffect(() => {
     const checkConnection = async () => {
       if (!user?.id) {
         setLoading(false);
         return;
       }
-      
+
       try {
-        // Check if we have Instagram credentials stored
         const { data, error } = await supabase
           .from('user_instagram_credentials')
           .select('client_id, access_token, instagram_profile_data, redirect_uri')
           .eq('user_id', user.id)
           .maybeSingle();
-          
+
         if (error) {
           console.error('Error checking Instagram connection:', error);
           throw error;
         }
-        
-        // Only access data properties if data exists
-        if (data && typeof data === 'object') {
+
+        if (isInstagramCredentialData(data)) {
           setCredentialsPresent(!!data.client_id);
-          
-          if (data.redirect_uri) {
-            setRedirectUri(data.redirect_uri);
-          } else {
-            setRedirectUri(window.location.origin + window.location.pathname);
-          }
-          
+          setRedirectUri(data.redirect_uri || (window.location.origin + window.location.pathname));
+
           if (data.access_token) {
             setIsConnected(true);
-            
-            if (data.instagram_profile_data) {
-              // Safely access instagram_profile_data
-              const profileData = data.instagram_profile_data as InstagramProfileData;
-              if (profileData && typeof profileData === 'object' && profileData.username) {
-                setProfileName(profileData.username);
-              }
+
+            const profileData = data.instagram_profile_data;
+            if (profileData && typeof profileData === 'object' && profileData.username) {
+              setProfileName(profileData.username);
             }
           }
         } else {
@@ -81,24 +85,22 @@ const InstagramOAuth = () => {
         setLoading(false);
       }
     };
-    
+
     checkConnection();
   }, [user, toast]);
-  
+
   useEffect(() => {
-    // Handle the OAuth callback
     const handleOAuthCallback = async () => {
       const url = new URL(window.location.href);
       const code = url.searchParams.get('code');
       const state = url.searchParams.get('state');
       const error = url.searchParams.get('error');
       const savedState = sessionStorage.getItem('instagram_state');
-      
-      // Clean up URL after processing
+
       if (code || error) {
         window.history.replaceState({}, document.title, window.location.pathname);
       }
-      
+
       if (error) {
         toast({
           title: "Instagram Connection Failed",
@@ -107,7 +109,7 @@ const InstagramOAuth = () => {
         });
         return;
       }
-      
+
       if (code && state && (!savedState || state !== savedState)) {
         toast({
           title: "OAuth State Mismatch",
@@ -116,42 +118,38 @@ const InstagramOAuth = () => {
         });
         return;
       }
-      
+
       if (code && state && savedState && state === savedState && user?.id) {
         setConnecting(true);
         try {
-          // Clear the state from session storage
           sessionStorage.removeItem('instagram_state');
-          
-          // Get user's configured redirect URI
+
           const { data: credentials } = await supabase
             .from('user_instagram_credentials')
             .select('redirect_uri')
             .eq('user_id', user.id)
             .maybeSingle();
-            
-          // Use custom redirect URI if available, otherwise use default
-          const finalRedirectUri = (credentials && credentials.redirect_uri) || 
+
+          const finalRedirectUri = (credentials && credentials.redirect_uri) ||
             (window.location.origin + window.location.pathname);
-            
-          console.log('Using redirect URI:', finalRedirectUri);     
-          
-          // Exchange the code for an access token
+
+          console.log('Using redirect URI:', finalRedirectUri);
+
           const { data, error } = await supabase.functions.invoke('instagram-oauth', {
-            body: { 
+            body: {
               code,
               state,
               user_id: user.id,
               redirect_uri: finalRedirectUri
             }
           });
-          
+
           if (error) throw error;
-          
+
           if (data.success) {
             setIsConnected(true);
             setProfileName(data.profile.username || data.profile.name);
-            
+
             toast({
               title: "Instagram Connected",
               description: "Your Instagram account has been successfully connected",
@@ -171,10 +169,10 @@ const InstagramOAuth = () => {
         }
       }
     };
-    
+
     handleOAuthCallback();
   }, [toast, user]);
-  
+
   const handleConnect = async () => {
     try {
       if (!user?.id) {
@@ -185,21 +183,19 @@ const InstagramOAuth = () => {
         });
         return;
       }
-      
-      // Get user's Instagram credentials
+
       const { data: credentials, error: credentialsError } = await supabase
         .from('user_instagram_credentials')
         .select('client_id, redirect_uri')
         .eq('user_id', user.id)
         .maybeSingle();
-        
+
       if (credentialsError) {
         console.error('Error fetching Instagram credentials:', credentialsError);
         throw credentialsError;
       }
-      
-      // Check if credentials exist and have a client_id
-      if (!credentials || !credentials.client_id) {
+
+      if (!isInstagramCredentialData(credentials)) {
         toast({
           title: "Instagram Credentials Missing",
           description: "Please add your Instagram API credentials in the Settings page first",
@@ -207,21 +203,17 @@ const InstagramOAuth = () => {
         });
         return;
       }
-      
-      // Generate and store state parameter for security
+
       const state = generateRandomString();
       sessionStorage.setItem('instagram_state', state);
-      
-      // Use custom redirect URI if available, default to current page otherwise
+
       const finalRedirectUri = credentials.redirect_uri || (window.location.origin + window.location.pathname);
-      
-      // Get the redirect URI
       const encodedRedirectUri = encodeURIComponent(finalRedirectUri);
-      console.log('Using redirect URI:', finalRedirectUri);      
-      
-      // Redirect to Instagram authorization page via Facebook (Instagram uses Facebook OAuth)
+
+      console.log('Using redirect URI:', finalRedirectUri);
+
       const instagramAuthUrl = `https://api.instagram.com/oauth/authorize?client_id=${credentials.client_id}&redirect_uri=${encodedRedirectUri}&scope=user_profile,user_media&response_type=code&state=${state}`;
-      
+
       window.location.href = instagramAuthUrl;
     } catch (error: any) {
       console.error('Error initiating Instagram connection:', error);
@@ -232,15 +224,14 @@ const InstagramOAuth = () => {
       });
     }
   };
-  
+
   const handleDisconnect = async () => {
     try {
       if (!user?.id) return;
-      
-      // Update Instagram credentials to remove access token
+
       const { error } = await supabase
         .from('user_instagram_credentials')
-        .update({ 
+        .update({
           access_token: null,
           long_lived_token: null,
           expires_at: null,
@@ -248,12 +239,12 @@ const InstagramOAuth = () => {
           instagram_profile_data: null
         })
         .eq('user_id', user.id);
-        
+
       if (error) throw error;
-      
+
       setIsConnected(false);
       setProfileName('');
-      
+
       toast({
         title: "Instagram Disconnected",
         description: "Your Instagram account has been disconnected",
@@ -268,7 +259,6 @@ const InstagramOAuth = () => {
     }
   };
 
-  // Generate a random string for the state parameter
   const generateRandomString = (length = 20) => {
     const charset = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789';
     let result = '';
@@ -285,7 +275,7 @@ const InstagramOAuth = () => {
       </div>
     );
   }
-  
+
   if (connecting) {
     return (
       <div className="space-y-4">
@@ -310,14 +300,14 @@ const InstagramOAuth = () => {
               Your Instagram account ({profileName || 'Instagram User'}) is successfully connected to Writlix.
             </AlertDescription>
           </Alert>
-          
+
           <div className="flex items-center justify-between p-4 border rounded-md">
             <div>
               <h3 className="font-medium">Instagram</h3>
               <p className="text-sm text-muted-foreground">Connected account</p>
             </div>
-            <Button 
-              variant="outline" 
+            <Button
+              variant="outline"
               onClick={handleDisconnect}
               className="text-red-500 hover:text-red-700 hover:border-red-200"
             >
@@ -331,11 +321,11 @@ const InstagramOAuth = () => {
             To connect your Instagram account, you'll need to authorize Writlix to post on your behalf.
             After clicking the button below, you'll be redirected to Instagram to complete the authorization.
           </p>
-          
+
           <Button onClick={handleConnect} disabled={!credentialsPresent}>
             Connect Instagram Account
           </Button>
-          
+
           <p className="text-xs text-muted-foreground mt-4">
             By connecting your Instagram account, you authorize Writlix to post content on your behalf.
             You can revoke this access at any time.
