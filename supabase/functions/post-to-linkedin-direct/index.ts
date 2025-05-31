@@ -21,6 +21,11 @@ serve(async (req) => {
     
     const { content, userId } = await req.json();
     
+    console.log('LinkedIn posting request received:', {
+      userId: userId || 'missing',
+      contentLength: content ? content.length : 0
+    });
+    
     if (!content) {
       throw new Error('Content is required');
     }
@@ -37,32 +42,50 @@ serve(async (req) => {
       .maybeSingle();
       
     if (credentialsError || !credentials || !credentials.access_token) {
+      console.error('LinkedIn credentials error:', credentialsError);
       throw new Error('LinkedIn access token not found. Please reconnect your LinkedIn account.');
     }
+
+    console.log('LinkedIn credentials found:', {
+      access_token: credentials.access_token ? 'present' : 'missing',
+      linkedin_profile_id: credentials.linkedin_profile_id || 'missing',
+      expires_at: credentials.expires_at || 'no expiration'
+    });
 
     // Check if token is expired
     if (credentials.expires_at) {
       const expiresAt = new Date(credentials.expires_at);
       const now = new Date();
       if (expiresAt < now) {
+        console.error('LinkedIn token expired:', {
+          expires_at: credentials.expires_at,
+          current_time: now.toISOString()
+        });
         throw new Error('LinkedIn access token has expired. Please reconnect your LinkedIn account.');
       }
     }
     
     // Validate that we can access LinkedIn profile before posting
     try {
+      console.log('Validating LinkedIn token...');
       const profileCheck = await fetch('https://api.linkedin.com/v2/userinfo', {
         headers: {
           'Authorization': `Bearer ${credentials.access_token}`,
         }
       });
       
+      console.log('LinkedIn token validation response status:', profileCheck.status);
+      
       if (!profileCheck.ok) {
         if (profileCheck.status === 401) {
+          console.error('LinkedIn token validation failed: 401 Unauthorized');
           throw new Error('LinkedIn authorization expired. Please reconnect your LinkedIn account.');
         }
+        console.error('LinkedIn token validation failed:', profileCheck.status);
         throw new Error('Failed to validate LinkedIn connection.');
       }
+      
+      console.log('LinkedIn token validation successful');
     } catch (validationError) {
       console.error('LinkedIn token validation failed:', validationError);
       throw new Error('LinkedIn authorization expired. Please reconnect your LinkedIn account.');
@@ -85,6 +108,8 @@ serve(async (req) => {
       }
     };
     
+    console.log('Posting to LinkedIn with author:', `urn:li:person:${credentials.linkedin_profile_id}`);
+    
     // Post content to LinkedIn
     const response = await fetch('https://api.linkedin.com/v2/ugcPosts', {
       method: 'POST',
@@ -97,6 +122,9 @@ serve(async (req) => {
     });
     
     const responseData = await response.json();
+    
+    console.log('LinkedIn posting response status:', response.status);
+    console.log('LinkedIn posting response:', responseData);
     
     if (!response.ok) {
       console.error('LinkedIn posting error:', responseData);

@@ -8,6 +8,7 @@ import { getCurrentUser } from '@/utils/supabaseUserUtils';
 import { parseISO } from 'date-fns';
 import { formatInTimeZone, toZonedTime } from 'date-fns-tz';
 import { Badge } from '@/components/ui/badge';
+import { isValidData } from '@/utils/supabaseHelpers';
 
 interface UpcomingPostsProps {
   scheduledPostsCount: number;
@@ -35,7 +36,7 @@ export function UpcomingPosts({ scheduledPostsCount }: UpcomingPostsProps) {
         const { data, error } = await supabase
           .from('schedule_settings')
           .select('timezone')
-          .eq('user_id', user.id)
+          .eq('user_id' as any, user.id as any)
           .maybeSingle();
 
         if (error) {
@@ -43,7 +44,7 @@ export function UpcomingPosts({ scheduledPostsCount }: UpcomingPostsProps) {
           return 'UTC';
         }
 
-        return data?.timezone || 'UTC';
+        return isValidData(data) && data.timezone ? data.timezone : 'UTC';
       } catch (error) {
         console.error('Error in fetchUserTimezone:', error);
         return 'UTC';
@@ -74,9 +75,9 @@ export function UpcomingPosts({ scheduledPostsCount }: UpcomingPostsProps) {
               status
             )
           `)
-          .eq('user_id', user.id)
-          .eq('status', 'pending')
-          .eq('content_ideas.status', 'Scheduled')
+          .eq('user_id' as any, user.id as any)
+          .eq('status' as any, 'pending' as any)
+          .eq('content_ideas.status' as any, 'Scheduled' as any)
           .order('next_run_at', { ascending: true });
 
         if (error) {
@@ -93,7 +94,10 @@ export function UpcomingPosts({ scheduledPostsCount }: UpcomingPostsProps) {
           const upcoming = [];
           
           for (const post of data) {
-            const contentId = post.content_ideas?.id;
+            if (!isValidData(post) || !post.content_ideas) continue;
+            
+            const contentIdea = Array.isArray(post.content_ideas) ? post.content_ideas[0] : post.content_ideas;
+            const contentId = contentIdea?.id;
             
             // Skip if we already have this content ID
             if (contentId && seenContentIds.has(contentId)) {
@@ -108,7 +112,7 @@ export function UpcomingPosts({ scheduledPostsCount }: UpcomingPostsProps) {
             
             const formattedPost = {
               id: post.id,
-              title: post.content_ideas?.title || 'Untitled Post',
+              title: contentIdea?.title || 'Untitled Post',
               nextRunAt: post.next_run_at,
               timezone: post.timezone || timezone
             };

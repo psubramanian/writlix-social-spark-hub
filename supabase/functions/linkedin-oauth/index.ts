@@ -20,6 +20,13 @@ serve(async (req) => {
     
     const { code, state, user_id, redirect_uri } = await req.json();
     
+    console.log('LinkedIn OAuth request received:', {
+      code: code ? code.substring(0, 10) + '...' : 'missing',
+      state: state || 'missing',
+      user_id: user_id || 'missing',
+      redirect_uri: redirect_uri || 'missing'
+    });
+    
     if (!code) {
       throw new Error('Authorization code is required');
     }
@@ -43,27 +50,55 @@ serve(async (req) => {
     // Use the provided redirect_uri or the one stored in the database
     const finalRedirectUri = redirect_uri || credentials.redirect_uri || `https://xhccvoivnelbzvzxmcoy.supabase.co/auth/v1/callback`;
     console.log('Using redirect_uri:', finalRedirectUri);
+    console.log('Client ID:', credentials.client_id);
     
     // Exchange the authorization code for an access token
+    const tokenParams = new URLSearchParams({
+      'grant_type': 'authorization_code',
+      'code': code,
+      'client_id': credentials.client_id,
+      'client_secret': credentials.client_secret,
+      'redirect_uri': finalRedirectUri,
+    });
+
+    console.log('Token exchange request params:', {
+      grant_type: 'authorization_code',
+      code: code.substring(0, 10) + '...',
+      client_id: credentials.client_id,
+      redirect_uri: finalRedirectUri
+    });
+
     const tokenResponse = await fetch('https://www.linkedin.com/oauth/v2/accessToken', {
       method: 'POST',
       headers: {
         'Content-Type': 'application/x-www-form-urlencoded',
       },
-      body: new URLSearchParams({
-        'grant_type': 'authorization_code',
-        'code': code,
-        'client_id': credentials.client_id,
-        'client_secret': credentials.client_secret,
-        'redirect_uri': finalRedirectUri,
-      }),
+      body: tokenParams,
     });
 
     const tokenData = await tokenResponse.json();
     
+    console.log('LinkedIn token response status:', tokenResponse.status);
+    console.log('LinkedIn token response:', {
+      access_token: tokenData.access_token ? 'present' : 'missing',
+      expires_in: tokenData.expires_in,
+      scope: tokenData.scope,
+      error: tokenData.error,
+      error_description: tokenData.error_description
+    });
+    
     if (!tokenResponse.ok || !tokenData.access_token) {
       console.error('LinkedIn token exchange failed:', tokenData);
-      throw new Error(tokenData.error_description || 'Failed to exchange authorization code for access token');
+      
+      if (tokenData.error === 'invalid_grant') {
+        throw new Error('LinkedIn authorization code has expired or is invalid. Please try connecting again.');
+      }
+      
+      if (tokenData.error === 'invalid_redirect_uri') {
+        throw new Error(`LinkedIn redirect URI mismatch. Expected: ${finalRedirectUri}. Please check your LinkedIn app configuration.`);
+      }
+      
+      throw new Error(tokenData.error_description || tokenData.error || 'Failed to exchange authorization code for access token');
     }
 
     console.log('Successfully obtained LinkedIn access token');
@@ -77,10 +112,13 @@ serve(async (req) => {
 
     const profileData = await profileResponse.json();
     
+    console.log('LinkedIn profile response status:', profileResponse.status);
+    
     if (!profileResponse.ok) {
       console.error('Failed to fetch LinkedIn profile:', profileData);
       
       // Fallback to older API if new one fails
+      console.log('Attempting fallback to v2/me endpoint');
       const fallbackResponse = await fetch('https://api.linkedin.com/v2/me', {
         headers: {
           'Authorization': `Bearer ${tokenData.access_token}`,
@@ -89,13 +127,15 @@ serve(async (req) => {
       
       if (fallbackResponse.ok) {
         const fallbackData = await fallbackResponse.json();
+        console.log('Fallback profile data received');
         Object.assign(profileData, fallbackData);
       } else {
+        console.error('Fallback profile fetch also failed');
         throw new Error('Failed to verify LinkedIn connection and retrieve profile');
       }
     }
 
-    // Verify that the user has granted the w_member_social permission
+    // Verify that the user has the necessary permissions
     try {
       const permissionsResponse = await fetch('https://api.linkedin.com/v2/me?projection=(id)', {
         headers: {
@@ -105,6 +145,8 @@ serve(async (req) => {
       
       if (!permissionsResponse.ok) {
         console.warn('Could not verify LinkedIn permissions, but proceeding with connection');
+      } else {
+        console.log('LinkedIn permissions verified successfully');
       }
     } catch (permissionError) {
       console.warn('Permission check failed:', permissionError);
@@ -131,6 +173,8 @@ serve(async (req) => {
       console.error('Failed to save LinkedIn token:', tokenSaveError);
       throw new Error('Failed to save LinkedIn authorization');
     }
+
+    console.log('LinkedIn credentials saved successfully');
 
     // Extract name from the profile data
     const displayName = profileData.name || 

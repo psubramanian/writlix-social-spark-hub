@@ -6,12 +6,15 @@ import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { Loader2 } from "lucide-react";
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/contexts/auth';
-import { credentialsOperations } from '@/utils/supabaseHelpers';
+import { credentialsOperations, isValidData } from '@/utils/supabaseHelpers';
 
 // LinkedIn profile structure
 interface LinkedInProfileData {
   localizedFirstName?: string;
   localizedLastName?: string;
+  name?: string;
+  given_name?: string;
+  family_name?: string;
   [key: string]: any;
 }
 
@@ -35,7 +38,7 @@ const LinkedInOAuth = () => {
       try {
         const data = await credentialsOperations.linkedin.fetch(user.id);
 
-        if (data && data.client_id) {
+        if (isValidData(data) && data.client_id) {
           setCredentialsPresent(true);
           setRedirectUri(data.redirect_uri || (window.location.origin + window.location.pathname));
 
@@ -44,8 +47,14 @@ const LinkedInOAuth = () => {
 
             const profile = data.linkedin_profile_data;
             if (profile && typeof profile === 'object') {
-              const name = `${profile.localizedFirstName || ''} ${profile.localizedLastName || ''}`.trim();
-              setProfileName(name || 'LinkedIn User');
+              const profileData = profile as LinkedInProfileData;
+              const name = profileData.name || 
+                         (profileData.given_name && profileData.family_name ? 
+                          `${profileData.given_name} ${profileData.family_name}` : 
+                          profileData.localizedFirstName ? 
+                          `${profileData.localizedFirstName} ${profileData.localizedLastName || ''}` : 
+                          'LinkedIn User');
+              setProfileName(name.trim() || 'LinkedIn User');
             }
           }
         } else {
@@ -73,6 +82,7 @@ const LinkedInOAuth = () => {
       const code = url.searchParams.get('code');
       const state = url.searchParams.get('state');
       const error = url.searchParams.get('error');
+      const errorDescription = url.searchParams.get('error_description');
       const savedState = sessionStorage.getItem('linkedin_state');
 
       if (code || error) {
@@ -80,15 +90,17 @@ const LinkedInOAuth = () => {
       }
 
       if (error) {
+        console.error('LinkedIn OAuth error:', error, errorDescription);
         toast({
           title: "LinkedIn Connection Failed",
-          description: `Error: ${error}`,
+          description: errorDescription || `Error: ${error}`,
           variant: "destructive",
         });
         return;
       }
 
       if (code && state && (!savedState || state !== savedState)) {
+        console.error('OAuth state mismatch:', { received: state, expected: savedState });
         toast({
           title: "OAuth State Mismatch",
           description: "OAuth state mismatch. Please try connecting again.",
@@ -103,7 +115,18 @@ const LinkedInOAuth = () => {
           sessionStorage.removeItem('linkedin_state');
 
           const credentials = await credentialsOperations.linkedin.fetch(user.id);
-          const finalRedirectUri = credentials?.redirect_uri || (window.location.origin + window.location.pathname);
+          let finalRedirectUri = window.location.origin + window.location.pathname;
+          
+          if (isValidData(credentials) && credentials.redirect_uri) {
+            finalRedirectUri = credentials.redirect_uri;
+          }
+
+          console.log('Sending OAuth data to backend:', {
+            code: code.substring(0, 10) + '...',
+            state,
+            user_id: user.id,
+            redirect_uri: finalRedirectUri
+          });
 
           const { data, error } = await supabase.functions.invoke('linkedin-oauth', {
             body: {
@@ -114,24 +137,29 @@ const LinkedInOAuth = () => {
             }
           });
 
-          if (error) throw error;
+          if (error) {
+            console.error('LinkedIn OAuth function error:', error);
+            throw error;
+          }
 
-          if (data.success) {
+          console.log('LinkedIn OAuth response:', data);
+
+          if (data?.success) {
             setIsConnected(true);
-            setProfileName(data.profile.name);
+            setProfileName(data.profile?.name || 'LinkedIn User');
 
             toast({
               title: "LinkedIn Connected",
               description: "Your LinkedIn account has been successfully connected",
             });
           } else {
-            throw new Error(data.error || 'Failed to connect LinkedIn account');
+            throw new Error(data?.error || 'Failed to connect LinkedIn account');
           }
         } catch (error: any) {
           console.error('LinkedIn OAuth error:', error);
           toast({
             title: "LinkedIn Connection Failed",
-            description: error.message || "Failed to connect LinkedIn account",
+            description: error.message || "Failed to connect LinkedIn account. Please check your LinkedIn app configuration and redirect URI.",
             variant: "destructive",
           });
         } finally {
@@ -156,7 +184,7 @@ const LinkedInOAuth = () => {
 
       const credentials = await credentialsOperations.linkedin.fetch(user.id);
 
-      if (!credentials || !credentials.client_id) {
+      if (!isValidData(credentials) || !credentials.client_id) {
         toast({
           title: "LinkedIn Credentials Missing",
           description: "Please add your LinkedIn API credentials in the Settings page first",
@@ -168,13 +196,24 @@ const LinkedInOAuth = () => {
       const state = generateRandomString();
       sessionStorage.setItem('linkedin_state', state);
 
-      const finalRedirectUri = credentials.redirect_uri || (window.location.origin + window.location.pathname);
+      let finalRedirectUri = window.location.origin + window.location.pathname;
+      if (credentials.redirect_uri) {
+        finalRedirectUri = credentials.redirect_uri;
+      }
+
+      console.log('Initiating LinkedIn OAuth with:', {
+        client_id: credentials.client_id,
+        redirect_uri: finalRedirectUri,
+        state
+      });
+
       const encodedRedirectUri = encodeURIComponent(finalRedirectUri);
 
       // Updated OAuth scope with current LinkedIn API requirements
       const scope = "openid profile email w_member_social";
       const linkedInAuthUrl = `https://www.linkedin.com/oauth/v2/authorization?response_type=code&client_id=${credentials.client_id}&redirect_uri=${encodedRedirectUri}&state=${state}&scope=${encodeURIComponent(scope)}`;
 
+      console.log('Redirecting to LinkedIn:', linkedInAuthUrl);
       window.location.href = linkedInAuthUrl;
     } catch (error: any) {
       console.error('Error initiating LinkedIn connection:', error);
@@ -293,10 +332,15 @@ const LinkedInOAuth = () => {
             </Alert>
           )}
 
-          <p className="text-xs text-muted-foreground mt-4">
-            By connecting your LinkedIn account, you authorize Writlix to post content on your behalf.
-            You can revoke this access at any time. We use the latest LinkedIn API with proper permissions.
-          </p>
+          <div className="text-xs text-muted-foreground mt-4 space-y-2">
+            <p>
+              By connecting your LinkedIn account, you authorize Writlix to post content on your behalf.
+              You can revoke this access at any time.
+            </p>
+            <p className="font-medium">
+              Important: Make sure your LinkedIn app's redirect URI matches: {redirectUri}
+            </p>
+          </div>
         </div>
       )}
     </div>

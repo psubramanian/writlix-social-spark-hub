@@ -1,3 +1,4 @@
+
 import React, { useState } from 'react';
 import { z } from 'zod';
 import { Dialog, DialogContent } from '@/components/ui/dialog';
@@ -31,7 +32,7 @@ export function NewsletterPopup({
 
       const { error } = await supabase
         .from('newsletter_subscriptions')
-        .insert({ email: trimmedEmail });
+        .insert({ email: trimmedEmail } as any);
 
       if (error) {
         if (
@@ -86,7 +87,7 @@ export function NewsletterPopup({
           </div>
           <h2 className="text-2xl font-bold text-white mb-4">SUBSCRIBE TODAY</h2>
           <p className="text-white/90 mb-6">
-            It’s good to be connected! We’ll share our newsletter with great content. Stay tuned.
+            It's good to be connected! We'll share our newsletter with great content. Stay tuned.
           </p>
           <form onSubmit={handleSubmit} className="space-y-4">
             <div className="relative">
