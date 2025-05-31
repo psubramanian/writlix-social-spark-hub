@@ -65,7 +65,7 @@ export function SubscriptionDebug() {
             <Badge variant={isSubscriptionActive ? "default" : "outline"} className="text-xs">
               Sub: {isSubscriptionActive ? 'Active' : 'Inactive'}
             </Badge>
-            <Badge variant={isSubscriptionCanceled ? "warning" : "outline"} className="text-xs">
+            <Badge variant={isSubscriptionCanceled ? "destructive" : "outline"} className="text-xs">
               Canceled: {isSubscriptionCanceled ? 'Yes' : 'No'}
             </Badge>
           </div>

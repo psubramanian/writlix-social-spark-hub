@@ -28,24 +28,26 @@ const LinkedInOAuth = () => {
   const [credentialsPresent, setCredentialsPresent] = useState(false);
   const [redirectUri, setRedirectUri] = useState('');
 
-  useEffect(() => {
-    const checkConnection = async () => {
-      if (!user?.id) {
-        setLoading(false);
-        return;
-      }
+  const checkConnection = async () => {
+    if (!user?.id) {
+      setLoading(false);
+      return;
+    }
 
-      try {
-        const data = await credentialsOperations.linkedin.fetch(user.id);
+    try {
+      const data = await credentialsOperations.linkedin.fetch(user.id);
 
-        if (isValidData(data) && data.client_id) {
+      if (isValidData(data)) {
+        const credentials = data as any; // Type assertion for Supabase data
+        
+        if (credentials.client_id) {
           setCredentialsPresent(true);
-          setRedirectUri(data.redirect_uri || (window.location.origin + window.location.pathname));
+          setRedirectUri(credentials.redirect_uri || (window.location.origin + window.location.pathname));
 
-          if (data.access_token) {
+          if (credentials.access_token) {
             setIsConnected(true);
 
-            const profile = data.linkedin_profile_data;
+            const profile = credentials.linkedin_profile_data;
             if (profile && typeof profile === 'object') {
               const profileData = profile as LinkedInProfileData;
               const name = profileData.name || 
@@ -61,18 +63,23 @@ const LinkedInOAuth = () => {
           setCredentialsPresent(false);
           setRedirectUri(window.location.origin + window.location.pathname);
         }
-      } catch (error) {
-        console.error('Error checking LinkedIn connection:', error);
-        toast({
-          title: "Error",
-          description: "Failed to check LinkedIn connection status",
-          variant: "destructive",
-        });
-      } finally {
-        setLoading(false);
+      } else {
+        setCredentialsPresent(false);
+        setRedirectUri(window.location.origin + window.location.pathname);
       }
-    };
+    } catch (error) {
+      console.error('Error checking LinkedIn connection:', error);
+      toast({
+        title: "Error",
+        description: "Failed to check LinkedIn connection status",
+        variant: "destructive",
+      });
+    } finally {
+      setLoading(false);
+    }
+  };
 
+  useEffect(() => {
     checkConnection();
   }, [user, toast]);
 
@@ -117,8 +124,11 @@ const LinkedInOAuth = () => {
           const credentials = await credentialsOperations.linkedin.fetch(user.id);
           let finalRedirectUri = window.location.origin + window.location.pathname;
           
-          if (isValidData(credentials) && credentials.redirect_uri) {
-            finalRedirectUri = credentials.redirect_uri;
+          if (isValidData(credentials)) {
+            const creds = credentials as any;
+            if (creds.redirect_uri) {
+              finalRedirectUri = creds.redirect_uri;
+            }
           }
 
           console.log('Sending OAuth data to backend:', {
@@ -145,8 +155,8 @@ const LinkedInOAuth = () => {
           console.log('LinkedIn OAuth response:', data);
 
           if (data?.success) {
-            setIsConnected(true);
-            setProfileName(data.profile?.name || 'LinkedIn User');
+            // Refresh the connection status
+            await checkConnection();
 
             toast({
               title: "LinkedIn Connected",
@@ -184,7 +194,17 @@ const LinkedInOAuth = () => {
 
       const credentials = await credentialsOperations.linkedin.fetch(user.id);
 
-      if (!isValidData(credentials) || !credentials.client_id) {
+      if (!isValidData(credentials)) {
+        toast({
+          title: "LinkedIn Credentials Missing",
+          description: "Please add your LinkedIn API credentials in the Settings page first",
+          variant: "destructive",
+        });
+        return;
+      }
+
+      const creds = credentials as any;
+      if (!creds.client_id) {
         toast({
           title: "LinkedIn Credentials Missing",
           description: "Please add your LinkedIn API credentials in the Settings page first",
@@ -197,12 +217,12 @@ const LinkedInOAuth = () => {
       sessionStorage.setItem('linkedin_state', state);
 
       let finalRedirectUri = window.location.origin + window.location.pathname;
-      if (credentials.redirect_uri) {
-        finalRedirectUri = credentials.redirect_uri;
+      if (creds.redirect_uri) {
+        finalRedirectUri = creds.redirect_uri;
       }
 
       console.log('Initiating LinkedIn OAuth with:', {
-        client_id: credentials.client_id,
+        client_id: creds.client_id,
         redirect_uri: finalRedirectUri,
         state
       });
@@ -211,7 +231,7 @@ const LinkedInOAuth = () => {
 
       // Updated OAuth scope with current LinkedIn API requirements
       const scope = "openid profile email w_member_social";
-      const linkedInAuthUrl = `https://www.linkedin.com/oauth/v2/authorization?response_type=code&client_id=${credentials.client_id}&redirect_uri=${encodedRedirectUri}&state=${state}&scope=${encodeURIComponent(scope)}`;
+      const linkedInAuthUrl = `https://www.linkedin.com/oauth/v2/authorization?response_type=code&client_id=${creds.client_id}&redirect_uri=${encodedRedirectUri}&state=${state}&scope=${encodeURIComponent(scope)}`;
 
       console.log('Redirecting to LinkedIn:', linkedInAuthUrl);
       window.location.href = linkedInAuthUrl;

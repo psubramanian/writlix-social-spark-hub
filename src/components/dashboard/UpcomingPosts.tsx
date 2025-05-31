@@ -44,7 +44,11 @@ export function UpcomingPosts({ scheduledPostsCount }: UpcomingPostsProps) {
           return 'UTC';
         }
 
-        return isValidData(data) && data.timezone ? data.timezone : 'UTC';
+        if (isValidData(data)) {
+          const scheduleData = data as any;
+          return scheduleData.timezone ? scheduleData.timezone : 'UTC';
+        }
+        return 'UTC';
       } catch (error) {
         console.error('Error in fetchUserTimezone:', error);
         return 'UTC';
@@ -94,9 +98,10 @@ export function UpcomingPosts({ scheduledPostsCount }: UpcomingPostsProps) {
           const upcoming = [];
           
           for (const post of data) {
-            if (!isValidData(post) || !post.content_ideas) continue;
+            if (!isValidData(post)) continue;
             
-            const contentIdea = Array.isArray(post.content_ideas) ? post.content_ideas[0] : post.content_ideas;
+            const postData = post as any;
+            const contentIdea = Array.isArray(postData.content_ideas) ? postData.content_ideas[0] : postData.content_ideas;
             const contentId = contentIdea?.id;
             
             // Skip if we already have this content ID
@@ -111,15 +116,15 @@ export function UpcomingPosts({ scheduledPostsCount }: UpcomingPostsProps) {
             }
             
             const formattedPost = {
-              id: post.id,
+              id: postData.id,
               title: contentIdea?.title || 'Untitled Post',
-              nextRunAt: post.next_run_at,
-              timezone: post.timezone || timezone
+              nextRunAt: postData.next_run_at,
+              timezone: postData.timezone || timezone
             };
             
             // Sort into past due or upcoming
-            const postTimezone = post.timezone || timezone;
-            const postDate = toZonedTime(parseISO(post.next_run_at), postTimezone);
+            const postTimezone = postData.timezone || timezone;
+            const postDate = toZonedTime(parseISO(postData.next_run_at), postTimezone);
             const nowInTimezone = toZonedTime(now, postTimezone);
             
             if (postDate < nowInTimezone) {
