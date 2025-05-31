@@ -62,7 +62,7 @@ export const credentialsOperations = {
       try {
         const { data, error } = await supabase
           .from('user_facebook_credentials')
-          .select('client_id, client_secret, redirect_uri, access_token, facebook_profile_data')
+          .select('client_id, client_secret, redirect_uri, access_token, long_lived_token, facebook_profile_data')
           .eq('user_id', asUserId(userId))
           .maybeSingle();
         
@@ -130,7 +130,7 @@ export const credentialsOperations = {
       try {
         const { data, error } = await supabase
           .from('user_linkedin_credentials')
-          .select('client_id, client_secret, redirect_uri, access_token, linkedin_profile_data')
+          .select('client_id, client_secret, redirect_uri, access_token, refresh_token, linkedin_profile_data')
           .eq('user_id', asUserId(userId))
           .maybeSingle();
         
@@ -198,7 +198,7 @@ export const credentialsOperations = {
       try {
         const { data, error } = await supabase
           .from('user_instagram_credentials')
-          .select('client_id, client_secret, redirect_uri, access_token, instagram_profile_data')
+          .select('client_id, client_secret, redirect_uri, access_token, long_lived_token, instagram_profile_data')
           .eq('user_id', asUserId(userId))
           .maybeSingle();
         

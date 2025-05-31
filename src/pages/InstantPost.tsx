@@ -1,5 +1,5 @@
 
-import { useState, useCallback } from 'react';
+import { useState, useCallback, useEffect } from 'react';
 import { useDropzone } from 'react-dropzone';
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -10,13 +10,13 @@ import { useInstantPost } from '../hooks/useInstantPost';
 import { Loader2, ImageIcon, Upload, AlertCircle } from "lucide-react";
 import RichTextEditor from '../components/RichTextEditor';
 import { useAuth } from '@/contexts/auth';
-import { supabase } from '@/integrations/supabase/client';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 import { Facebook, Instagram, Linkedin } from "lucide-react";
 import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group";
 import { Input } from '@/components/ui/input';
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import SocialMediaPreviewDialog from '../components/SocialMediaPreviewDialog';
+import { credentialsOperations, isValidData } from '@/utils/supabaseHelpers';
 
 interface SocialConnectionStatus {
   linkedin: boolean;
@@ -57,54 +57,60 @@ const InstantPost = () => {
     postingPlatform
   } = useInstantPost();
 
-  // Check social connections when component mounts
-  useState(() => {
+  // Check social connections when component mounts and when user changes
+  useEffect(() => {
     const checkSocialConnections = async () => {
-      if (!user) return;
+      if (!user?.id) {
+        console.log('No user found for social connection check');
+        return;
+      }
+      
+      setLoading(true);
+      console.log('Checking social connections for user:', user.id);
       
       try {
-        // Check LinkedIn
-        const { data: linkedInData } = await supabase
-          .from('user_linkedin_credentials')
-          .select('access_token')
-          .eq('user_id', user.id as any)
-          .maybeSingle();
-          
-        setSocialConnections(prev => ({
-          ...prev,
-          linkedin: !!linkedInData?.access_token
-        }));
+        // Check LinkedIn using standardized helper
+        const linkedInData = await credentialsOperations.linkedin.fetch(user.id);
+        const linkedInConnected = isValidData(linkedInData) && !!(linkedInData as any)?.access_token;
+        console.log('LinkedIn connection status:', linkedInConnected, linkedInData);
         
-        // Check Facebook
-        const { data: facebookData } = await supabase
-          .from('user_facebook_credentials')
-          .select('access_token, long_lived_token')
-          .eq('user_id', user.id as any)
-          .maybeSingle();
-          
-        setSocialConnections(prev => ({
-          ...prev,
-          facebook: !!(facebookData?.access_token || facebookData?.long_lived_token)
-        }));
+        // Check Facebook using standardized helper
+        const facebookData = await credentialsOperations.facebook.fetch(user.id);
+        const facebookConnected = isValidData(facebookData) && 
+          (!!(facebookData as any)?.access_token || !!(facebookData as any)?.long_lived_token);
+        console.log('Facebook connection status:', facebookConnected, facebookData);
         
-        // Check Instagram
-        const { data: instagramData } = await supabase
-          .from('user_instagram_credentials')
-          .select('access_token, long_lived_token')
-          .eq('user_id', user.id as any)
-          .maybeSingle();
-          
-        setSocialConnections(prev => ({
-          ...prev,
-          instagram: !!(instagramData?.access_token || instagramData?.long_lived_token)
-        }));
+        // Check Instagram using standardized helper
+        const instagramData = await credentialsOperations.instagram.fetch(user.id);
+        const instagramConnected = isValidData(instagramData) && 
+          (!!(instagramData as any)?.access_token || !!(instagramData as any)?.long_lived_token);
+        console.log('Instagram connection status:', instagramConnected, instagramData);
+        
+        setSocialConnections({
+          linkedin: linkedInConnected,
+          facebook: facebookConnected,
+          instagram: instagramConnected
+        });
+        
+        console.log('Updated social connections state:', {
+          linkedin: linkedInConnected,
+          facebook: facebookConnected,
+          instagram: instagramConnected
+        });
       } catch (error) {
         console.error('Error checking social connections:', error);
+        toast({
+          title: "Connection Check Failed",
+          description: "Failed to check social media connections. Please refresh the page.",
+          variant: "destructive",
+        });
+      } finally {
+        setLoading(false);
       }
     };
     
     checkSocialConnections();
-  });
+  }, [user?.id, toast]);
 
   const onDrop = useCallback((acceptedFiles: File[]) => {
     setDropError(null);
@@ -266,6 +272,42 @@ const InstantPost = () => {
     handlePostToInstagram();
   };
 
+  const handleRefreshConnections = async () => {
+    if (!user?.id) return;
+    
+    setLoading(true);
+    try {
+      // Re-check all social connections
+      const [linkedInData, facebookData, instagramData] = await Promise.all([
+        credentialsOperations.linkedin.fetch(user.id),
+        credentialsOperations.facebook.fetch(user.id),
+        credentialsOperations.instagram.fetch(user.id)
+      ]);
+
+      setSocialConnections({
+        linkedin: isValidData(linkedInData) && !!(linkedInData as any)?.access_token,
+        facebook: isValidData(facebookData) && 
+          (!!(facebookData as any)?.access_token || !!(facebookData as any)?.long_lived_token),
+        instagram: isValidData(instagramData) && 
+          (!!(instagramData as any)?.access_token || !!(instagramData as any)?.long_lived_token)
+      });
+
+      toast({
+        title: "Connections Refreshed",
+        description: "Social media connection status has been updated.",
+      });
+    } catch (error) {
+      console.error('Error refreshing connections:', error);
+      toast({
+        title: "Refresh Failed",
+        description: "Failed to refresh connection status.",
+        variant: "destructive",
+      });
+    } finally {
+      setLoading(false);
+    }
+  };
+
   const resetForm = () => {
     setContentHtml('');
     setContentPlain('');
@@ -275,6 +317,7 @@ const InstantPost = () => {
   };
   
   const isDisabled = isGenerating || isPosting || loading;
+  const hasAnyConnection = socialConnections.linkedin || socialConnections.facebook || socialConnections.instagram;
 
   return (
     <main className="flex-1 overflow-y-auto p-6">
@@ -387,7 +430,21 @@ const InstantPost = () => {
           
           <CardContent className="space-y-6">
             <div className="space-y-2">
-              <label className="block text-sm font-medium">Select platforms</label>
+              <div className="flex items-center justify-between">
+                <label className="block text-sm font-medium">Select platforms</label>
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  onClick={handleRefreshConnections}
+                  disabled={loading}
+                  className="text-xs"
+                >
+                  {loading ? (
+                    <Loader2 className="h-3 w-3 animate-spin mr-1" />
+                  ) : null}
+                  Refresh
+                </Button>
+              </div>
               <ToggleGroup 
                 type="multiple" 
                 className="justify-start"
@@ -406,6 +463,9 @@ const InstantPost = () => {
                 >
                   <Linkedin className="h-4 w-4" />
                   <span>LinkedIn</span>
+                  {!socialConnections.linkedin && (
+                    <span className="text-xs text-muted-foreground">(Not connected)</span>
+                  )}
                 </ToggleGroupItem>
                 
                 <ToggleGroupItem 
@@ -416,6 +476,9 @@ const InstantPost = () => {
                 >
                   <Facebook className="h-4 w-4" />
                   <span>Facebook</span>
+                  {!socialConnections.facebook && (
+                    <span className="text-xs text-muted-foreground">(Not connected)</span>
+                  )}
                 </ToggleGroupItem>
                 
                 <ToggleGroupItem 
@@ -426,11 +489,14 @@ const InstantPost = () => {
                 >
                   <Instagram className="h-4 w-4" />
                   <span>Instagram</span>
+                  {!socialConnections.instagram && (
+                    <span className="text-xs text-muted-foreground">(Not connected)</span>
+                  )}
                 </ToggleGroupItem>
               </ToggleGroup>
             </div>
             
-            {!socialConnections.linkedin && !socialConnections.facebook && !socialConnections.instagram && (
+            {!hasAnyConnection && (
               <Alert>
                 <AlertCircle className="h-4 w-4" />
                 <AlertTitle>No social accounts connected</AlertTitle>
@@ -440,11 +506,20 @@ const InstantPost = () => {
               </Alert>
             )}
             
+            {loading && (
+              <Alert>
+                <Loader2 className="h-4 w-4 animate-spin" />
+                <AlertTitle>Checking Connections</AlertTitle>
+                <AlertDescription>
+                  Verifying your social media connections...
+                </AlertDescription>
+              </Alert>
+            )}
+            
             <div className="pt-4">
               <Button
                 onClick={handlePreviewAndPost}
-                disabled={!contentPlain.trim() || selectedPlatforms.length === 0 || isDisabled || 
-                         (!socialConnections.linkedin && !socialConnections.facebook && !socialConnections.instagram)}
+                disabled={!contentPlain.trim() || selectedPlatforms.length === 0 || isDisabled || !hasAnyConnection}
                 className="w-full"
               >
                 Preview & Post

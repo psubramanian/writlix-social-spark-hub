@@ -34,11 +34,17 @@ const LinkedInOAuth = () => {
       return;
     }
 
+    console.log('Checking LinkedIn connection for user:', user.id);
+
     try {
       const data = await credentialsOperations.linkedin.fetch(user.id);
 
       if (isValidData(data)) {
-        const credentials = data as any; // Type assertion for Supabase data
+        const credentials = data as any;
+        console.log('LinkedIn credentials found:', { 
+          hasClientId: !!credentials.client_id, 
+          hasAccessToken: !!credentials.access_token 
+        });
         
         if (credentials.client_id) {
           setCredentialsPresent(true);
@@ -46,6 +52,7 @@ const LinkedInOAuth = () => {
 
           if (credentials.access_token) {
             setIsConnected(true);
+            console.log('LinkedIn is connected with access token');
 
             const profile = credentials.linkedin_profile_data;
             if (profile && typeof profile === 'object') {
@@ -58,14 +65,19 @@ const LinkedInOAuth = () => {
                           'LinkedIn User');
               setProfileName(name.trim() || 'LinkedIn User');
             }
+          } else {
+            setIsConnected(false);
+            console.log('LinkedIn credentials present but no access token');
           }
         } else {
           setCredentialsPresent(false);
           setRedirectUri(window.location.origin + window.location.pathname);
+          console.log('No LinkedIn credentials found');
         }
       } else {
         setCredentialsPresent(false);
         setRedirectUri(window.location.origin + window.location.pathname);
+        console.log('No LinkedIn data returned');
       }
     } catch (error) {
       console.error('Error checking LinkedIn connection:', error);
@@ -79,9 +91,24 @@ const LinkedInOAuth = () => {
     }
   };
 
+  // Broadcast connection status changes to other components
+  const broadcastConnectionChange = () => {
+    // Dispatch a custom event that other components can listen to
+    window.dispatchEvent(new CustomEvent('socialConnectionChanged', {
+      detail: { platform: 'linkedin', connected: isConnected }
+    }));
+  };
+
   useEffect(() => {
     checkConnection();
   }, [user, toast]);
+
+  // Broadcast when connection status changes
+  useEffect(() => {
+    if (!loading) {
+      broadcastConnectionChange();
+    }
+  }, [isConnected, loading]);
 
   useEffect(() => {
     const handleOAuthCallback = async () => {
@@ -162,6 +189,13 @@ const LinkedInOAuth = () => {
               title: "LinkedIn Connected",
               description: "Your LinkedIn account has been successfully connected",
             });
+
+            // Broadcast the successful connection to other components
+            setTimeout(() => {
+              window.dispatchEvent(new CustomEvent('socialConnectionChanged', {
+                detail: { platform: 'linkedin', connected: true }
+              }));
+            }, 100);
           } else {
             throw new Error(data?.error || 'Failed to connect LinkedIn account');
           }
@@ -266,6 +300,13 @@ const LinkedInOAuth = () => {
         title: "LinkedIn Disconnected",
         description: "Your LinkedIn account has been disconnected",
       });
+
+      // Broadcast the disconnection to other components
+      setTimeout(() => {
+        window.dispatchEvent(new CustomEvent('socialConnectionChanged', {
+          detail: { platform: 'linkedin', connected: false }
+        }));
+      }, 100);
     } catch (error: any) {
       console.error('Error disconnecting LinkedIn account:', error);
       toast({
