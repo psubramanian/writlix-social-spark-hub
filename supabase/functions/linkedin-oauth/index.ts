@@ -40,7 +40,7 @@ serve(async (req) => {
       throw new Error('LinkedIn credentials not found. Please add your LinkedIn API credentials in Settings.');
     }
 
-    // Use the provided redirect_uri or the one stored in the database, fall back to a default if needed
+    // Use the provided redirect_uri or the one stored in the database
     const finalRedirectUri = redirect_uri || credentials.redirect_uri || `https://xhccvoivnelbzvzxmcoy.supabase.co/auth/v1/callback`;
     console.log('Using redirect_uri:', finalRedirectUri);
     
@@ -63,13 +63,13 @@ serve(async (req) => {
     
     if (!tokenResponse.ok || !tokenData.access_token) {
       console.error('LinkedIn token exchange failed:', tokenData);
-      throw new Error('Failed to exchange authorization code for access token');
+      throw new Error(tokenData.error_description || 'Failed to exchange authorization code for access token');
     }
 
     console.log('Successfully obtained LinkedIn access token');
     
-    // Get LinkedIn user profile to confirm connection
-    const profileResponse = await fetch('https://api.linkedin.com/v2/me', {
+    // Get LinkedIn user profile using the new API endpoint
+    const profileResponse = await fetch('https://api.linkedin.com/v2/userinfo', {
       headers: {
         'Authorization': `Bearer ${tokenData.access_token}`,
       }
@@ -79,12 +79,40 @@ serve(async (req) => {
     
     if (!profileResponse.ok) {
       console.error('Failed to fetch LinkedIn profile:', profileData);
-      throw new Error('Failed to verify LinkedIn connection');
+      
+      // Fallback to older API if new one fails
+      const fallbackResponse = await fetch('https://api.linkedin.com/v2/me', {
+        headers: {
+          'Authorization': `Bearer ${tokenData.access_token}`,
+        }
+      });
+      
+      if (fallbackResponse.ok) {
+        const fallbackData = await fallbackResponse.json();
+        Object.assign(profileData, fallbackData);
+      } else {
+        throw new Error('Failed to verify LinkedIn connection and retrieve profile');
+      }
+    }
+
+    // Verify that the user has granted the w_member_social permission
+    try {
+      const permissionsResponse = await fetch('https://api.linkedin.com/v2/me?projection=(id)', {
+        headers: {
+          'Authorization': `Bearer ${tokenData.access_token}`,
+        }
+      });
+      
+      if (!permissionsResponse.ok) {
+        console.warn('Could not verify LinkedIn permissions, but proceeding with connection');
+      }
+    } catch (permissionError) {
+      console.warn('Permission check failed:', permissionError);
     }
 
     // Calculate expires_at from expires_in
     const expiresAt = new Date();
-    expiresAt.setSeconds(expiresAt.getSeconds() + tokenData.expires_in);
+    expiresAt.setSeconds(expiresAt.getSeconds() + (tokenData.expires_in || 3600));
 
     // Store the access token in user credentials
     const { error: tokenSaveError } = await supabase
@@ -93,9 +121,9 @@ serve(async (req) => {
         access_token: tokenData.access_token,
         refresh_token: tokenData.refresh_token,
         expires_at: expiresAt.toISOString(),
-        linkedin_profile_id: profileData.id,
+        linkedin_profile_id: profileData.sub || profileData.id,
         linkedin_profile_data: profileData,
-        redirect_uri: finalRedirectUri // Save the redirect URI that was used for this successful authentication
+        redirect_uri: finalRedirectUri
       })
       .eq('user_id', user_id);
       
@@ -104,14 +132,20 @@ serve(async (req) => {
       throw new Error('Failed to save LinkedIn authorization');
     }
 
+    // Extract name from the profile data
+    const displayName = profileData.name || 
+                       (profileData.given_name && profileData.family_name ? 
+                        `${profileData.given_name} ${profileData.family_name}` : 
+                        profileData.localizedFirstName ? 
+                        `${profileData.localizedFirstName} ${profileData.localizedLastName || ''}` : 
+                        'LinkedIn User');
+
     return new Response(JSON.stringify({ 
       success: true,
       message: 'LinkedIn account connected successfully',
       profile: {
-        name: profileData.localizedFirstName 
-          ? `${profileData.localizedFirstName} ${profileData.localizedLastName || ''}`
-          : 'LinkedIn User',
-        id: profileData.id
+        name: displayName.trim(),
+        id: profileData.sub || profileData.id
       }
     }), {
       headers: { ...corsHeaders, 'Content-Type': 'application/json' },

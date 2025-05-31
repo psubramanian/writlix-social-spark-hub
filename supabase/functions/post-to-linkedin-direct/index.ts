@@ -32,12 +32,40 @@ serve(async (req) => {
     // Get LinkedIn credentials for the user
     const { data: credentials, error: credentialsError } = await supabase
       .from('user_linkedin_credentials')
-      .select('access_token, linkedin_profile_id')
+      .select('access_token, linkedin_profile_id, expires_at')
       .eq('user_id', userId)
       .maybeSingle();
       
     if (credentialsError || !credentials || !credentials.access_token) {
       throw new Error('LinkedIn access token not found. Please reconnect your LinkedIn account.');
+    }
+
+    // Check if token is expired
+    if (credentials.expires_at) {
+      const expiresAt = new Date(credentials.expires_at);
+      const now = new Date();
+      if (expiresAt < now) {
+        throw new Error('LinkedIn access token has expired. Please reconnect your LinkedIn account.');
+      }
+    }
+    
+    // Validate that we can access LinkedIn profile before posting
+    try {
+      const profileCheck = await fetch('https://api.linkedin.com/v2/userinfo', {
+        headers: {
+          'Authorization': `Bearer ${credentials.access_token}`,
+        }
+      });
+      
+      if (!profileCheck.ok) {
+        if (profileCheck.status === 401) {
+          throw new Error('LinkedIn authorization expired. Please reconnect your LinkedIn account.');
+        }
+        throw new Error('Failed to validate LinkedIn connection.');
+      }
+    } catch (validationError) {
+      console.error('LinkedIn token validation failed:', validationError);
+      throw new Error('LinkedIn authorization expired. Please reconnect your LinkedIn account.');
     }
     
     // Prepare the LinkedIn Share API request
@@ -73,7 +101,7 @@ serve(async (req) => {
     if (!response.ok) {
       console.error('LinkedIn posting error:', responseData);
       
-      // Handle expired token
+      // Handle specific LinkedIn API errors
       if (response.status === 401) {
         return new Response(JSON.stringify({
           success: false,
@@ -84,7 +112,27 @@ serve(async (req) => {
         });
       }
       
-      throw new Error(responseData.message || 'Failed to post to LinkedIn');
+      if (response.status === 403) {
+        return new Response(JSON.stringify({
+          success: false,
+          error: 'Insufficient permissions to post to LinkedIn. Please ensure your app has w_member_social permission and reconnect your account.'
+        }), {
+          headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+          status: 403
+        });
+      }
+      
+      if (response.status === 429) {
+        return new Response(JSON.stringify({
+          success: false,
+          error: 'LinkedIn API rate limit exceeded. Please try again later.'
+        }), {
+          headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+          status: 429
+        });
+      }
+      
+      throw new Error(responseData.message || responseData.error || 'Failed to post to LinkedIn');
     }
     
     console.log('Successfully posted to LinkedIn:', responseData);

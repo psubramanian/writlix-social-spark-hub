@@ -1,3 +1,4 @@
+
 import { useState, useEffect } from 'react';
 import { Button } from '@/components/ui/button';
 import { useToast } from '@/components/ui/use-toast';
@@ -5,33 +6,13 @@ import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { Loader2 } from "lucide-react";
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/contexts/auth';
-import type { Database } from '@/integrations/supabase/types';
-
-type UserIdType = Database['public']['Tables']['user_linkedin_credentials']['Row']['user_id'];
+import { credentialsOperations } from '@/utils/supabaseHelpers';
 
 // LinkedIn profile structure
 interface LinkedInProfileData {
   localizedFirstName?: string;
   localizedLastName?: string;
   [key: string]: any;
-}
-
-// Supabase row structure
-interface LinkedInCredentialRow {
-  client_id: string;
-  redirect_uri?: string;
-  access_token?: string;
-  linkedin_profile_data?: LinkedInProfileData;
-}
-
-// Type guard
-function isLinkedInCredentialData(obj: any): obj is LinkedInCredentialRow {
-  return (
-    obj &&
-    typeof obj === "object" &&
-    "client_id" in obj &&
-    typeof obj.client_id === "string"
-  );
 }
 
 const LinkedInOAuth = () => {
@@ -52,16 +33,10 @@ const LinkedInOAuth = () => {
       }
 
       try {
-        const { data, error } = await supabase
-          .from('user_linkedin_credentials')
-          .select('client_id, access_token, linkedin_profile_data, redirect_uri')
-          .eq('user_id', user.id as any)
-          .maybeSingle();
+        const data = await credentialsOperations.linkedin.fetch(user.id);
 
-        if (error) throw error;
-
-        if (isLinkedInCredentialData(data)) {
-          setCredentialsPresent(!!data.client_id);
+        if (data && data.client_id) {
+          setCredentialsPresent(true);
           setRedirectUri(data.redirect_uri || (window.location.origin + window.location.pathname));
 
           if (data.access_token) {
@@ -127,15 +102,8 @@ const LinkedInOAuth = () => {
         try {
           sessionStorage.removeItem('linkedin_state');
 
-          const { data: credentials } = await supabase
-            .from('user_linkedin_credentials')
-            .select('redirect_uri')
-            .eq('user_id', user.id as any)
-            .maybeSingle();
-
-          if (credentials && 'redirect_uri' in credentials) {
-            const finalRedirectUri = credentials.redirect_uri || (window.location.origin + window.location.pathname);
-          }
+          const credentials = await credentialsOperations.linkedin.fetch(user.id);
+          const finalRedirectUri = credentials?.redirect_uri || (window.location.origin + window.location.pathname);
 
           const { data, error } = await supabase.functions.invoke('linkedin-oauth', {
             body: {
@@ -186,15 +154,9 @@ const LinkedInOAuth = () => {
         return;
       }
 
-      const { data: credentials, error: credentialsError } = await supabase
-        .from('user_linkedin_credentials')
-        .select('client_id, redirect_uri')
-        .eq('user_id', user.id as UserIdType)
-        .maybeSingle();
+      const credentials = await credentialsOperations.linkedin.fetch(user.id);
 
-      if (credentialsError) throw credentialsError;
-
-      if (!isLinkedInCredentialData(credentials)) {
+      if (!credentials || !credentials.client_id) {
         toast({
           title: "LinkedIn Credentials Missing",
           description: "Please add your LinkedIn API credentials in the Settings page first",
@@ -209,7 +171,9 @@ const LinkedInOAuth = () => {
       const finalRedirectUri = credentials.redirect_uri || (window.location.origin + window.location.pathname);
       const encodedRedirectUri = encodeURIComponent(finalRedirectUri);
 
-      const linkedInAuthUrl = `https://www.linkedin.com/oauth/v2/authorization?response_type=code&client_id=${credentials.client_id}&redirect_uri=${encodedRedirectUri}&state=${state}&scope=r_liteprofile%20r_emailaddress%20w_member_social`;
+      // Updated OAuth scope with current LinkedIn API requirements
+      const scope = "openid profile email w_member_social";
+      const linkedInAuthUrl = `https://www.linkedin.com/oauth/v2/authorization?response_type=code&client_id=${credentials.client_id}&redirect_uri=${encodedRedirectUri}&state=${state}&scope=${encodeURIComponent(scope)}`;
 
       window.location.href = linkedInAuthUrl;
     } catch (error: any) {
@@ -226,16 +190,13 @@ const LinkedInOAuth = () => {
     try {
       if (!user?.id) return;
 
-      const { error } = await supabase
-        .from('user_linkedin_credentials')
-        .update({
-          access_token: null,
-          refresh_token: null,
-          expires_at: null,
-          linkedin_profile_id: null,
-          linkedin_profile_data: null
-        })
-        .eq('user_id', user.id);
+      const { error } = await credentialsOperations.linkedin.updateTokens(user.id, {
+        access_token: null,
+        refresh_token: null,
+        expires_at: null,
+        linkedin_profile_id: null,
+        linkedin_profile_data: null
+      });
 
       if (error) throw error;
 
@@ -323,9 +284,18 @@ const LinkedInOAuth = () => {
             Connect LinkedIn Account
           </Button>
 
+          {!credentialsPresent && (
+            <Alert className="bg-amber-50 border-amber-200">
+              <AlertTitle className="text-amber-800">LinkedIn Credentials Required</AlertTitle>
+              <AlertDescription className="text-amber-700">
+                Please add your LinkedIn API credentials above before connecting your account.
+              </AlertDescription>
+            </Alert>
+          )}
+
           <p className="text-xs text-muted-foreground mt-4">
             By connecting your LinkedIn account, you authorize Writlix to post content on your behalf.
-            You can revoke this access at any time.
+            You can revoke this access at any time. We use the latest LinkedIn API with proper permissions.
           </p>
         </div>
       )}

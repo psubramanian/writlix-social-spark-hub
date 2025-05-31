@@ -7,7 +7,7 @@ export const asUserId = (id: string): Database['public']['Tables']['profiles']['
   return id as Database['public']['Tables']['profiles']['Row']['id'];
 };
 
-// Type guard to check if Supabase query result contains data (not error)
+// Type guard to check if data is valid (not null and not an error)
 export const isValidData = <T>(data: T | null): data is T => {
   return data !== null && typeof data === 'object' && !('error' in data);
 };
@@ -15,18 +15,23 @@ export const isValidData = <T>(data: T | null): data is T => {
 // Helper for profile operations
 export const profileOperations = {
   async fetchProfile(userId: string) {
-    const { data, error } = await supabase
-      .from('profiles')
-      .select('email, first_name, last_name, mobile_number')
-      .eq('id', asUserId(userId))
-      .maybeSingle();
-    
-    if (error) {
-      console.error('Error fetching profile:', error);
+    try {
+      const { data, error } = await supabase
+        .from('profiles')
+        .select('email, first_name, last_name, mobile_number')
+        .eq('id', asUserId(userId))
+        .maybeSingle();
+      
+      if (error) {
+        console.error('Error fetching profile:', error);
+        return null;
+      }
+      
+      return data;
+    } catch (error) {
+      console.error('Exception fetching profile:', error);
       return null;
     }
-    
-    return isValidData(data) ? data : null;
   },
 
   async updateProfile(userId: string, profileData: {
@@ -36,12 +41,17 @@ export const profileOperations = {
     mobile_number: string;
     profile_completed?: boolean;
   }) {
-    const { error } = await supabase
-      .from('profiles')
-      .update(profileData as any)
-      .eq('id', asUserId(userId));
-    
-    return { error };
+    try {
+      const { error } = await supabase
+        .from('profiles')
+        .update(profileData as any)
+        .eq('id', asUserId(userId));
+      
+      return { error };
+    } catch (error) {
+      console.error('Exception updating profile:', error);
+      return { error };
+    }
   }
 };
 
@@ -49,18 +59,23 @@ export const profileOperations = {
 export const credentialsOperations = {
   facebook: {
     async fetch(userId: string) {
-      const { data, error } = await supabase
-        .from('user_facebook_credentials')
-        .select('client_id, client_secret, redirect_uri, access_token, facebook_profile_data')
-        .eq('user_id', asUserId(userId))
-        .maybeSingle();
-      
-      if (error) {
-        console.error('Error fetching Facebook credentials:', error);
+      try {
+        const { data, error } = await supabase
+          .from('user_facebook_credentials')
+          .select('client_id, client_secret, redirect_uri, access_token, facebook_profile_data')
+          .eq('user_id', asUserId(userId))
+          .maybeSingle();
+        
+        if (error) {
+          console.error('Error fetching Facebook credentials:', error);
+          return null;
+        }
+        
+        return data;
+      } catch (error) {
+        console.error('Exception fetching Facebook credentials:', error);
         return null;
       }
-      
-      return isValidData(data) ? data : null;
     },
 
     async upsert(userId: string, credentials: {
@@ -68,19 +83,24 @@ export const credentialsOperations = {
       client_secret: string;
       redirect_uri: string;
     }, isUpdate: boolean = false) {
-      if (isUpdate) {
-        const { error } = await supabase
-          .from('user_facebook_credentials')
-          .update(credentials as any)
-          .eq('user_id', asUserId(userId));
-        return { error };
-      } else {
-        const { error } = await supabase
-          .from('user_facebook_credentials')
-          .insert({
-            user_id: asUserId(userId),
-            ...credentials
-          } as any);
+      try {
+        if (isUpdate) {
+          const { error } = await supabase
+            .from('user_facebook_credentials')
+            .update(credentials as any)
+            .eq('user_id', asUserId(userId));
+          return { error };
+        } else {
+          const { error } = await supabase
+            .from('user_facebook_credentials')
+            .insert({
+              user_id: asUserId(userId),
+              ...credentials
+            } as any);
+          return { error };
+        }
+      } catch (error) {
+        console.error('Exception upserting Facebook credentials:', error);
         return { error };
       }
     },
@@ -92,28 +112,38 @@ export const credentialsOperations = {
       facebook_user_id?: string | null;
       facebook_profile_data?: any | null;
     }) {
-      const { error } = await supabase
-        .from('user_facebook_credentials')
-        .update(tokenData as any)
-        .eq('user_id', asUserId(userId));
-      return { error };
+      try {
+        const { error } = await supabase
+          .from('user_facebook_credentials')
+          .update(tokenData as any)
+          .eq('user_id', asUserId(userId));
+        return { error };
+      } catch (error) {
+        console.error('Exception updating Facebook tokens:', error);
+        return { error };
+      }
     }
   },
 
   linkedin: {
     async fetch(userId: string) {
-      const { data, error } = await supabase
-        .from('user_linkedin_credentials')
-        .select('client_id, client_secret, redirect_uri, access_token, linkedin_profile_data')
-        .eq('user_id', asUserId(userId))
-        .maybeSingle();
-      
-      if (error) {
-        console.error('Error fetching LinkedIn credentials:', error);
+      try {
+        const { data, error } = await supabase
+          .from('user_linkedin_credentials')
+          .select('client_id, client_secret, redirect_uri, access_token, linkedin_profile_data')
+          .eq('user_id', asUserId(userId))
+          .maybeSingle();
+        
+        if (error) {
+          console.error('Error fetching LinkedIn credentials:', error);
+          return null;
+        }
+        
+        return data;
+      } catch (error) {
+        console.error('Exception fetching LinkedIn credentials:', error);
         return null;
       }
-      
-      return isValidData(data) ? data : null;
     },
 
     async upsert(userId: string, credentials: {
@@ -121,19 +151,24 @@ export const credentialsOperations = {
       client_secret: string;
       redirect_uri: string;
     }, isUpdate: boolean = false) {
-      if (isUpdate) {
-        const { error } = await supabase
-          .from('user_linkedin_credentials')
-          .update(credentials as any)
-          .eq('user_id', asUserId(userId));
-        return { error };
-      } else {
-        const { error } = await supabase
-          .from('user_linkedin_credentials')
-          .insert({
-            user_id: asUserId(userId),
-            ...credentials
-          } as any);
+      try {
+        if (isUpdate) {
+          const { error } = await supabase
+            .from('user_linkedin_credentials')
+            .update(credentials as any)
+            .eq('user_id', asUserId(userId));
+          return { error };
+        } else {
+          const { error } = await supabase
+            .from('user_linkedin_credentials')
+            .insert({
+              user_id: asUserId(userId),
+              ...credentials
+            } as any);
+          return { error };
+        }
+      } catch (error) {
+        console.error('Exception upserting LinkedIn credentials:', error);
         return { error };
       }
     },
@@ -145,28 +180,38 @@ export const credentialsOperations = {
       linkedin_profile_id?: string | null;
       linkedin_profile_data?: any | null;
     }) {
-      const { error } = await supabase
-        .from('user_linkedin_credentials')
-        .update(tokenData as any)
-        .eq('user_id', asUserId(userId));
-      return { error };
+      try {
+        const { error } = await supabase
+          .from('user_linkedin_credentials')
+          .update(tokenData as any)
+          .eq('user_id', asUserId(userId));
+        return { error };
+      } catch (error) {
+        console.error('Exception updating LinkedIn tokens:', error);
+        return { error };
+      }
     }
   },
 
   instagram: {
     async fetch(userId: string) {
-      const { data, error } = await supabase
-        .from('user_instagram_credentials')
-        .select('client_id, client_secret, redirect_uri, access_token, instagram_profile_data')
-        .eq('user_id', asUserId(userId))
-        .maybeSingle();
-      
-      if (error) {
-        console.error('Error fetching Instagram credentials:', error);
+      try {
+        const { data, error } = await supabase
+          .from('user_instagram_credentials')
+          .select('client_id, client_secret, redirect_uri, access_token, instagram_profile_data')
+          .eq('user_id', asUserId(userId))
+          .maybeSingle();
+        
+        if (error) {
+          console.error('Error fetching Instagram credentials:', error);
+          return null;
+        }
+        
+        return data;
+      } catch (error) {
+        console.error('Exception fetching Instagram credentials:', error);
         return null;
       }
-      
-      return isValidData(data) ? data : null;
     },
 
     async upsert(userId: string, credentials: {
@@ -174,19 +219,24 @@ export const credentialsOperations = {
       client_secret: string;
       redirect_uri: string;
     }, isUpdate: boolean = false) {
-      if (isUpdate) {
-        const { error } = await supabase
-          .from('user_instagram_credentials')
-          .update(credentials as any)
-          .eq('user_id', asUserId(userId));
-        return { error };
-      } else {
-        const { error } = await supabase
-          .from('user_instagram_credentials')
-          .insert({
-            user_id: asUserId(userId),
-            ...credentials
-          } as any);
+      try {
+        if (isUpdate) {
+          const { error } = await supabase
+            .from('user_instagram_credentials')
+            .update(credentials as any)
+            .eq('user_id', asUserId(userId));
+          return { error };
+        } else {
+          const { error } = await supabase
+            .from('user_instagram_credentials')
+            .insert({
+              user_id: asUserId(userId),
+              ...credentials
+            } as any);
+          return { error };
+        }
+      } catch (error) {
+        console.error('Exception upserting Instagram credentials:', error);
         return { error };
       }
     },
@@ -198,11 +248,16 @@ export const credentialsOperations = {
       instagram_user_id?: string | null;
       instagram_profile_data?: any | null;
     }) {
-      const { error } = await supabase
-        .from('user_instagram_credentials')
-        .update(tokenData as any)
-        .eq('user_id', asUserId(userId));
-      return { error };
+      try {
+        const { error } = await supabase
+          .from('user_instagram_credentials')
+          .update(tokenData as any)
+          .eq('user_id', asUserId(userId));
+        return { error };
+      } catch (error) {
+        console.error('Exception updating Instagram tokens:', error);
+        return { error };
+      }
     }
   }
 };
