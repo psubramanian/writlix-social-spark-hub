@@ -1,4 +1,3 @@
-
 import { useNavigate } from 'react-router-dom';
 import { useToast } from '@/components/ui/use-toast';
 import type { ContentItem } from '@/types/content';
@@ -6,8 +5,8 @@ import {
   updateContentIdea, 
   getCurrentUser, 
   invokeFunction,
-  updateContent,
-  deleteContent
+  updateContent as updateContentInDb,
+  deleteContent as deleteContentInDb
 } from '@/utils/supabase-helpers';
 
 export const useContentOperations = (setGeneratedContent: React.Dispatch<React.SetStateAction<ContentItem[]>>) => {
@@ -65,7 +64,7 @@ export const useContentOperations = (setGeneratedContent: React.Dispatch<React.S
         title: newContent.title,
       });
 
-      const { error: dbError } = await updateContent(currentContentItem.db_id, updateData);
+      const { error: dbError } = await updateContentInDb(String(currentContentItem.db_id), updateData);
 
       if (dbError) {
         console.error('Database update error:', dbError);
@@ -130,7 +129,7 @@ export const useContentOperations = (setGeneratedContent: React.Dispatch<React.S
       });
 
       if (currentItem.db_id) {
-        const { error: updateError } = await updateContent(currentItem.db_id, updateData);
+        const { error: updateError } = await updateContentInDb(String(currentItem.db_id), updateData);
 
         if (updateError) {
           console.error('Content update error:', updateError);
@@ -210,7 +209,7 @@ export const useContentOperations = (setGeneratedContent: React.Dispatch<React.S
         // when the content_ideas record is deleted
         
         console.log('Deleting content with db_id:', itemToDelete.db_id);
-        const { error: deleteError } = await deleteContent(itemToDelete.db_id);
+        const { error: deleteError } = await deleteContentInDb(String(itemToDelete.db_id));
           
         if (deleteError) {
           console.error('Error deleting from database:', deleteError);
