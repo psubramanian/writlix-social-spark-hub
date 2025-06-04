@@ -4,7 +4,6 @@ import { useNavigate } from 'react-router-dom';
 import { useToast } from '@/components/ui/use-toast';
 import { supabase } from '@/integrations/supabase/client';
 import type { ContentItem } from '@/types/content';
-import { asUserId } from '@/utils/supabase-helpers';
 
 export const useContentFetch = () => {
   const [loading, setLoading] = useState(true);
@@ -31,7 +30,7 @@ export const useContentFetch = () => {
       const { data, error } = await supabase
         .from('content_ideas')
         .select('*')
-        .eq('user_id', asUserId(user.id));
+        .eq('user_id', user.id);
 
       if (error) {
         console.error('Error fetching content:', error);

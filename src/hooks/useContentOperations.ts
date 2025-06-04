@@ -4,8 +4,7 @@ import { useNavigate } from 'react-router-dom';
 import { useToast } from '@/components/ui/use-toast';
 import { supabase } from '@/integrations/supabase/client';
 import type { ContentItem } from '@/types/content';
-import { Database } from '@/integrations/supabase/types';
-import { asUserId, asContentId, asContentStatus } from '@/utils/supabase-helpers';
+import { updateContentIdea } from '@/utils/supabase-helpers';
 
 export const useContentOperations = (setGeneratedContent: React.Dispatch<React.SetStateAction<ContentItem[]>>) => {
   const { toast } = useToast();
@@ -55,15 +54,15 @@ export const useContentOperations = (setGeneratedContent: React.Dispatch<React.S
       }
 
       // Create typed update data
-      const updateData: Database['public']['Tables']['content_ideas']['Update'] = {
+      const updateData = updateContentIdea({
         content: newContent.content,
         title: newContent.title,
-      };
+      });
 
       const { error: dbError } = await supabase
         .from('content_ideas')
         .update(updateData)
-        .eq('id', asContentId(currentContentItem.db_id));
+        .eq('id', currentContentItem.db_id);
 
       if (dbError) {
         console.error('Database update error:', dbError);
@@ -122,19 +121,16 @@ export const useContentOperations = (setGeneratedContent: React.Dispatch<React.S
       if (!currentItem) return;
 
       // Create typed update data
-      const updateData: Database['public']['Tables']['content_ideas']['Update'] = { 
-        content 
-      };
-      
-      if (newStatus) {
-        updateData.status = asContentStatus(newStatus);
-      }
+      const updateData = updateContentIdea({ 
+        content,
+        ...(newStatus ? { status: newStatus } : {})
+      });
 
       if (currentItem.db_id) {
         const { error: updateError } = await supabase
           .from('content_ideas')
           .update(updateData)
-          .eq('id', asContentId(currentItem.db_id));
+          .eq('id', currentItem.db_id);
 
         if (updateError) {
           console.error('Content update error:', updateError);
@@ -217,7 +213,7 @@ export const useContentOperations = (setGeneratedContent: React.Dispatch<React.S
         const { error: deleteError } = await supabase
           .from('content_ideas')
           .delete()
-          .eq('id', asContentId(itemToDelete.db_id));
+          .eq('id', itemToDelete.db_id);
           
         if (deleteError) {
           console.error('Error deleting from database:', deleteError);

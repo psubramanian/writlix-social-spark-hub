@@ -4,7 +4,6 @@ import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/components/ui/use-toast';
 import { startOfMonth, endOfMonth } from 'date-fns';
 import { getCurrentUser } from '@/utils/supabaseUserUtils';
-import { asUserId, asContentStatus } from '@/utils/supabase-helpers';
 
 interface DashboardStats {
   postsCreated: number;
@@ -37,7 +36,7 @@ export function useDashboardStats(selectedMonth: Date) {
       const { count: totalContentCount, error: createdError } = await supabase
         .from('content_ideas')
         .select('*', { count: 'exact', head: true })
-        .eq('user_id', asUserId(user.id))
+        .eq('user_id', user.id)
         .gte('created_at', monthStart.toISOString())
         .lte('created_at', monthEnd.toISOString());
 
@@ -53,9 +52,9 @@ export function useDashboardStats(selectedMonth: Date) {
           content_id,
           content_ideas!inner(status)
         `)
-        .eq('user_id', asUserId(user.id))
+        .eq('user_id', user.id)
         .eq('status', 'pending')
-        .eq('content_ideas.status', asContentStatus('Scheduled'))
+        .eq('content_ideas.status', 'Scheduled')
         .gt('next_run_at', now.toISOString());
 
       if (scheduledPostsError) {
@@ -82,8 +81,8 @@ export function useDashboardStats(selectedMonth: Date) {
       const { count: publishedCount, error: publishedError } = await supabase
         .from('content_ideas')
         .select('id', { count: 'exact', head: true })
-        .eq('user_id', asUserId(user.id))
-        .eq('status', asContentStatus('Published'))
+        .eq('user_id', user.id)
+        .eq('status', 'Published')
         .gte('created_at', monthStart.toISOString())
         .lte('created_at', monthEnd.toISOString());
 
@@ -96,8 +95,8 @@ export function useDashboardStats(selectedMonth: Date) {
       const { count: reviewCount, error: reviewError } = await supabase
         .from('content_ideas')
         .select('id', { count: 'exact', head: true })
-        .eq('user_id', asUserId(user.id))
-        .eq('status', asContentStatus('Review'))
+        .eq('user_id', user.id)
+        .eq('status', 'Review')
         .gte('created_at', monthStart.toISOString())
         .lte('created_at', monthEnd.toISOString());
 
