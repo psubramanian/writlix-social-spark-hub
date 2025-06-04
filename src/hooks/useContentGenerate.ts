@@ -1,10 +1,15 @@
-
 import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useToast } from '@/components/ui/use-toast';
-import { supabase } from '@/integrations/supabase/client';
 import type { ContentItem, GenerationOptions } from '@/types/content';
-import { createContentIdea } from '@/utils/supabase-helpers';
+import { 
+  createContentIdea, 
+  hasError, 
+  getCurrentUser,
+  invokeFunction,
+  insertContentIdea,
+  type ContentIdea
+} from '@/utils/supabase-helpers';
 
 export const useContentGenerate = (setGeneratedContent: React.Dispatch<React.SetStateAction<ContentItem[]>>) => {
   const [generating, setGenerating] = useState(false);
@@ -15,7 +20,7 @@ export const useContentGenerate = (setGeneratedContent: React.Dispatch<React.Set
     setGenerating(true);
     
     try {
-      const { data: { user }, error: authError } = await supabase.auth.getUser();
+      const { user, error: authError } = await getCurrentUser();
       
       if (authError || !user) {
         console.error("Authentication error:", authError);
@@ -28,16 +33,18 @@ export const useContentGenerate = (setGeneratedContent: React.Dispatch<React.Set
         return;
       }
 
-      const { data: generationData, error: generationError } = await supabase.functions.invoke('generate-content', {
-        body: {
-          topic,
-          quantity,
-        },
+      const { data: generationData, error: generationError } = await invokeFunction<any[]>('generate-content', {
+        topic,
+        quantity,
       });
 
       if (generationError) {
         console.error('Generation error:', generationError);
-        throw new Error(generationError.message || 'Failed to generate content');
+        throw new Error(
+          generationError instanceof Error 
+            ? generationError.message 
+            : 'Failed to generate content'
+        );
       }
 
       if (!generationData || !Array.isArray(generationData)) {
@@ -61,21 +68,20 @@ export const useContentGenerate = (setGeneratedContent: React.Dispatch<React.Set
           user_id: user.id
         });
 
-        const { data: dbData, error: dbError } = await supabase
-          .from('content_ideas')
-          .insert(insertData)
-          .select();
+        const { data: dbData, error: dbError } = await insertContentIdea(insertData);
 
         if (dbError) {
           console.error('Database insertion error:', dbError);
-          throw new Error(`Failed to save content to database: ${dbError.message}`);
+          throw new Error(
+            `Failed to save content to database: ${dbError instanceof Error ? dbError.message : 'Unknown error'}`
+          );
         }
 
         if (dbData && dbData.length > 0) {
           newContentItems.push({
             id: `content-${Date.now()}-${Math.random().toString(36).substring(2, 9)}`,
             title: item.title,
-            preview: item.preview,
+            preview: item.preview || formattedContent.substring(0, 100) + '...',
             content: formattedContent,
             status: 'Review',
             db_id: dbData[0].id

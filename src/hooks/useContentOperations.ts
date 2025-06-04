@@ -1,10 +1,14 @@
 
-import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useToast } from '@/components/ui/use-toast';
-import { supabase } from '@/integrations/supabase/client';
 import type { ContentItem } from '@/types/content';
-import { updateContentIdea } from '@/utils/supabase-helpers';
+import { 
+  updateContentIdea, 
+  getCurrentUser, 
+  invokeFunction,
+  updateContent,
+  deleteContent
+} from '@/utils/supabase-helpers';
 
 export const useContentOperations = (setGeneratedContent: React.Dispatch<React.SetStateAction<ContentItem[]>>) => {
   const { toast } = useToast();
@@ -12,7 +16,7 @@ export const useContentOperations = (setGeneratedContent: React.Dispatch<React.S
 
   const regenerateContent = async (id: string, title: string) => {
     try {
-      const { data: { user }, error: authError } = await supabase.auth.getUser();
+      const { user, error: authError } = await getCurrentUser();
       
       if (authError || !user) {
         console.error("Authentication error:", authError);
@@ -36,16 +40,18 @@ export const useContentOperations = (setGeneratedContent: React.Dispatch<React.S
         throw new Error('Could not find content item to update');
       }
 
-      const { data: generationData, error: generationError } = await supabase.functions.invoke('generate-content', {
-        body: {
-          topic: title,
-          quantity: 1,
-        },
+      const { data: generationData, error: generationError } = await invokeFunction<any[]>('generate-content', {
+        topic: title,
+        quantity: 1,
       });
 
       if (generationError) {
         console.error('Regeneration error:', generationError);
-        throw new Error(generationError.message || 'Failed to regenerate content');
+        throw new Error(
+          generationError instanceof Error 
+            ? generationError.message 
+            : 'Failed to regenerate content'
+        );
       }
 
       const newContent = generationData[0];
@@ -59,10 +65,7 @@ export const useContentOperations = (setGeneratedContent: React.Dispatch<React.S
         title: newContent.title,
       });
 
-      const { error: dbError } = await supabase
-        .from('content_ideas')
-        .update(updateData)
-        .eq('id', currentContentItem.db_id);
+      const { error: dbError } = await updateContent(currentContentItem.db_id, updateData);
 
       if (dbError) {
         console.error('Database update error:', dbError);
@@ -98,7 +101,7 @@ export const useContentOperations = (setGeneratedContent: React.Dispatch<React.S
 
   const updateContent = async (id: string, content: string, newStatus?: 'Review' | 'Scheduled' | 'Published') => {
     try {
-      const { data: { user }, error: authError } = await supabase.auth.getUser();
+      const { user, error: authError } = await getCurrentUser();
       
       if (authError || !user) {
         console.error("Authentication error:", authError);
@@ -127,10 +130,7 @@ export const useContentOperations = (setGeneratedContent: React.Dispatch<React.S
       });
 
       if (currentItem.db_id) {
-        const { error: updateError } = await supabase
-          .from('content_ideas')
-          .update(updateData)
-          .eq('id', currentItem.db_id);
+        const { error: updateError } = await updateContent(currentItem.db_id, updateData);
 
         if (updateError) {
           console.error('Content update error:', updateError);
@@ -169,7 +169,7 @@ export const useContentOperations = (setGeneratedContent: React.Dispatch<React.S
   const deleteContent = async (id: string) => {
     console.log('Deleting content with ID:', id);
     try {
-      const { data: { user }, error: authError } = await supabase.auth.getUser();
+      const { user, error: authError } = await getCurrentUser();
       
       if (authError || !user) {
         console.error("Authentication error:", authError);
@@ -210,10 +210,7 @@ export const useContentOperations = (setGeneratedContent: React.Dispatch<React.S
         // when the content_ideas record is deleted
         
         console.log('Deleting content with db_id:', itemToDelete.db_id);
-        const { error: deleteError } = await supabase
-          .from('content_ideas')
-          .delete()
-          .eq('id', itemToDelete.db_id);
+        const { error: deleteError } = await deleteContent(itemToDelete.db_id);
           
         if (deleteError) {
           console.error('Error deleting from database:', deleteError);
