@@ -1,4 +1,3 @@
-
 import { useContentFetch } from './useContentFetch';
 import { useContentGenerate } from './useContentGenerate';
 import { useContentOperations } from './useContentOperations';
@@ -7,7 +6,7 @@ import { useNavigate } from 'react-router-dom';
 import { useToast } from '@/components/ui/use-toast';
 import { supabase } from '@/integrations/supabase/client';
 import type { ContentItem, GenerationOptions } from '@/types/content';
-import { createContentIdea } from '@/utils/supabase-helpers';
+import { createContentIdea, insertContentIdea } from '@/utils/supabase-helpers';
 
 export const useContentGeneration = () => {
   const { 
@@ -68,22 +67,23 @@ export const useContentGeneration = () => {
           user_id: user.id
         });
 
-        const { data: dbData, error: dbError } = await supabase
-          .from('content_ideas')
-          .insert(insertData)
-          .select();
+        const { data: insertedResult, error: dbError } = await insertContentIdea([insertData]);
 
         if (dbError) {
           console.error('Database insertion error:', dbError);
           throw new Error(`Failed to save content to database: ${dbError.message}`);
         }
         
-        if (dbData && dbData.length > 0) {
+        if (insertedResult && insertedResult.length > 0) {
           // Add to our local state with the database ID
           newContentItems.push({
             ...item,
-            db_id: dbData[0].id
+            db_id: insertedResult[0].id
           });
+        } else if (!dbError) {
+          console.warn('Content idea inserted, but no data returned from select query.');
+          // Fallback: add item without db_id, or consider it an error if db_id is critical
+          newContentItems.push(item); 
         }
       }
       
@@ -124,7 +124,9 @@ export const useContentGeneration = () => {
       const newStatus = item.status === 'Review' ? 'Scheduled' : 'Review';
       
       // First update the content status in the content_ideas table
-      await updateContent(id, item.content, newStatus);
+      if (item.db_id) {
+        await updateContent(item.db_id, { content: item.content, status: newStatus });
+      }
       
       // If changing to Scheduled, we need to create a scheduled post with next_run_at
       if (newStatus === 'Scheduled') {
@@ -144,7 +146,9 @@ export const useContentGeneration = () => {
         if (!scheduled) {
           // If scheduling failed, revert the status change
           console.error('Failed to schedule content, reverting status change');
-          await updateContent(id, item.content, 'Review');
+          if (item.db_id) {
+            await updateContent(item.db_id, { content: item.content, status: 'Review' });
+          }
           
           toast({
             title: "Scheduling Failed",

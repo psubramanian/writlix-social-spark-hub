@@ -1,4 +1,3 @@
-
 import { useState } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { getCurrentUser } from '@/utils/supabaseUserUtils';
@@ -53,7 +52,7 @@ export function useInstantPost() {
       const { data: uploadData, error: uploadError } = await supabase
         .storage
         .from('temp-images')
-        .upload(fileName, image, {
+        .upload(fileName as any, image, {
           cacheControl: '3600',
           upsert: false,
         });
@@ -125,7 +124,8 @@ export function useInstantPost() {
         throw new Error("Error checking LinkedIn connection");
       }
       
-      if (!credentials?.access_token) {
+      const typedCredentials = credentials as ({ access_token: string | null } | null);
+      if (!typedCredentials?.access_token) {
         throw new Error("LinkedIn account not connected. Please connect your LinkedIn account in Settings.");
       }
 
@@ -178,7 +178,8 @@ export function useInstantPost() {
         throw new Error("Error checking Facebook connection");
       }
       
-      if (!credentials?.access_token && !credentials?.long_lived_token) {
+      const typedFacebookCredentials = credentials as { access_token: string | null; long_lived_token: string | null } | null;
+      if (!typedFacebookCredentials?.access_token && !typedFacebookCredentials?.long_lived_token) {
         throw new Error("Facebook account not connected. Please connect your Facebook account in Settings.");
       }
 
@@ -231,7 +232,8 @@ export function useInstantPost() {
         throw new Error("Error checking Instagram connection");
       }
       
-      if (!credentials?.access_token && !credentials?.long_lived_token) {
+      const typedInstagramCredentials = credentials as { access_token: string | null; long_lived_token: string | null } | null;
+      if (!typedInstagramCredentials?.access_token && !typedInstagramCredentials?.long_lived_token) {
         throw new Error("Instagram account not connected. Please connect your Instagram account in Settings.");
       }
 

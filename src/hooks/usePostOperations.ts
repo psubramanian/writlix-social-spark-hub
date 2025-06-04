@@ -17,7 +17,7 @@ export function usePostOperations() {
       const { data: postData, error: postError } = await supabase
         .from('scheduled_posts')
         .select('content_id, user_id')
-        .eq('id', postId)
+        .eq('id', Number(postId))
         .eq('user_id', user.id)
         .maybeSingle();
       
@@ -73,7 +73,7 @@ export function usePostOperations() {
             title
           )
         `)
-        .eq('id', postId)
+        .eq('id', Number(postId))
         .eq('user_id', user.id)
         .maybeSingle();
       
