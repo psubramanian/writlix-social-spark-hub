@@ -1,0 +1,6 @@
+
+Hello! This is a test file to verify the GitHub connection is working properly.
+
+Created by Lovable AI on 2025-06-04.
+
+If you can see this file in your GitHub repository, then the bidirectional sync is working correctly!
