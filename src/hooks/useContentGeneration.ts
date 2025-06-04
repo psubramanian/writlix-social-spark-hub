@@ -7,6 +7,8 @@ import { useNavigate } from 'react-router-dom';
 import { useToast } from '@/components/ui/use-toast';
 import { supabase } from '@/integrations/supabase/client';
 import type { ContentItem, GenerationOptions } from '@/types/content';
+import { Database } from '@/integrations/supabase/types';
+import { asUserId, asContentStatus } from '@/utils/supabase-helpers';
 
 export const useContentGeneration = () => {
   const { 
@@ -59,14 +61,17 @@ export const useContentGeneration = () => {
       
       // Insert into database
       for (const item of contentFromCsv) {
+        // Create typed insert data
+        const insertData: Database['public']['Tables']['content_ideas']['Insert'] = {
+          title: item.title,
+          content: item.content || item.preview || item.title,
+          status: asContentStatus(item.status),
+          user_id: asUserId(user.id)
+        };
+
         const { data: dbData, error: dbError } = await supabase
           .from('content_ideas')
-          .insert({
-            title: item.title,
-            content: item.content || item.preview || item.title,
-            status: item.status,
-            user_id: user.id
-          })
+          .insert(insertData)
           .select();
 
         if (dbError) {

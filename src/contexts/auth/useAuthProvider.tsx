@@ -1,4 +1,3 @@
-
 import { useState, useEffect, useRef, useCallback } from "react";
 import { Session } from "@supabase/supabase-js";
 import { useToast } from "@/components/ui/use-toast";
@@ -287,7 +286,7 @@ export function useAuthProvider(): AuthContextType {
       localStorage.setItem('auth_active', 'true');
       localStorage.setItem('auth_timestamp', timestamp);
       
-      // Initiate OAuth sign-in with enhanced options
+      // Initiate OAuth sign-in with enhanced options (removed flowType)
       const { data, error } = await supabase.auth.signInWithOAuth({
         provider,
         options: {
@@ -297,9 +296,7 @@ export function useAuthProvider(): AuthContextType {
               access_type: 'offline',
               prompt: 'select_account',
             })
-          },
-          // Use PKCE flow for better security and reliability
-          flowType: 'pkce',
+          }
         }
       });
 

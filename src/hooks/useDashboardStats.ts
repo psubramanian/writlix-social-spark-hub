@@ -4,6 +4,7 @@ import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/components/ui/use-toast';
 import { startOfMonth, endOfMonth } from 'date-fns';
 import { getCurrentUser } from '@/utils/supabaseUserUtils';
+import { asUserId, asContentStatus } from '@/utils/supabase-helpers';
 
 interface DashboardStats {
   postsCreated: number;
@@ -36,9 +37,14 @@ export function useDashboardStats(selectedMonth: Date) {
       const { count: totalContentCount, error: createdError } = await supabase
         .from('content_ideas')
         .select('*', { count: 'exact', head: true })
-        .eq('user_id', user.id)
+        .eq('user_id', asUserId(user.id))
         .gte('created_at', monthStart.toISOString())
         .lte('created_at', monthEnd.toISOString());
+
+      if (createdError) {
+        console.error('Error fetching created content count:', createdError);
+        throw createdError;
+      }
 
       // Count scheduled posts by joining with content_ideas to ensure both conditions are met
       const { data: scheduledPostsData, error: scheduledPostsError } = await supabase
@@ -47,19 +53,23 @@ export function useDashboardStats(selectedMonth: Date) {
           content_id,
           content_ideas!inner(status)
         `)
-        .eq('user_id', user.id)
+        .eq('user_id', asUserId(user.id))
         .eq('status', 'pending')
-        .eq('content_ideas.status', 'Scheduled')
+        .eq('content_ideas.status', asContentStatus('Scheduled'))
         .gt('next_run_at', now.toISOString());
 
-      if (scheduledPostsError) throw scheduledPostsError;
+      if (scheduledPostsError) {
+        console.error('Error fetching scheduled posts:', scheduledPostsError);
+        throw scheduledPostsError;
+      }
       
       // Deduplicate by content_id to get accurate count
       const uniqueContentIds = new Set();
       
-      if (scheduledPostsData) {
+      if (scheduledPostsData && Array.isArray(scheduledPostsData)) {
         scheduledPostsData.forEach(post => {
-          if (post.content_id) {
+          // Type guard to ensure we have the right structure
+          if (post && typeof post === 'object' && 'content_id' in post && post.content_id) {
             uniqueContentIds.add(post.content_id);
           }
         });
@@ -72,22 +82,28 @@ export function useDashboardStats(selectedMonth: Date) {
       const { count: publishedCount, error: publishedError } = await supabase
         .from('content_ideas')
         .select('id', { count: 'exact', head: true })
-        .eq('user_id', user.id)
-        .eq('status', 'Published')
+        .eq('user_id', asUserId(user.id))
+        .eq('status', asContentStatus('Published'))
         .gte('created_at', monthStart.toISOString())
         .lte('created_at', monthEnd.toISOString());
+
+      if (publishedError) {
+        console.error('Error fetching published count:', publishedError);
+        throw publishedError;
+      }
 
       // Count posts to review
       const { count: reviewCount, error: reviewError } = await supabase
         .from('content_ideas')
         .select('id', { count: 'exact', head: true })
-        .eq('user_id', user.id)
-        .eq('status', 'Review')
+        .eq('user_id', asUserId(user.id))
+        .eq('status', asContentStatus('Review'))
         .gte('created_at', monthStart.toISOString())
         .lte('created_at', monthEnd.toISOString());
 
-      if (createdError || publishedError || reviewError) {
-        throw new Error('Error fetching dashboard stats');
+      if (reviewError) {
+        console.error('Error fetching review count:', reviewError);
+        throw reviewError;
       }
 
       console.log('Dashboard stats:', {
