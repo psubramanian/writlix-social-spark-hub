@@ -2,6 +2,20 @@
 
 This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
 
+## Project Status: AWS Migration
+
+**⚠️ IMPORTANT: This project is currently undergoing migration from Supabase to AWS**
+
+- **Current State**: Supabase-based architecture (legacy)
+- **Target State**: AWS serverless architecture with Clerk authentication
+- **Migration Timeline**: 21 days implementation
+- **Budget**: $500 for migration + <$100/month operational costs
+
+For detailed migration information, see:
+- `project-docs/Technical_Implementation_Plan.md` - Complete technical roadmap
+- `project-docs/Step_by_Step_Execution_Plan.md` - Day-by-day implementation guide
+- `client-docs/AWS_Architecture_Overview.md` - Target architecture design
+
 ## Development Commands
 
 ```bash
@@ -11,7 +25,7 @@ npm i
 # Start development server
 npm run dev
 
-# Build for production  
+# Build for production (will deploy to S3 + CloudFront)
 npm run build
 
 # Build for development mode
@@ -24,15 +38,27 @@ npm run lint
 npm run preview
 ```
 
-## Project Architecture
+## Current Architecture (Legacy Supabase)
 
 ### Tech Stack
 - **Frontend**: React 18 + TypeScript + Vite
 - **UI Framework**: shadcn/ui + Radix UI + Tailwind CSS
-- **Backend**: Supabase (PostgreSQL + Edge Functions)
+- **Backend**: Supabase (PostgreSQL + Edge Functions) *[TO BE MIGRATED]*
 - **State Management**: React Query + Context API
-- **Authentication**: Supabase Auth with OAuth (Google, LinkedIn)
+- **Authentication**: Supabase Auth with OAuth *[MIGRATING TO CLERK]*
 - **Routing**: React Router v6
+
+## Target Architecture (AWS Migration)
+
+### New Tech Stack
+- **Frontend Hosting**: S3 Static Hosting + CloudFront CDN
+- **Authentication**: Clerk (B2C + OAuth for Google, LinkedIn, Facebook, Instagram)
+- **Backend**: AWS Lambda + API Gateway (serverless)
+- **Database**: Amazon RDS PostgreSQL (optimized schema)
+- **Storage**: S3 (AI images + assets)
+- **Payments**: Stripe (replacing current Razorpay)
+- **Monitoring**: CloudWatch
+- **External APIs**: OpenAI, Social Media APIs, Google reCAPTCHA
 
 ### Core Architecture Patterns
 
