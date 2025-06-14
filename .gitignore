@@ -22,3 +22,9 @@ dist-ssr
 *.njsproj
 *.sln
 *.sw?
+corelift-dev_accessKeys.csv
+CLAUDE.md
+project-docs/
+client-docs/
+
+
