@@ -30,16 +30,17 @@ const Sidebar = () => {
   } = useSubscription();
   
   // A user has access if they have an active trial, active subscription, or canceled subscription that hasn't expired
-  const hasActiveSubscription = isTrialActive || isSubscriptionActive || 
-    (isSubscriptionCanceled && subscription?.active_till && new Date(subscription.active_till) > new Date());
-  
+  // const hasActiveSubscription = isTrialActive || isSubscriptionActive || 
+  //   (isSubscriptionCanceled && subscription?.active_till && new Date(subscription.active_till) > new Date());
+  // This variable is no longer needed for sidebar item gating.
+
   const menuItems = [
-    { icon: BarChart, label: 'Dashboard', path: '/dashboard', premium: false },
-    { icon: FileText, label: 'Data Seed', path: '/data-seed', premium: true },
-    { icon: Calendar, label: 'Schedule', path: '/schedule', premium: false },
-    { icon: Send, label: 'Instant Post', path: '/instant-post', premium: true },
-    { icon: Settings, label: 'Settings', path: '/settings', premium: false },
-    { icon: CreditCard, label: 'Subscription', path: '/subscription', premium: false },
+    { icon: BarChart, label: 'Dashboard', path: '/dashboard' },
+    { icon: FileText, label: 'Data Seed', path: '/data-seed' },
+    { icon: Calendar, label: 'Schedule', path: '/schedule' },
+    { icon: Send, label: 'Instant Post', path: '/instant-post' },
+    { icon: Settings, label: 'Settings', path: '/settings' },
+    { icon: CreditCard, label: 'Subscription', path: '/subscription' },
   ];
   
   return (
@@ -55,44 +56,23 @@ const Sidebar = () => {
       
       <SidebarContent>
         <SidebarMenu>
-          {menuItems.map((item) => {
-            const isPremiumLocked = item.premium && !hasActiveSubscription;
-            
-            return (
-              <SidebarMenuItem key={item.path}>
-                <Tooltip>
-                  <TooltipTrigger asChild>
-                    <div className="w-full">
-                      <SidebarMenuButton
-                        asChild
-                        isActive={location.pathname === item.path}
-                        tooltip={item.label}
-                        className={cn(
-                          isPremiumLocked && "opacity-70 cursor-default"
-                        )}
-                      >
-                        <Link to={isPremiumLocked ? "/subscription" : item.path} className="flex items-center w-full">
-                          <item.icon />
-                          <span>{item.label}</span>
-                          {isPremiumLocked && <Lock className="ml-2 h-3 w-3" />}
-                        </Link>
-                      </SidebarMenuButton>
-                    </div>
-                  </TooltipTrigger>
-                  {isPremiumLocked && (
-                    <TooltipContent className="w-60">
-                      <p>
-                        {item.label} is a premium feature. 
-                        {isSubscriptionCanceled ? 
-                          " Your subscription is canceled but access continues until the end of billing period." : 
-                          " Please subscribe to access."}
-                      </p>
-                    </TooltipContent>
-                  )}
-                </Tooltip>
-              </SidebarMenuItem>
-            );
-          })}
+          {menuItems.map((item) => (
+            <SidebarMenuItem key={item.path}>
+              {/* Tooltip for item.label is handled by SidebarMenuButton's tooltip prop */}
+              <div className="w-full">
+                <SidebarMenuButton
+                  asChild
+                  isActive={location.pathname === item.path}
+                  tooltip={item.label}
+                >
+                  <Link to={item.path} className="flex items-center w-full">
+                    <item.icon />
+                    <span>{item.label}</span>
+                  </Link>
+                </SidebarMenuButton>
+              </div>
+            </SidebarMenuItem>
+          ))}
         </SidebarMenu>
       </SidebarContent>
       
