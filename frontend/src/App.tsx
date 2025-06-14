@@ -21,7 +21,6 @@ import { Loader2 } from "lucide-react";
 import { useEffect, useState, memo } from "react";
 import ProfileComplete from "./pages/ProfileComplete";
 import { ThemeProvider } from "./components/ThemeProvider";
-import SubscriptionProtectedRoute from "./components/routes/SubscriptionProtectedRoute";
 
 // Create QueryClient outside of component to ensure it's only created once
 const queryClient = new QueryClient({
@@ -118,9 +117,7 @@ const AppRoutes = memo(() => {
       
       <Route path="/data-seed" element={
         <ProtectedRoute>
-          <SubscriptionProtectedRoute featureName="Data Seed">
             <DataSeed />
-          </SubscriptionProtectedRoute>
         </ProtectedRoute>
       } />
       
@@ -150,9 +147,7 @@ const AppRoutes = memo(() => {
       
       <Route path="/instant-post" element={
         <ProtectedRoute>
-          <SubscriptionProtectedRoute featureName="Instant Post">
             <InstantPost />
-          </SubscriptionProtectedRoute>
         </ProtectedRoute>
       } />
       
