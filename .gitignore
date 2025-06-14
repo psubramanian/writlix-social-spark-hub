@@ -7,22 +7,31 @@ yarn-error.log*
 pnpm-debug.log*
 lerna-debug.log*
 
-node_modules
-dist
-dist-ssr
-*.local
+# Frontend folder
+frontend/node_modules/
+frontend/dist/
+frontend/dist-ssr/
+frontend/.env
+frontend/.env.*
+!frontend/.env.example
 
-# Editor directories and files
-.vscode/*
-!.vscode/extensions.json
-.idea
+# Misc
 .DS_Store
+*.pem
 *.suo
 *.ntvs*
 *.njsproj
 *.sln
 *.sw?
+
+# Editor directories and files
+.vscode/*
+!.vscode/extensions.json
+.idea/
+
+# Custom ignores for this project
 corelift-dev_accessKeys.csv
 client-docs/
 project-docs/
 CLAUDE.md
+
