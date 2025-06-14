@@ -23,8 +23,5 @@ dist-ssr
 *.sln
 *.sw?
 corelift-dev_accessKeys.csv
-CLAUDE.md
-project-docs/
 client-docs/
-
-
+project-docs/
