@@ -4,8 +4,8 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { useToast } from "@/components/ui/use-toast";
-import { useAuth } from '@/contexts/auth';
-import { HelpCircle } from 'lucide-react';
+import { useUser } from '@clerk/clerk-react'; // Replaced useAuth with Clerk's useUser
+import { HelpCircle, Loader2 } from 'lucide-react';
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 import { credentialsOperations } from '@/utils/supabaseHelpers';
 
@@ -31,17 +31,44 @@ const InstagramCredentialsForm = () => {
   const [clientId, setClientId] = useState('');
   const [clientSecret, setClientSecret] = useState('');
   const [redirectUri, setRedirectUri] = useState('');
-  const [loading, setLoading] = useState(false);
+  const [loading, setLoading] = useState(false); // This is for submit loading, not initial data load
   const [hasCredentials, setHasCredentials] = useState(false);
   const { toast } = useToast();
-  const { user } = useAuth();
+  const { user, isLoaded } = useUser(); // Moved useUser here to be before the initial !isLoaded check
   const defaultRedirectUri = typeof window !== "undefined"
     ? window.location.origin + window.location.pathname
     : "";
 
+  if (!isLoaded) { // Initial Clerk loading state
+    return (
+      <Card>
+        <CardHeader>
+          <CardTitle>Instagram API Credentials</CardTitle>
+        </CardHeader>
+        <CardContent>
+          <div className="flex items-center justify-center p-8">
+            <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" /> Initializing...
+          </div>
+        </CardContent>
+      </Card>
+    );
+  }
+
   useEffect(() => {
-    fetchCredentials();
-  }, []);
+    if (isLoaded && user?.id) {
+      fetchCredentials();
+    } else if (isLoaded && !user?.id) {
+        setClientId('');
+        setClientSecret('');
+        setRedirectUri(defaultRedirectUri);
+        setHasCredentials(false);
+        toast({
+            title: "User not found",
+            description: "Please log in to manage Instagram credentials.",
+            variant: "destructive",
+        });
+    }
+  }, [user?.id, isLoaded, toast, defaultRedirectUri]); // `fetchCredentials` is defined in scope, its dependencies are covered.
 
   const fetchCredentials = async () => {
     try {

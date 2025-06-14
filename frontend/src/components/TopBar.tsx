@@ -1,6 +1,6 @@
 
 import React from 'react';
-import { useAuth } from '../contexts/AuthContext';
+import { useUser, UserButton } from '@clerk/clerk-react'; // Changed to use Clerk's useUser hook, Added UserButton // Changed to use Clerk's useUser hook
 import { Button } from '@/components/ui/button';
 import { Avatar, AvatarImage, AvatarFallback } from '@/components/ui/avatar';
 import { Bell, Menu } from 'lucide-react';
@@ -9,7 +9,23 @@ import { useSidebar } from '@/components/ui/sidebar';
 import { ThemeToggle } from './ThemeToggle';
 
 const TopBar = () => {
-  const { user } = useAuth();
+  const { user, isLoaded: isUserLoaded } = useUser(); // Use Clerk's useUser hook
+  // const { subscription, loading, formatSubscriptionStatus } = useSubscription(); // This line is already present
+  // const { toggleSidebar } = useSidebar(); // This line is already present
+
+  if (!isUserLoaded) {
+    // You might want a more sophisticated loading state, or just render minimal UI
+    return (
+      <div className="h-16 border-b bg-white dark:bg-background-dark dark:border-border-dark flex items-center justify-between px-6">
+        <div>Loading...</div>
+      </div>
+    );
+  }
+
+  // Construct a display name, Clerk provides firstName, lastName, fullName
+  const displayName = user?.fullName || user?.firstName || 'User';
+  const avatarFallback = displayName?.charAt(0)?.toUpperCase() || 'U';
+  const emailAddress = user?.primaryEmailAddress?.emailAddress || '';
   const { subscription, loading, formatSubscriptionStatus } = useSubscription();
   const { toggleSidebar } = useSidebar();
   
@@ -20,7 +36,7 @@ const TopBar = () => {
           <Menu className="h-5 w-5" />
           <span className="sr-only">Toggle sidebar</span>
         </Button>
-        <h1 className="text-xl font-semibold dark:text-foreground-dark">Welcome, {user?.name || 'User'}</h1>
+        <h1 className="text-xl font-semibold dark:text-foreground-dark">Welcome, {displayName}</h1>
       </div>
       
       <div className="flex items-center gap-4">
@@ -30,19 +46,7 @@ const TopBar = () => {
           <Bell className="h-5 w-5" />
         </Button>
         
-        <div className="flex items-center gap-3">
-          <Avatar>
-            <AvatarImage src={user?.avatar} />
-            <AvatarFallback>{user?.name?.charAt(0) || 'U'}</AvatarFallback>
-          </Avatar>
-          <div>
-            <p className="text-sm font-medium dark:text-foreground-dark">{user?.name || 'Guest'}</p>
-            <p className="text-xs text-muted-foreground dark:text-muted-dark-foreground">{user?.email || ''}</p>
-            <p className="text-xs text-muted-foreground dark:text-muted-dark-foreground">
-              {loading ? 'Loading subscription...' : formatSubscriptionStatus()}
-            </p>
-          </div>
-        </div>
+        <UserButton afterSignOutUrl="/login" />
       </div>
     </div>
   );

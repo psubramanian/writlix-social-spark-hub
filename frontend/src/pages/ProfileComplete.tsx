@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { useAuth } from '../contexts/auth';
+import { useUser, useClerk } from '@clerk/clerk-react'; // Replaced useAuth with Clerk's useUser and useClerk
 import { useNavigate } from 'react-router-dom';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from '@/components/ui/card';
@@ -10,12 +10,27 @@ import { supabase } from '@/integrations/supabase/client';
 import { Loader2, AlertCircle } from 'lucide-react';
 import { Alert, AlertDescription } from '@/components/ui/alert';
 
+// Define a type for publicMetadata that includes profileComplete
+interface UserPublicMetadataWithProfile extends Record<string, unknown> {
+  profileComplete?: boolean;
+}
+
+// Type guard to check for profileComplete in publicMetadata
+function userHasCompletedProfile(user: { publicMetadata: Record<string, unknown> | null } | null | undefined): boolean {
+  return !!(user && user.publicMetadata && typeof (user.publicMetadata as UserPublicMetadataWithProfile).profileComplete === 'boolean' && (user.publicMetadata as UserPublicMetadataWithProfile).profileComplete);
+}
+
 const ProfileComplete = () => {
-  const { user, isLoading: authLoading, refreshUserProfile } = useAuth();
+  const { user, isLoaded: clerkIsLoaded } = useUser();
+  const { signOut } = useClerk(); // For potential session management if needed, e.g. sign out on critical error
+  const authLoading = !clerkIsLoaded;
+  // refreshUserProfile is no longer directly available from Clerk's useUser in the same way.
+  // Clerk's user object updates automatically. If a forced reload is needed, user.reload() can be called.
+  // For now, we'll remove direct calls to refreshUserProfile and rely on automatic updates.
   const navigate = useNavigate();
   const { toast } = useToast();
   const [isLoading, setIsLoading] = useState(false);
-  const [fullName, setFullName] = useState(user?.name || '');
+  const [fullName, setFullName] = useState(user?.fullName || user?.firstName || ''); // Ensured correct Clerk properties
   const [error, setError] = useState<string | null>(null);
   const [skipAttempted, setSkipAttempted] = useState(false);
   
@@ -26,10 +41,10 @@ const ProfileComplete = () => {
   
   useEffect(() => {
     // Initialize with user name if available and it changes
-    if (user?.name && user.name !== fullName) {
-      setFullName(user.name);
+    if (user && (user.fullName || user.firstName) && (user.fullName || user.firstName) !== fullName) {
+      setFullName(user.fullName || user.firstName || '');
     }
-  }, [user?.name]);
+  }, [user?.fullName, user?.firstName]); // Corrected dependency array for Clerk user name properties
   
   // Check if user has attempted to complete profile before
   useEffect(() => {
@@ -42,11 +57,11 @@ const ProfileComplete = () => {
   // Check if user is already redirected to dashboard when profile is complete
   useEffect(() => {
     // If user already has a complete profile, redirect to dashboard
-    if (!authLoading && user?.profileComplete) {
+    if (!authLoading && userHasCompletedProfile(user)) {
       console.log("[PROFILE] User has completed profile, redirecting to dashboard");
       navigate('/dashboard', { replace: true });
     }
-  }, [user?.profileComplete, authLoading, navigate]);
+  }, [user?.publicMetadata?.profileComplete, authLoading, navigate, user]); // Explicitly depend on the boolean value and the user object
   
   // Handle form submission
   const handleSubmit = async (e: React.FormEvent) => {
@@ -87,8 +102,8 @@ const ProfileComplete = () => {
             .upsert({
               id: user.id,
               full_name: fullName,
-              email: user.email,
-              avatar_url: user.avatar,
+              email: user.primaryEmailAddress?.emailAddress,
+              avatar_url: user.imageUrl,
               profile_completed: true, // Explicitly mark as complete
               updated_at: new Date().toISOString()
             });
@@ -117,7 +132,8 @@ const ProfileComplete = () => {
       localStorage.removeItem('profile_bypass_attempts');
       
       // Refresh user profile to reflect changes
-      await refreshUserProfile();
+      // await refreshUserProfile(); // Removed, Clerk user object updates automatically
+      // Potentially call user.reload() here if an immediate forced refresh of Clerk's user data is critical
       
       toast({
         title: "Profile Updated",
@@ -182,9 +198,11 @@ const ProfileComplete = () => {
     });
     
     // Refresh user profile to reflect changes
-    refreshUserProfile().then(() => {
-      navigate('/dashboard', { replace: true });
-    });
+    // refreshUserProfile().then(...); // Removed
+    // Assuming profile_completed status is now part of Clerk's user.publicMetadata
+    // If not immediately reflected, a user.reload() might be considered here before navigating.
+    // For now, relying on Clerk's automatic updates.
+    navigate('/dashboard', { replace: true });
   };
   
   // Show loading state while checking authentication
@@ -278,7 +296,7 @@ const ProfileComplete = () => {
         {process.env.NODE_ENV === 'development' && (
           <div className="mt-4 p-2 bg-black/80 text-xs text-white rounded">
             <div>Auth ID: {user?.id || 'None'}</div>
-            <div>Profile state: {user?.profileComplete ? 'Complete' : 'Incomplete'}</div>
+            <div>Profile state: {userHasCompletedProfile(user) ? 'Complete' : 'Incomplete'}</div>
             <div>LS Skip: {localStorage.getItem('profile_skip_attempted') || 'false'}</div>
             <div>LS Complete: {localStorage.getItem('profile_completed') || 'false'}</div>
             <div>LS Bypass Attempts: {localStorage.getItem('profile_bypass_attempts') || '0'}</div>

@@ -1,6 +1,6 @@
 
 import { useState, useEffect, useCallback } from 'react';
-import { useAuth } from '@/contexts/AuthContext';
+import { useUser } from '@clerk/clerk-react'; // Changed to use Clerk's useUser hook
 import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
 import { format, addDays, isAfter } from 'date-fns';
@@ -16,7 +16,7 @@ interface SubscriptionData {
 }
 
 export function useSubscription() {
-  const { user } = useAuth();
+  const { user, isLoaded: isUserLoaded } = useUser(); // Use Clerk's useUser hook, aliasing isLoaded to avoid conflict
   const { toast } = useToast();
   const [subscription, setSubscription] = useState<SubscriptionData | null>(null);
   const [loading, setLoading] = useState(true);
@@ -53,7 +53,13 @@ export function useSubscription() {
   }, []);
 
   const fetchSubscription = useCallback(async () => {
-    if (!user?.id) return;
+    if (!isUserLoaded || !user?.id) {
+      // If user is not loaded yet, or no user, don't fetch. 
+      // Set loading to false if it was true, or handle as appropriate.
+      // This prevents errors if the hook runs before Clerk has loaded the user.
+      if (loading) setLoading(false);
+      return;
+    }
     
     try {
       setLoading(true);
@@ -113,7 +119,7 @@ export function useSubscription() {
     } finally {
       setLoading(false);
     }
-  }, [user?.id]);
+  }, [user?.id, isUserLoaded]); // Add isUserLoaded to dependency array
 
   useEffect(() => {
     if (user?.id) {
@@ -249,8 +255,8 @@ export function useSubscription() {
         order_id: data.id,
         handler: handlePaymentSuccess,
         prefill: {
-          name: user.name || '',
-          email: user.email || '',
+          name: user.fullName || user.firstName || '',
+          email: user.primaryEmailAddress?.emailAddress || '',
         },
         theme: {
           color: "#6366f1" // Primary color from Tailwind

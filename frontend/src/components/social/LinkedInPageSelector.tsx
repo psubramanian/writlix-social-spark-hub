@@ -7,7 +7,7 @@ import { useToast } from "@/components/ui/use-toast";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Loader2, Building2, User, CheckCircle } from "lucide-react";
 import { supabase } from '@/integrations/supabase/client';
-import { useAuth } from '@/contexts/auth';
+import { useUser } from '@clerk/clerk-react'; // Replaced useAuth with Clerk's useUser
 
 interface LinkedInPage {
   id: string;
@@ -29,7 +29,38 @@ const LinkedInPageSelector = ({ isOpen, onClose, onSave }: LinkedInPageSelectorP
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const { toast } = useToast();
-  const { user } = useAuth();
+  const { user, isLoaded } = useUser();
+
+  // Defer operations until user is loaded, especially for useEffect dependencies
+  // The existing useEffect for fetchPages already depends on user?.id and isOpen.
+  // We need to ensure that `isLoaded` is also considered or that `user` is stable.
+  // The component only renders if isOpen is true, so loading state inside the modal is appropriate.
+
+  useEffect(() => {
+    if (isOpen && isLoaded && user?.id) { // Ensure user is loaded before fetching
+      setLoading(true);
+      fetchPages();
+    } else if (isOpen && isLoaded && !user?.id) {
+      // User is loaded but not available (e.g., logged out while modal was open or about to open)
+      setLoading(false);
+      setPages([]); // Clear pages if no user
+      toast({
+        title: "Authentication Error",
+        description: "User not found. Please log in.",
+        variant: "destructive",
+      });
+    }
+    // If !isLoaded yet, the fetchPages will be triggered by this effect once isLoaded becomes true.
+  }, [isOpen, user?.id, isLoaded]); // Added isLoaded to dependency array
+
+  // Original useEffect for fetchPages is removed as its logic is merged above.
+  // useEffect(() => {
+  //   if (isOpen) {
+  //     setLoading(true);
+  //     fetchPages();
+  //   }
+  // }, [isOpen, user?.id]);
+
 
   const fetchPages = async () => {
     if (!user?.id) return;

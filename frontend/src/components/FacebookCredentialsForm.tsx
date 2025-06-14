@@ -4,8 +4,8 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { useToast } from "@/components/ui/use-toast";
-import { useAuth } from '@/contexts/auth';
-import { HelpCircle } from 'lucide-react';
+import { useUser } from '@clerk/clerk-react'; // Replaced useAuth with Clerk's useUser
+import { HelpCircle, Loader2 } from 'lucide-react'; // Added Loader2
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 import { credentialsOperations } from '@/utils/supabaseHelpers';
 
@@ -34,21 +34,35 @@ const FacebookCredentialsForm = () => {
   const [loading, setLoading] = useState(false);
   const [hasCredentials, setHasCredentials] = useState(false);
   const { toast } = useToast();
-  const { user } = useAuth();
+  const { user, isLoaded } = useUser(); // Replaced useAuth with Clerk's useUser
+  const authLoading = !isLoaded;
   const defaultRedirectUri = typeof window !== "undefined" ? 
     window.location.origin + window.location.pathname : "";
 
   useEffect(() => {
-    fetchCredentials();
-  }, []);
+    if (isLoaded && user?.id) { // Check isLoaded before fetching
+      fetchCredentials();
+    } else if (isLoaded && !user) {
+      toast({
+        title: "Authentication Error",
+        description: "User not found. Cannot fetch credentials.",
+        variant: "destructive",
+      });
+    }
+  }, [user?.id, isLoaded, toast]); // Added isLoaded and toast to dependencies
 
   const fetchCredentials = async () => {
+    // user and user.id are now checked in useEffect before calling this
+    if (!user?.id) { // This check is now more of a safeguard
+      console.error('Fetch credentials called without user ID');
+      toast({
+        title: "Error",
+        description: "Cannot fetch credentials without a user.",
+        variant: "destructive",
+      });
+      return;
+    }
     try {
-      if (!user?.id) {
-        console.error('No user ID available for fetching credentials');
-        return;
-      }
-      
       console.log('Fetching Facebook credentials for user ID:', user.id);
 
       const data = await credentialsOperations.facebook.fetch(user.id);
@@ -72,10 +86,17 @@ const FacebookCredentialsForm = () => {
     e.preventDefault();
     setLoading(true);
 
+    if (!isLoaded || !user?.id) { // Check isLoaded and user before submitting
+      toast({
+        title: "Authentication Error",
+        description: "User not available. Please try again.",
+        variant: "destructive",
+      });
+      setLoading(false);
+      return;
+    }
+
     try {
-      if (!user?.id) {
-        throw new Error('User not authenticated');
-      }
 
       const { error } = await credentialsOperations.facebook.upsert(
         user.id,
@@ -109,6 +130,15 @@ const FacebookCredentialsForm = () => {
       setLoading(false);
     }
   };
+
+  if (authLoading) {
+    return (
+      <Card className="flex items-center justify-center p-8 min-h-[200px]">
+        <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
+        <p className="ml-2">Loading Facebook credentials...</p>
+      </Card>
+    );
+  }
 
   return (
     <Card>

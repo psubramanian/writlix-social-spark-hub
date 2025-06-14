@@ -12,7 +12,7 @@ import { ScheduledPostsList } from '@/components/schedule/ScheduledPostsList';
 import OutlookCalendar from '@/components/schedule/OutlookCalendar';
 import { LinkedInWarning } from '@/components/dashboard/LinkedInWarning';
 import { supabase } from '@/integrations/supabase/client';
-import { useAuth } from '../contexts/AuthContext';
+import { useUser } from '@clerk/clerk-react'; // Replaced useAuth with Clerk's useUser
 import { useScheduleSettings } from '@/hooks/useScheduleSettings';
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
@@ -63,7 +63,19 @@ const Schedule = () => {
   const [imageUrl, setImageUrl] = useState('');
   const [currentPostId, setCurrentPostId] = useState<string | null>(null);
   const { toast } = useToast();
-  const { user } = useAuth();
+  const { user, isLoaded: isUserLoaded } = useUser(); // Renamed isLoaded to avoid conflict if 'loading' is already defined in this scope
+
+  // It's crucial to wait for user to be loaded before proceeding, especially for checks like !user
+  // or when user.id is used in useEffect dependencies or initial queries.
+  // The existing useEffect for checkSocialConnections already checks for `!user`, 
+  // but it's good practice to ensure user (and its .id) is available when needed.
+  // A general loading state for the page might be appropriate if user data is critical for rendering.
+  // For now, we'll rely on the existing `!user` checks within functions/useEffect.
+  // If the component renders significant UI before user is loaded, consider a top-level loading state:
+  if (!isUserLoaded) {
+    // Or a more integrated loading state within your page layout
+    return <div className="p-4">Loading user data...</div>;
+  }
   const { updateUserSettings, isUpdating } = useScheduleSettings();
   
   const [previewDialogOpen, setPreviewDialogOpen] = useState(false);

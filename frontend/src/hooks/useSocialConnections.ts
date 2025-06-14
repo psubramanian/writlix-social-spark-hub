@@ -1,6 +1,6 @@
 
 import { useState, useEffect } from 'react';
-import { useAuth } from '@/contexts/auth';
+import { useUser } from '@clerk/clerk-react'; // Replaced useAuth with Clerk's useUser
 import { supabase } from '@/integrations/supabase/client';
 
 interface SocialConnectionStatus {
@@ -17,7 +17,20 @@ export function useSocialConnections() {
   });
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const { user } = useAuth();
+  const { user, isLoaded } = useUser();
+
+  // The hook's logic heavily depends on the user object, especially user.id.
+  // It might be beneficial to not run `checkAllConnections` or event listeners until user is loaded.
+  // However, the existing code already checks for `!user?.id` before proceeding in `checkAllConnections`.
+  // Adding a top-level loading state for the hook itself could be an option if consumers need to know.
+  // For now, we ensure `user` is from Clerk. The `useEffect` dependencies on `user?.id` will still work.
+  // If the hook is used in a component that shows UI before user is loaded, that component should handle loading state.
+  // A simple check to prevent premature execution if user is not loaded yet:
+  // if (!isLoaded && !user) { // initial load before user object is available
+  //   return { connections, loading: true, error, refresh: () => {} }; 
+  // }
+  // The above commented-out block is an option, but for now, let's rely on `!user?.id` checks within the hook.
+
 
   const checkAllConnections = async () => {
     if (!user?.id) {

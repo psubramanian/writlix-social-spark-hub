@@ -4,10 +4,10 @@ import { Toaster as Sonner } from "@/components/ui/sonner";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { BrowserRouter, Routes, Route, Navigate } from "react-router-dom";
-import { AuthProvider } from "./contexts/AuthContext";
-import { useAuth } from "./contexts/AuthContext";
+import { useAuth } from "@clerk/clerk-react"; // Updated to use Clerk's useAuth
 import Index from "./pages/Index";
 import Login from "./pages/Login";
+import SignUpPage from "./pages/SignUpPage";
 import Dashboard from "./pages/Dashboard";
 import DataSeed from "./pages/DataSeed";
 import Schedule from "./pages/Schedule";
@@ -45,9 +45,10 @@ const LoadingScreen = memo(() => (
 LoadingScreen.displayName = 'LoadingScreen';
 
 // Auth Debug Component - only shown in development
-const AuthDebug = ({ user }: { user: any }) => {
+const AuthDebug = memo(({ user }: { user: any }) => {
   if (process.env.NODE_ENV !== 'development') return null;
-  
+  // Note: The 'user' prop for AuthDebug would need to be passed from Clerk's useUser() or useAuth()
+  // if this component were to be actively used. For now, it's not instantiated in ProtectedRoute.
   return (
     <div className="fixed bottom-0 right-0 bg-black/80 text-white p-2 text-xs max-w-[300px] z-50 rounded-tl-md">
       <div>Auth Status: {user ? 'Logged In' : 'Logged Out'}</div>
@@ -58,108 +59,40 @@ const AuthDebug = ({ user }: { user: any }) => {
       <div>LS-Bypass: {localStorage.getItem('profile_bypass_attempts') || 'null'}</div>
     </div>
   );
-};
+});
+AuthDebug.displayName = 'AuthDebug';
 
 // Using memo to prevent unnecessary re-renders
 const ProtectedRoute = memo(({ children }: { children: React.ReactNode }) => {
-  const { isAuthenticated, isLoading, user } = useAuth();
-  const [shouldBypassProfileCheck, setShouldBypassProfileCheck] = useState(false);
-  
-  // Enhanced logging for protected route decisions
+  const { isLoaded, isSignedIn, userId } = useAuth(); // Use Clerk's useAuth
+
   useEffect(() => {
-    console.log("[ROUTER] Protected route accessed, auth status:", 
-      isAuthenticated ? "Authenticated" : "Not authenticated", 
-      "Loading:", isLoading,
-      "User:", user?.email || "No email",
-      "Profile complete flag:", user?.profileComplete ? "Complete" : "Incomplete"
-    );
-    
-    // Log localStorage state for debugging
-    console.log("[ROUTER] LocalStorage state:", {
-      profile_skip_attempted: localStorage.getItem('profile_skip_attempted'),
-      profile_completed: localStorage.getItem('profile_completed'),
-      profile_bypass_attempts: localStorage.getItem('profile_bypass_attempts'),
-      auth_active: localStorage.getItem('auth_active')
-    });
-  }, [isAuthenticated, isLoading, user]);
-  
-  // Check for profile bypass flags with enhanced recovery
-  useEffect(() => {
-    // Reset bypass attempts if coming from profile complete page
-    if (window.location.pathname === '/profile-complete') {
-      localStorage.removeItem('profile_bypass_attempts');
+    if (isLoaded) {
+      console.log("[CLERK ROUTER] ProtectedRoute check:", { isLoaded, isSignedIn, userId });
     }
-    
-    // Check multiple sources to determine if we should bypass profile completion
-    const hasSkippedProfileCompletion = localStorage.getItem('profile_skip_attempted') === 'true';
-    const hasCompletedProfile = localStorage.getItem('profile_completed') === 'true';
-    const databaseProfileComplete = user?.profileComplete === true;
-    
-    // Force bypass after multiple attempts to prevent endless loops
-    // But make sure to increment cautiously
-    const bypassAttemptCount = parseInt(localStorage.getItem('profile_bypass_attempts') || '0', 10);
-    
-    // Check if we need to force a bypass to prevent infinite loops
-    if (bypassAttemptCount >= 3) {
-      console.warn("[ROUTER] Forcing profile bypass after multiple attempts");
-      localStorage.setItem('profile_skip_attempted', 'true');
-      localStorage.setItem('profile_completed', 'true');
-      setShouldBypassProfileCheck(true);
-      return;
-    }
-    
-    // If any of these conditions are met, bypass profile check
-    if (hasSkippedProfileCompletion || hasCompletedProfile || databaseProfileComplete) {
-      console.log("[ROUTER] Bypassing profile check due to:", {
-        hasSkippedProfileCompletion,
-        hasCompletedProfile,
-        databaseProfileComplete
-      });
-      setShouldBypassProfileCheck(true);
-    } else if (window.location.pathname !== '/profile-complete') {
-      // Only increment bypass attempt counter when not on profile completion page
-      // and when we're actually going to try to redirect to profile completion
-      localStorage.setItem('profile_bypass_attempts', String(bypassAttemptCount + 1));
-    }
-  }, [user, window.location.pathname]);
-  
-  // Show loading screen while checking auth
-  if (isLoading) {
-    console.log("[ROUTER] Auth is still loading");
+  }, [isLoaded, isSignedIn, userId]);
+
+  if (!isLoaded) {
+    console.log("[CLERK ROUTER] Auth is loading...");
     return <LoadingScreen />;
   }
-  
-  // Redirect to login if not authenticated
-  if (!isAuthenticated) {
-    console.log("[ROUTER] User not authenticated, redirecting to login");
-    // Clear any bypass attempts on redirect to login
-    localStorage.removeItem('profile_bypass_attempts');
-    return <Navigate to="/login" replace />;
+
+  if (!isSignedIn) {
+    console.log("[CLERK ROUTER] User not signed in, redirecting to /login");
+    return <Navigate to="/login" state={{ from: window.location.pathname }} replace />;
   }
+
+  // At this point, user is signed in.
+  // We can add profile completion logic here later if needed, using Clerk's user object.
+  // For now, if signed in, grant access.
+  console.log("[CLERK ROUTER] User signed in, rendering protected content for userId:", userId);
   
-  // Add debug component in development mode
-  const authDebug = process.env.NODE_ENV === 'development' ? <AuthDebug user={user} /> : null;
-  
-  // If user profile isn't complete and route isn't the profile completion page,
-  // and we haven't set the bypass flag, redirect to profile completion
-  if (user && 
-      user.profileComplete === false && 
-      window.location.pathname !== '/profile-complete' && 
-      !shouldBypassProfileCheck) {
-    console.log("[ROUTER] User profile incomplete, redirecting to profile completion");
-    return (
-      <>
-        {authDebug}
-        <Navigate to="/profile-complete" replace />
-      </>
-    );
-  }
-  
-  // User is authenticated, render the protected content
-  console.log("[ROUTER] User authenticated, rendering protected content");
+  // The AuthDebug component might need to be updated to use Clerk's user object if still needed
+  // const authDebug = process.env.NODE_ENV === 'development' ? <AuthDebug user={/* Clerk's user object */} /> : null;
+
   return (
     <>
-      {authDebug}
+      {/* authDebug */}
       <AppLayout>{children}</AppLayout>
     </>
   );
@@ -171,7 +104,8 @@ const AppRoutes = memo(() => {
   return (
     <Routes>
       <Route path="/" element={<Index />} />
-      <Route path="/login" element={<Login />} />
+      <Route path="/login/*" element={<Login />} />
+      <Route path="/sign-up/*" element={<SignUpPage />} />
       <Route path="/profile-complete" element={
         <ProfileComplete />
       } />
@@ -233,13 +167,11 @@ const App = () => {
     <BrowserRouter>
       <QueryClientProvider client={queryClient}>
         <ThemeProvider defaultTheme="light" storageKey="writlix-theme">
-          <AuthProvider>
             <TooltipProvider>
               <Toaster />
               <Sonner />
               <AppRoutes />
             </TooltipProvider>
-          </AuthProvider>
         </ThemeProvider>
       </QueryClientProvider>
     </BrowserRouter>

@@ -9,14 +9,15 @@ import SimpleInstagramConnection from '../components/social/SimpleInstagramConne
 import { AccountSettingsForm } from '../components/AccountSettingsForm';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
-import { AlertCircle } from 'lucide-react';
-import { useAuth } from '@/contexts/auth';
+import { AlertCircle, Loader2 } from 'lucide-react'; // Added Loader2
+import { useUser } from '@clerk/clerk-react'; // Replaced useAuth with Clerk's useUser
 
 const Settings = () => {
   const location = useLocation();
   const navigate = useNavigate();
   const [activeTab, setActiveTab] = useState('account');
-  const { isLoading: authLoading, user } = useAuth();
+  const { user, isLoaded } = useUser();
+  const authLoading = !isLoaded;
   
   useEffect(() => {
     const searchParams = new URLSearchParams(location.search);
@@ -40,10 +41,18 @@ const Settings = () => {
       </div>
       
       {authLoading ? (
-        <div className="space-y-6">
-          <Skeleton className="h-[300px] w-full rounded-lg" />
+        <div className="flex items-center justify-center p-8">
+          <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" /> Loading settings...
         </div>
-      ) : user ? (
+      ) : isLoaded && !user ? (
+        <Alert variant="destructive">
+          <AlertCircle className="h-4 w-4" />
+          <AlertTitle>Authentication Error</AlertTitle>
+          <AlertDescription>
+            Could not load user data. Please try logging out and back in.
+          </AlertDescription>
+        </Alert>
+      ) : isLoaded && user ? (
         <Tabs value={activeTab} onValueChange={handleTabChange}>
           <TabsList className="mb-6">
             <TabsTrigger value="account">Account</TabsTrigger>
@@ -120,11 +129,11 @@ const Settings = () => {
           </TabsContent>
         </Tabs>
       ) : (
-        <Alert variant="destructive">
+        <Alert variant="default">
           <AlertCircle className="h-4 w-4" />
-          <AlertTitle>Authentication Error</AlertTitle>
+          <AlertTitle>Status Unknown</AlertTitle>
           <AlertDescription>
-            Could not load user data. Please try logging out and back in.
+            Cannot determine authentication status.
           </AlertDescription>
         </Alert>
       )}

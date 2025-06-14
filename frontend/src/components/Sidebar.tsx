@@ -1,7 +1,7 @@
 
 import React from 'react';
 import { Link, useLocation } from "react-router-dom";
-import { useAuth } from '../contexts/AuthContext';
+import { useClerk } from '@clerk/clerk-react'; // Changed to use Clerk's useClerk hook
 import { useSubscription } from '../hooks/useSubscription';
 import { BarChart, Settings, LogOut, FileText, Calendar, CreditCard, Send, Lock } from 'lucide-react';
 import {
@@ -18,7 +18,8 @@ import { cn } from "@/lib/utils";
 
 const Sidebar = () => {
   const location = useLocation();
-  const { logout } = useAuth();
+  const { signOut } = useClerk(); // Use Clerk's signOut function
+  // const { user } = useUser(); // We might need user.id for useSubscription later
   const { 
     subscription, 
     loading, 
@@ -100,7 +101,7 @@ const Sidebar = () => {
           {loading ? "Loading subscription..." : formatSubscriptionStatus()}
         </div>
         <SidebarMenuButton
-          onClick={() => logout()}
+          onClick={() => signOut({ redirectUrl: '/login' })}
           className="w-full"
         >
           <LogOut />

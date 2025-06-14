@@ -8,7 +8,7 @@ import { useToast } from "@/components/ui/use-toast";
 import { useInstantPost } from '../hooks/useInstantPost';
 import { Loader2, ImageIcon, Upload, AlertCircle } from "lucide-react";
 import RichTextEditor from '../components/RichTextEditor';
-import { useAuth } from '@/contexts/auth';
+import { useUser } from '@clerk/clerk-react'; // Replaced useAuth with Clerk's useUser
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 import { Facebook, Instagram, Linkedin } from "lucide-react";
 import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group";
@@ -45,7 +45,8 @@ const InstantPost = () => {
   const [imageUrl, setImageUrl] = useState('');
   
   const { toast } = useToast();
-  const { user } = useAuth();
+  const { user, isLoaded } = useUser(); // Replaced useAuth with Clerk's useUser
+  const authLoading = !isLoaded;
   const { 
     generateContentFromImage, 
     postToLinkedIn, 
@@ -56,60 +57,58 @@ const InstantPost = () => {
     postingPlatform
   } = useInstantPost();
 
-  // Check social connections when component mounts and when user changes
-  useEffect(() => {
-    const checkSocialConnections = async () => {
-      if (!user?.id) {
-        console.log('No user found for social connection check');
-        return;
-      }
-      
-      setLoading(true);
-      console.log('Checking social connections for user:', user.id);
-      
-      try {
-        // Check LinkedIn using standardized helper
-        const linkedInData = await credentialsOperations.linkedin.fetch(user.id);
-        const linkedInConnected = isValidData(linkedInData) && !!(linkedInData as any)?.access_token;
-        console.log('LinkedIn connection status:', linkedInConnected, linkedInData);
-        
-        // Check Facebook using standardized helper
-        const facebookData = await credentialsOperations.facebook.fetch(user.id);
-        const facebookConnected = isValidData(facebookData) && 
-          (!!(facebookData as any)?.access_token || !!(facebookData as any)?.long_lived_token);
-        console.log('Facebook connection status:', facebookConnected, facebookData);
-        
-        // Check Instagram using standardized helper
-        const instagramData = await credentialsOperations.instagram.fetch(user.id);
-        const instagramConnected = isValidData(instagramData) && 
-          (!!(instagramData as any)?.access_token || !!(instagramData as any)?.long_lived_token);
-        console.log('Instagram connection status:', instagramConnected, instagramData);
-        
-        setSocialConnections({
-          linkedin: linkedInConnected,
-          facebook: facebookConnected,
-          instagram: instagramConnected
-        });
-        
-        console.log('Updated social connections state:', {
-          linkedin: linkedInConnected,
-          facebook: facebookConnected,
-          instagram: instagramConnected
-        });
-      } catch (error) {
-        console.error('Error checking social connections:', error);
-        toast({
-          title: "Connection Check Failed",
-          description: "Failed to check social media connections. Please refresh the page.",
-          variant: "destructive",
-        });
-      } finally {
-        setLoading(false);
-      }
-    };
+  const checkSocialConnections = useCallback(async () => {
+    if (!user?.id) {
+      console.log('User not available for social connection check.');
+      setSocialConnections({ linkedin: false, facebook: false, instagram: false });
+      setLoading(false);
+      return;
+    }
     
-    checkSocialConnections();
-  }, [user?.id, toast]);
+    setLoading(true);
+    console.log('Checking social connections for user:', user.id);
+    
+    try {
+      const linkedInData = await credentialsOperations.linkedin.fetch(user.id);
+      const linkedInConnected = isValidData(linkedInData) && !!(linkedInData as any)?.access_token;
+      
+      const facebookData = await credentialsOperations.facebook.fetch(user.id);
+      const facebookConnected = isValidData(facebookData) && (!!(facebookData as any)?.access_token || !!(facebookData as any)?.long_lived_token);
+      
+      const instagramData = await credentialsOperations.instagram.fetch(user.id);
+      const instagramConnected = isValidData(instagramData) && (!!(instagramData as any)?.access_token || !!(instagramData as any)?.long_lived_token);
+      
+      setSocialConnections({
+        linkedin: linkedInConnected,
+        facebook: facebookConnected,
+        instagram: instagramConnected
+      });
+      console.log('Updated social connections state:', { linkedin: linkedInConnected, facebook: facebookConnected, instagram: instagramConnected });
+    } catch (error) {
+      console.error('Error checking social connections:', error);
+      toast({
+        title: "Connection Check Failed",
+        description: "Failed to check social media connections. Please refresh the page.",
+        variant: "destructive",
+      });
+    } finally {
+      setLoading(false);
+    }
+  }, [user?.id, isLoaded, toast]);
+
+  useEffect(() => {
+    if (isLoaded && user?.id) {
+      checkSocialConnections();
+    } else if (isLoaded && !user) {
+      console.log('User loaded but not authenticated, clearing social connections.');
+      setSocialConnections({ linkedin: false, facebook: false, instagram: false });
+      setLoading(false);
+    } else if (!isLoaded) {
+      // Still loading user information, set loading true to reflect this phase
+      console.log('User information is loading, deferring social connection check.');
+      setLoading(true); 
+    }
+  }, [isLoaded, user?.id, checkSocialConnections]);
 
   const onDrop = useCallback((acceptedFiles: File[]) => {
     setDropError(null);
@@ -315,9 +314,32 @@ const InstantPost = () => {
     setImageUrl('');
   };
   
-  const isDisabled = isGenerating || isPosting || loading;
+  const isDisabled = authLoading || isGenerating || isPosting || !contentPlain.trim() || loading; 
   const hasAnyConnection = socialConnections.linkedin || socialConnections.facebook || socialConnections.instagram;
 
+  if (authLoading && !user) { 
+    return (
+      <div className="flex flex-col items-center justify-center min-h-screen">
+        <Loader2 className="h-12 w-12 animate-spin text-primary mb-4" />
+        <p className="text-lg text-muted-foreground">Loading your space...</p>
+      </div>
+    );
+  }
+
+  if (isLoaded && !user) {
+    return (
+      <div className="flex flex-col items-center justify-center min-h-screen">
+        <Alert variant="destructive" className="max-w-md">
+          <AlertCircle className="h-4 w-4" />
+          <AlertTitle>Authentication Required</AlertTitle>
+          <AlertDescription>
+            You need to be logged in to access this page. Please log in or sign up.
+          </AlertDescription>
+        </Alert>
+      </div>
+    );
+  }
+  
   return (
     <main className="flex-1 overflow-y-auto p-6">
       <div className="mb-8">

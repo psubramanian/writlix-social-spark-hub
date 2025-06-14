@@ -5,13 +5,17 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { useToast } from '@/components/ui/use-toast';
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
-import { useAuth } from '../contexts/AuthContext';
+import { useUser } from '@clerk/clerk-react'; // Replaced useAuth with Clerk's useUser
 
 const LinkedInConnect = () => {
   const [isConnected, setIsConnected] = useState(false);
   const [apiKey, setApiKey] = useState('');
   const { toast } = useToast();
-  const { user } = useAuth();
+  const { user, isLoaded } = useUser();
+
+  if (!isLoaded) {
+    return <div>Loading user information...</div>; // Or a spinner/skeleton loader
+  }
   
   const handleConnect = () => {
     if (!apiKey.trim()) {
@@ -46,7 +50,8 @@ const LinkedInConnect = () => {
   
   // For demo purposes, if user logged in via LinkedIn, show as connected
   React.useEffect(() => {
-    if (user?.linkedInConnected) {
+    // Assuming 'linkedInConnected' is stored in publicMetadata after migration to Clerk
+    if (user?.publicMetadata?.linkedInConnected) {
       setIsConnected(true);
     }
   }, [user]);

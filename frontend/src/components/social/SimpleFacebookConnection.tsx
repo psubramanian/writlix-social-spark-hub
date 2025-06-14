@@ -5,7 +5,7 @@ import { useToast } from '@/components/ui/use-toast';
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { Loader2, CheckCircle } from "lucide-react";
 import { supabase } from '@/integrations/supabase/client';
-import { useAuth } from '@/contexts/auth';
+import { useUser } from '@clerk/clerk-react'; // Replaced useAuth with Clerk's useUser
 
 interface FacebookProfileData {
   name?: string;
@@ -19,7 +19,16 @@ const SimpleFacebookConnection = () => {
   const [connecting, setConnecting] = useState(false);
   const [profileName, setProfileName] = useState('');
   const { toast } = useToast();
-  const { user } = useAuth();
+  const { user, isLoaded } = useUser();
+
+  // Wait for user to be loaded before proceeding
+  if (!isLoaded) {
+    return (
+      <div className="flex items-center justify-center p-4">
+        <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" /> Initializing Facebook Connection...
+      </div>
+    );
+  }
 
   const checkConnection = async () => {
     if (!user?.id) {

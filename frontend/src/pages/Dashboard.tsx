@@ -1,6 +1,6 @@
 
 import React, { useState } from 'react';
-import { useAuth } from '../contexts/AuthContext';
+import { useUser } from '@clerk/clerk-react'; // Changed to use Clerk's useUser hook
 import { format, subMonths } from 'date-fns';
 import { CalendarIcon } from 'lucide-react';
 import {
@@ -17,7 +17,14 @@ import { QuickActions } from '@/components/dashboard/QuickActions';
 import { useDashboardStats } from '@/hooks/useDashboardStats';
 
 export default function Dashboard() {
-  const { user } = useAuth();
+  const { user, isLoaded } = useUser(); // Use Clerk's useUser hook
+
+  // It's good practice to handle the loading state from useUser
+  if (!isLoaded) {
+    // You can return a loading spinner or null here
+    // For consistency, you might want to use the same LoadingScreen as in App.tsx
+    return <div>Loading dashboard...</div>; // Or a proper loading component
+  }
   const [date, setDate] = useState<Date>(new Date());
   const { stats, loading } = useDashboardStats(date);
 
@@ -62,7 +69,15 @@ export default function Dashboard() {
         </Select>
       </div>
       
-      {!user?.linkedInConnected && <LinkedInWarning />}
+      {/* We'll need to check how linkedInConnected is populated with Clerk. 
+    This might involve custom metadata or checking session tokens if LinkedIn is a federated provider.
+    For now, let's assume 'linkedInConnected' might be a custom property on the Clerk user.user.publicMetadata or user.unsafeMetadata object.
+    If it's not directly available, this line might need further adjustment based on your Clerk user object structure. 
+    Example: !user?.publicMetadata?.linkedInConnected 
+*/}
+      {/* {user && !((user.publicMetadata as any)?.linkedInConnected) && <LinkedInWarning />} */}
+      {/* The above line is commented out as linkedInConnected was part of the old Supabase auth. */}
+      {/* LinkedIn integration will need to be re-evaluated with Clerk if still required. */}
       
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
         <DashboardStatCard

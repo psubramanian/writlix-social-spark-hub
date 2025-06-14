@@ -4,7 +4,7 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { useToast } from '@/components/ui/use-toast';
-import { useAuth } from '@/contexts/auth';
+import { useUser } from '@clerk/clerk-react'; // Replaced useAuth with Clerk's useUser
 import { Loader2 } from 'lucide-react';
 import { profileOperations } from '@/utils/supabaseHelpers';
 
@@ -16,7 +16,7 @@ interface ProfileData {
 }
 
 export const AccountSettingsForm = () => {
-  const { user } = useAuth();
+  const { user, isLoaded } = useUser();
   const { toast } = useToast();
   const [loading, setLoading] = useState(false);
   const [saving, setSaving] = useState(false);
@@ -29,8 +29,7 @@ export const AccountSettingsForm = () => {
 
   useEffect(() => {
     const fetchProfile = async () => {
-      if (!user?.id) return;
-
+      // user.id is guaranteed by the if (isLoaded && user?.id) check below
       setLoading(true);
       try {
         const data = await profileOperations.fetchProfile(user.id);
@@ -57,8 +56,18 @@ export const AccountSettingsForm = () => {
       }
     };
 
-    fetchProfile();
-  }, [user?.id]);
+    if (isLoaded && user?.id) {
+      fetchProfile();
+    } else if (isLoaded && !user?.id) {
+        setLoading(false); 
+        setFormData({ email: '', first_name: '', last_name: '', mobile_number: '' });
+        toast({
+          title: "User not found",
+          description: "Please log in to view account settings.",
+          variant: "destructive",
+        });
+    }
+  }, [user?.id, isLoaded, toast]);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -96,7 +105,22 @@ export const AccountSettingsForm = () => {
     setFormData(prev => ({ ...prev, [field]: value }));
   };
 
-  if (loading) {
+  if (!isLoaded) { // Initial Clerk loading state
+    return (
+      <Card>
+        <CardHeader>
+          <CardTitle>Account Settings</CardTitle>
+        </CardHeader>
+        <CardContent>
+          <div className="flex items-center justify-center p-8">
+            <Loader2 className="h-8 w-8 animate-spin" /> Initializing...
+          </div>
+        </CardContent>
+      </Card>
+    );
+  }
+
+  if (loading) { // Loading state for fetching profile data
     return (
       <Card>
         <CardHeader>

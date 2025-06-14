@@ -1,6 +1,6 @@
 
 import React, { useState, useEffect } from 'react';
-import { useAuth } from '../contexts/auth';
+import { useAuth, useUser } from '@clerk/clerk-react'; // Using Clerk's useAuth for session state and useUser for user data
 import { useNavigate } from 'react-router-dom';
 import Header from '../components/landing/Header';
 import Hero from '../components/landing/Hero';
@@ -10,7 +10,10 @@ import Footer from '../components/landing/Footer';
 import { NewsletterPopup } from '../components/NewsletterPopup';
 
 const Index = () => {
-  const { isAuthenticated, isLoading } = useAuth();
+  const { isLoaded, isSignedIn, userId } = useAuth(); // Clerk's useAuth hook
+  const { user } = useUser(); // Clerk's useUser for more detailed user info if needed, though not directly used here yet.
+  const isAuthenticated = isSignedIn; // Map Clerk's isSignedIn to isAuthenticated
+  const isLoading = !isLoaded; // Map Clerk's !isLoaded to isLoading
   const navigate = useNavigate();
   const [isNewsletterPopupOpen, setIsNewsletterPopupOpen] = useState(false);
   const [contentLoaded, setContentLoaded] = useState(false);
@@ -61,7 +64,7 @@ const Index = () => {
   }, [isLoading, isAuthenticated]);
   
   // Show loading screen while checking authentication
-  if (isLoading) {
+  if (isLoading || !isLoaded) { // Ensure both Clerk's isLoaded and our derived isLoading are checked
     return (
       <div className="flex items-center justify-center h-screen bg-black">
         <div className="flex flex-col items-center space-y-4">

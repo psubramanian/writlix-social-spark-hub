@@ -3,7 +3,7 @@ import { Button } from '@/components/ui/button';
 import { useToast } from '@/components/ui/use-toast';
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { Loader2 } from "lucide-react";
-import { useAuth } from '@/contexts/auth';
+import { useUser } from '@clerk/clerk-react'; // Replaced useAuth with Clerk's useUser
 import { credentialsOperations } from '@/utils/supabaseHelpers';
 
 interface FacebookProfileData {
@@ -36,16 +36,14 @@ const FacebookOAuth = () => {
   const [connecting, setConnecting] = useState(false);
   const [profileName, setProfileName] = useState('');
   const { toast } = useToast();
-  const { user } = useAuth();
+  const { user, isLoaded } = useUser();
   const [credentialsPresent, setCredentialsPresent] = useState(false);
   const [redirectUri, setRedirectUri] = useState('');
 
   useEffect(() => {
     const checkConnection = async () => {
-      if (!user?.id) {
-        setLoading(false);
-        return;
-      }
+      // user.id is guaranteed by the if (isLoaded && user?.id) check below
+      // setLoading(true) is called inside this async function if needed.
 
       try {
         const data = await credentialsOperations.facebook.fetch(user.id);
@@ -80,8 +78,15 @@ const FacebookOAuth = () => {
       }
     };
 
-    checkConnection();
-  }, [user, toast]);
+    if (isLoaded && user?.id) {
+      setLoading(true); // Set loading true before calling async checkConnection
+      checkConnection();
+    } else if (isLoaded && !user?.id) {
+      setLoading(false);
+      setIsConnected(false);
+      setCredentialsPresent(false);
+    }
+  }, [user?.id, isLoaded, toast]);
 
   useEffect(() => {
     const handleOAuthCallback = async () => {
@@ -113,7 +118,7 @@ const FacebookOAuth = () => {
         return;
       }
 
-      if (code && state && savedState && state === savedState && user?.id) {
+      if (code && state && savedState && state === savedState && isLoaded && user?.id) { // Added isLoaded check
         setConnecting(true);
         try {
           sessionStorage.removeItem('facebook_state');
@@ -158,14 +163,19 @@ const FacebookOAuth = () => {
             description: error.message || "Failed to connect Facebook account",
             variant: "destructive",
           });
-        } finally {
-          setConnecting(false);
         }
+      } else if (isLoaded && !user?.id && (new URL(window.location.href).searchParams.get('code') || new URL(window.location.href).searchParams.get('error'))){
+        toast({
+          title: "Authentication Error",
+          description: "User session not found during OAuth callback. Please try again.",
+          variant: "destructive",
+        });
+        setConnecting(false);
       }
     };
 
     handleOAuthCallback();
-  }, [toast, user]);
+  }, [user?.id, isLoaded, toast]);
 
   const handleConnect = async () => {
     try {
@@ -250,7 +260,15 @@ const FacebookOAuth = () => {
     return result;
   };
 
-  if (loading) {
+  if (!isLoaded) { // Initial Clerk loading state, precedes component's own 'loading' and 'connecting' states
+    return (
+      <div className="flex items-center justify-center p-4">
+        <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" /> Initializing Facebook Connection...
+      </div>
+    );
+  }
+
+  if (loading) { // This is the component's own loading state for checkConnection
     return (
       <div className="flex items-center justify-center p-4">
         <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />
