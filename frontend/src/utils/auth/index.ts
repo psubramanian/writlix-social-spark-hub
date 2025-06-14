@@ -1,6 +1,5 @@
 
 // Export all auth utilities from a single entry point
-export { getCurrentUser } from './getCurrentUser';
 export { 
   ensureProfileExists, 
   isProfileComplete,

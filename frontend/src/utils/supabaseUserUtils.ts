@@ -5,7 +5,6 @@
  * @deprecated Use @/utils/auth imports directly instead
  */
 
-export { getCurrentUser } from './auth/getCurrentUser';
 export { ensureProfileExists, isProfileComplete } from './auth/profileUtils';
 export { useAuthRedirect } from './auth/redirectUtils';
 export { clearAuthLocalStorage, restoreAuthLocalFlags } from './auth/storageUtils';

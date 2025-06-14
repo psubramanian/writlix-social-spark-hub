@@ -2,7 +2,7 @@
 import { useState, useEffect } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/components/ui/use-toast';
-import { getCurrentUser, useAuthRedirect } from '@/utils/supabaseUserUtils';
+import { useAuthRedirect } from '@/utils/supabaseUserUtils';
 import { calculateNextRunTime } from '@/utils/scheduleUtils';
 
 export interface ScheduleSettings {
@@ -15,7 +15,7 @@ export interface ScheduleSettings {
   nextRunAt?: string;
 }
 
-export function useScheduleSettings() {
+export function useScheduleSettings(userId: string | undefined) {
   const [userSettings, setUserSettings] = useState<ScheduleSettings | null>(null);
   const [isUpdating, setIsUpdating] = useState(false);
   const { toast } = useToast();
@@ -23,8 +23,7 @@ export function useScheduleSettings() {
 
   const fetchUserSettings = async () => {
     try {
-      const user = await getCurrentUser();
-      if (!user) {
+      if (!userId) {
         redirectToLogin();
         return;
       }
@@ -32,7 +31,7 @@ export function useScheduleSettings() {
       const { data: settings, error } = await supabase
         .from('schedule_settings')
         .select('*')
-        .eq('user_id', user.id as any)
+        .eq('user_id', userId as any)
         .is('post_id', null)
         .maybeSingle();
 
@@ -60,8 +59,7 @@ export function useScheduleSettings() {
   const updateUserSettings = async (newSettings: Omit<ScheduleSettings, 'id' | 'nextRunAt'>) => {
     setIsUpdating(true);
     try {
-      const user = await getCurrentUser();
-      if (!user) {
+      if (!userId) {
         redirectToLogin();
         return false;
       }
@@ -76,7 +74,7 @@ export function useScheduleSettings() {
       });
 
       const settingsData = {
-        user_id: user.id,
+        user_id: userId,
         frequency: newSettings.frequency,
         time_of_day: newSettings.timeOfDay,
         day_of_week: newSettings.dayOfWeek,
@@ -106,7 +104,7 @@ export function useScheduleSettings() {
       const { error: updatePostsError } = await supabase
         .from('scheduled_posts')
         .update({ timezone: newSettings.timezone || 'UTC' } as any)
-        .eq('user_id', user.id as any);
+        .eq('user_id', userId as any);
 
       if (updatePostsError) {
         console.error('Error updating posts timezone:', updatePostsError);

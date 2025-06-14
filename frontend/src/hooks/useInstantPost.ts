@@ -1,9 +1,7 @@
 
 import { useState } from 'react';
 import { supabase } from '@/integrations/supabase/client';
-import { getCurrentUser } from '@/utils/supabaseUserUtils';
-
-export function useInstantPost() {
+export function useInstantPost(userId: string | undefined) {
   const [isGenerating, setIsGenerating] = useState(false);
   const [isPosting, setIsPosting] = useState(false);
   const [postingPlatform, setPostingPlatform] = useState<string | null>(null);
@@ -38,14 +36,13 @@ export function useInstantPost() {
     setIsGenerating(true);
     try {
       // Upload image to Supabase storage first
-      const user = await getCurrentUser();
-      if (!user) {
-        throw new Error("Authentication required");
+      if (!userId) {
+        throw new Error("Authentication required: userId is missing");
       }
 
       // Sanitize the filename to avoid potential issues
       const sanitizedName = sanitizeFileName(image.name);
-      const fileName = `${user.id}_${Date.now()}_${sanitizedName}`;
+      const fileName = `${userId}_${Date.now()}_${sanitizedName}`;
       
       console.log(`Uploading image: ${fileName}`);
       
@@ -79,7 +76,7 @@ export function useInstantPost() {
       const { data, error } = await supabase.functions.invoke('generate-content-from-image', {
         body: { 
           imageUrl: publicUrlData.publicUrl,
-          userId: user.id,
+          userId: userId,
         }
       });
 
@@ -108,16 +105,15 @@ export function useInstantPost() {
     setIsPosting(true);
     setPostingPlatform('linkedin');
     try {
-      const user = await getCurrentUser();
-      if (!user) {
-        throw new Error("Authentication required");
+      if (!userId) {
+        throw new Error("Authentication required: userId is missing");
       }
 
       // Check if user has LinkedIn credentials
       const { data: credentials, error: tokensError } = await supabase
         .from('user_linkedin_credentials')
         .select('access_token')
-        .eq('user_id', user.id as any)
+        .eq('user_id', userId as any)
         .maybeSingle();
         
       if (tokensError) {
@@ -133,7 +129,7 @@ export function useInstantPost() {
       const { data, error } = await supabase.functions.invoke('post-to-linkedin-direct', {
         body: { 
           content,
-          userId: user.id
+          userId: userId
         }
       });
 
@@ -161,16 +157,15 @@ export function useInstantPost() {
     setIsPosting(true);
     setPostingPlatform('facebook');
     try {
-      const user = await getCurrentUser();
-      if (!user) {
-        throw new Error("Authentication required");
+      if (!userId) {
+        throw new Error("Authentication required: userId is missing");
       }
 
       // Check if user has Facebook credentials
       const { data: credentials, error: tokensError } = await supabase
         .from('user_facebook_credentials')
         .select('access_token, long_lived_token')
-        .eq('user_id', user.id as any)
+        .eq('user_id', userId as any)
         .maybeSingle();
         
       if (tokensError) {
@@ -186,7 +181,7 @@ export function useInstantPost() {
       const { data, error } = await supabase.functions.invoke('post-to-facebook-direct', {
         body: { 
           content,
-          userId: user.id
+          userId: userId
         }
       });
 
@@ -214,16 +209,15 @@ export function useInstantPost() {
     setIsPosting(true);
     setPostingPlatform('instagram');
     try {
-      const user = await getCurrentUser();
-      if (!user) {
-        throw new Error("Authentication required");
+      if (!userId) {
+        throw new Error("Authentication required: userId is missing");
       }
 
       // Check if user has Instagram credentials
       const { data: credentials, error: tokensError } = await supabase
         .from('user_instagram_credentials')
         .select('access_token, long_lived_token')
-        .eq('user_id', user.id as any)
+        .eq('user_id', userId as any)
         .maybeSingle();
         
       if (tokensError) {
@@ -243,7 +237,7 @@ export function useInstantPost() {
       const { data, error } = await supabase.functions.invoke('post-to-instagram-direct', {
         body: { 
           content,
-          userId: user.id,
+          userId: userId,
           imageUrl
         }
       });

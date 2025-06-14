@@ -2,23 +2,20 @@
 import { useState } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/components/ui/use-toast';
-import { getCurrentUser } from '@/utils/supabaseUserUtils';
-
-export function usePostContent() {
+export function usePostContent(userId: string | undefined) {
   const { toast } = useToast();
   const [isRegenerating, setIsRegenerating] = useState(false);
 
   const savePostContent = async (postId: string, content: string) => {
     try {
-      const user = await getCurrentUser();
-      if (!user) throw new Error('User not authenticated');
+      if (!userId) throw new Error('User not authenticated: userId is missing');
       
       // First get the scheduled post to find the content_id
       const { data: postData, error: postError } = await supabase
         .from('scheduled_posts')
         .select('content_id, user_id')
         .eq('id', postId as any)
-        .eq('user_id', user.id as any)
+        .eq('user_id', userId as any)
         .maybeSingle();
       
       if (postError) {
@@ -35,7 +32,7 @@ export function usePostContent() {
       }
       
       // Verify user owns this post
-      if (postData.user_id !== user.id) {
+      if (postData.user_id !== userId) {
         throw new Error('Not authorized to update this post');
       }
       
@@ -73,8 +70,7 @@ export function usePostContent() {
   const regenerateContent = async (postId: string) => {
     try {
       setIsRegenerating(true);
-      const user = await getCurrentUser();
-      if (!user) throw new Error('User not authenticated');
+      if (!userId) throw new Error('User not authenticated: userId is missing');
       
       // Get the post content and title
       const { data: post, error: postError } = await supabase
@@ -87,7 +83,7 @@ export function usePostContent() {
           )
         `)
         .eq('id', postId as any)
-        .eq('user_id', user.id as any)
+        .eq('user_id', userId as any)
         .maybeSingle();
       
       if (postError) {
@@ -104,7 +100,7 @@ export function usePostContent() {
       }
       
       // Verify user owns this post
-      if (post.user_id !== user.id) {
+      if (post.user_id !== userId) {
         throw new Error('Not authorized to update this post');
       }
       

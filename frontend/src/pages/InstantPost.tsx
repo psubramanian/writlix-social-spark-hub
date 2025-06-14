@@ -55,7 +55,7 @@ const InstantPost = () => {
     isGenerating, 
     isPosting,
     postingPlatform
-  } = useInstantPost();
+  } = useInstantPost(user?.id);
 
   const checkSocialConnections = useCallback(async () => {
     if (!user?.id) {

@@ -4,7 +4,7 @@ import { Link } from 'react-router-dom';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { supabase } from '@/integrations/supabase/client';
-import { getCurrentUser } from '@/utils/supabaseUserUtils';
+import { useUser } from '@clerk/clerk-react';
 import { parseISO } from 'date-fns';
 import { formatInTimeZone, toZonedTime } from 'date-fns-tz';
 import { Badge } from '@/components/ui/badge';
@@ -21,21 +21,23 @@ interface UpcomingPost {
 }
 
 export function UpcomingPosts({ scheduledPostsCount }: UpcomingPostsProps) {
+  const { user, isLoaded: isUserLoaded } = useUser();
   const [upcomingPosts, setUpcomingPosts] = useState<UpcomingPost[]>([]);
   const [pastDuePosts, setPastDuePosts] = useState<UpcomingPost[]>([]);
   const [loading, setLoading] = useState(true);
   const [userTimezone, setUserTimezone] = useState<string>('UTC');
 
   useEffect(() => {
+    if (!isUserLoaded) return; // Wait for user to be loaded
+
     const fetchUserTimezone = async () => {
       try {
-        const user = await getCurrentUser();
         if (!user) return 'UTC';
 
         const { data, error } = await supabase
           .from('schedule_settings')
           .select('timezone')
-          .eq('user_id', user.id)
+          .eq('user_id', user.id!)
           .maybeSingle();
 
         if (error) {
@@ -52,7 +54,6 @@ export function UpcomingPosts({ scheduledPostsCount }: UpcomingPostsProps) {
 
     const fetchAllPosts = async () => {
       try {
-        const user = await getCurrentUser();
         if (!user) return;
 
         const timezone = await fetchUserTimezone();
@@ -74,7 +75,7 @@ export function UpcomingPosts({ scheduledPostsCount }: UpcomingPostsProps) {
               status
             )
           `)
-          .eq('user_id', user.id)
+          .eq('user_id', user.id!)
           .eq('status', 'pending')
           .eq('content_ideas.status', 'Scheduled')
           .order('next_run_at', { ascending: true });
@@ -154,7 +155,7 @@ export function UpcomingPosts({ scheduledPostsCount }: UpcomingPostsProps) {
     };
 
     fetchAllPosts();
-  }, []);
+  }, [isUserLoaded, user]); // Add user and isUserLoaded to dependency array
 
   const formatScheduleDate = (dateString: string, timezone: string) => {
     try {

@@ -26,7 +26,7 @@ export default function Dashboard() {
     return <div>Loading dashboard...</div>; // Or a proper loading component
   }
   const [date, setDate] = useState<Date>(new Date());
-  const { stats, loading } = useDashboardStats(date);
+  const { stats, loading } = useDashboardStats(user?.id, date);
 
   // Generate last 12 months for the selector
   const last12Months = Array.from({ length: 12 }, (_, i) => {

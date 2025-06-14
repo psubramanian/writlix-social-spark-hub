@@ -1,5 +1,6 @@
 
 import { useEffect } from 'react';
+import { useUser } from '@clerk/clerk-react';
 import { useScheduleSettings } from './useScheduleSettings';
 import { usePostOperations } from './usePostOperations';
 import { usePostScheduling } from './usePostScheduling';
@@ -22,10 +23,11 @@ export interface ScheduledPost {
 }
 
 export function useScheduledPosts() {
-  const { userSettings, fetchUserSettings } = useScheduleSettings();
-  const { savePostContent, regenerateContent, isRegenerating, postToLinkedIn, postToFacebook, postToInstagram } = usePostOperations();
-  const { scheduleContentIdea } = usePostScheduling();
-  const { posts, loading, fetchPosts, setPosts } = useScheduledPostsFetch();
+  const { user } = useUser();
+  const { userSettings, fetchUserSettings } = useScheduleSettings(user?.id);
+  const { savePostContent, regenerateContent, isRegenerating, postToLinkedIn, postToFacebook, postToInstagram } = usePostOperations(user?.id);
+  const { scheduleContentIdea } = usePostScheduling(user?.id);
+  const { posts, loading, fetchPosts, setPosts } = useScheduledPostsFetch(user?.id);
   const { groupedPosts, groupPostsByTimeframe, getPostsForDate } = usePostGrouping();
 
   // Group posts whenever posts or timezone changes

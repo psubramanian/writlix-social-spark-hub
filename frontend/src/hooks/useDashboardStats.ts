@@ -3,7 +3,7 @@ import { useState, useEffect } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/components/ui/use-toast';
 import { startOfMonth, endOfMonth } from 'date-fns';
-import { getCurrentUser } from '@/utils/supabaseUserUtils';
+
 
 interface DashboardStats {
   postsCreated: number;
@@ -12,7 +12,7 @@ interface DashboardStats {
   postsToReview: number;
 }
 
-export function useDashboardStats(selectedMonth: Date) {
+export function useDashboardStats(userId: string | undefined, selectedMonth: Date) {
   const [stats, setStats] = useState<DashboardStats>({
     postsCreated: 0,
     postsScheduled: 0,
@@ -24,8 +24,7 @@ export function useDashboardStats(selectedMonth: Date) {
 
   const fetchStats = async () => {
     try {
-      const user = await getCurrentUser();
-      if (!user) return;
+      if (!userId) return;
 
       const monthStart = startOfMonth(selectedMonth);
       const monthEnd = endOfMonth(selectedMonth);
@@ -36,7 +35,7 @@ export function useDashboardStats(selectedMonth: Date) {
       const { count: totalContentCount, error: createdError } = await supabase
         .from('content_ideas')
         .select('*', { count: 'exact', head: true })
-        .eq('user_id', user.id as any)
+        .eq('user_id', userId as any)
         .gte('created_at', monthStart.toISOString())
         .lte('created_at', monthEnd.toISOString());
 
@@ -47,7 +46,7 @@ export function useDashboardStats(selectedMonth: Date) {
           content_id,
           content_ideas!inner(status)
         `)
-        .eq('user_id', user.id as any)
+        .eq('user_id', userId as any)
         .eq('status', 'pending' as any)
         .eq('content_ideas.status', 'Scheduled' as any)
         .gt('next_run_at', now.toISOString());
@@ -72,7 +71,7 @@ export function useDashboardStats(selectedMonth: Date) {
       const { count: publishedCount, error: publishedError } = await supabase
         .from('content_ideas')
         .select('id', { count: 'exact', head: true })
-        .eq('user_id', user.id as any)
+        .eq('user_id', userId as any)
         .eq('status', 'Published' as any)
         .gte('created_at', monthStart.toISOString())
         .lte('created_at', monthEnd.toISOString());
@@ -81,7 +80,7 @@ export function useDashboardStats(selectedMonth: Date) {
       const { count: reviewCount, error: reviewError } = await supabase
         .from('content_ideas')
         .select('id', { count: 'exact', head: true })
-        .eq('user_id', user.id as any)
+        .eq('user_id', userId as any)
         .eq('status', 'Review' as any)
         .gte('created_at', monthStart.toISOString())
         .lte('created_at', monthEnd.toISOString());
@@ -116,8 +115,10 @@ export function useDashboardStats(selectedMonth: Date) {
   };
 
   useEffect(() => {
-    fetchStats();
-  }, [selectedMonth]);
+    if (userId) { // Only fetch if userId is available
+      fetchStats();
+    }
+  }, [userId, selectedMonth]); // Add userId to dependency array
 
   return { stats, loading, refetch: fetchStats };
 }

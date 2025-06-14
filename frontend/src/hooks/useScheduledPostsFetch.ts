@@ -2,10 +2,10 @@
 import { useState } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/components/ui/use-toast';
-import { getCurrentUser, useAuthRedirect } from '@/utils/supabaseUserUtils';
+import { useAuthRedirect } from '@/utils/supabaseUserUtils';
 import type { ScheduledPost } from './useScheduledPosts';
 
-export function useScheduledPostsFetch() {
+export function useScheduledPostsFetch(userId: string | undefined) {
   const [posts, setPosts] = useState<ScheduledPost[]>([]);
   const [loading, setLoading] = useState(true);
   const { toast } = useToast();
@@ -13,8 +13,7 @@ export function useScheduledPostsFetch() {
 
   const fetchPosts = async () => {
     try {
-      const user = await getCurrentUser();
-      if (!user) {
+      if (!userId) {
         redirectToLogin();
         return;
       }
@@ -33,7 +32,7 @@ export function useScheduledPostsFetch() {
             status
           )
         `)
-        .eq('user_id', user.id as any)
+        .eq('user_id', userId as any)
         .eq('status', 'pending' as any)
         .order('next_run_at', { ascending: true });
 

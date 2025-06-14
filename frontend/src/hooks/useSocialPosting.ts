@@ -1,18 +1,15 @@
 
 import { supabase } from '@/integrations/supabase/client';
-import { getCurrentUser } from '@/utils/supabaseUserUtils';
-
-export function useSocialPosting() {
+export function useSocialPosting(userId: string | undefined) {
   const postToLinkedIn = async (postId: string) => {
     try {
-      const user = await getCurrentUser();
-      if (!user) throw new Error('User not authenticated');
+      if (!userId) throw new Error('User not authenticated: userId is missing');
 
       // Check if user has connected LinkedIn
       const { data: credentials } = await supabase
         .from('user_linkedin_credentials')
         .select('access_token')
-        .eq('user_id', user.id)
+        .eq('user_id', userId)
         .maybeSingle();
 
       if (!credentials?.access_token) {
@@ -20,7 +17,7 @@ export function useSocialPosting() {
       }
 
       const { data, error } = await supabase.functions.invoke('post-to-linkedin', {
-        body: { postId, userId: user.id }
+        body: { postId, userId: userId }
       });
 
       if (error || !data.success) {
@@ -36,14 +33,13 @@ export function useSocialPosting() {
   
   const postToFacebook = async (postId: string) => {
     try {
-      const user = await getCurrentUser();
-      if (!user) throw new Error('User not authenticated');
+      if (!userId) throw new Error('User not authenticated: userId is missing');
 
       // Check if user has connected Facebook
       const { data: credentials } = await supabase
         .from('user_facebook_credentials')
         .select('access_token')
-        .eq('user_id', user.id)
+        .eq('user_id', userId)
         .maybeSingle();
 
       if (!credentials?.access_token) {
@@ -51,7 +47,7 @@ export function useSocialPosting() {
       }
 
       const { data, error } = await supabase.functions.invoke('post-to-facebook', {
-        body: { postId, userId: user.id }
+        body: { postId, userId: userId }
       });
 
       if (error || !data.success) {
@@ -67,14 +63,13 @@ export function useSocialPosting() {
   
   const postToInstagram = async (postId: string, imageUrl: string) => {
     try {
-      const user = await getCurrentUser();
-      if (!user) throw new Error('User not authenticated');
+      if (!userId) throw new Error('User not authenticated: userId is missing');
 
       // Check if user has connected Instagram
       const { data: credentials } = await supabase
         .from('user_instagram_credentials')
         .select('access_token')
-        .eq('user_id', user.id)
+        .eq('user_id', userId)
         .maybeSingle();
 
       if (!credentials?.access_token) {
@@ -82,7 +77,7 @@ export function useSocialPosting() {
       }
 
       const { data, error } = await supabase.functions.invoke('post-to-instagram', {
-        body: { postId, userId: user.id, imageUrl }
+        body: { postId, userId: userId, imageUrl }
       });
 
       if (error || !data.success) {

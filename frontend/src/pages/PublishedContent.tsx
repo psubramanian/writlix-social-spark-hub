@@ -9,7 +9,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { format } from 'date-fns';
 import { Skeleton } from '@/components/ui/skeleton';
 import ContentDialog from '@/components/data-seed/ContentDialog';
-import { getCurrentUser } from '@/utils/supabaseUserUtils';
+import { useUser } from '@clerk/clerk-react';
 
 interface PublishedPost {
   id: string;
@@ -20,20 +20,21 @@ interface PublishedPost {
 }
 
 const PublishedContent = () => {
+  const { user, isLoaded: isUserLoaded } = useUser();
   const [selectedContent, setSelectedContent] = React.useState<any>(null);
 
   const { data: publishedPosts, isLoading } = useQuery({
-    queryKey: ['published-posts'],
+    queryKey: ['published-posts', user?.id], // Add user.id to queryKey to re-fetch on user change
     queryFn: async () => {
-      const user = await getCurrentUser();
-      if (!user) throw new Error('User not authenticated');
+      if (!user) throw new Error('User not authenticated for query'); // Should be caught by enabled option too
+
       
       // Query the content_ideas table directly to get published content
       const { data, error } = await supabase
         .from('content_ideas')
         .select('id, title, content, status, created_at')
         .eq('status', 'Published')
-        .eq('user_id', user.id)
+        .eq('user_id', user.id!)
         .order('created_at', { ascending: false });
       
       if (error) {
@@ -51,7 +52,8 @@ const PublishedContent = () => {
         preview: post.content.substring(0, 100) + '...',
         published_at: post.created_at
       })) as PublishedPost[];
-    }
+    },
+    enabled: !!user && isUserLoaded // Only run query if user is loaded and available
   });
 
   return (
@@ -73,7 +75,7 @@ const PublishedContent = () => {
               <CardDescription>Your recently published content</CardDescription>
             </CardHeader>
             <CardContent>
-              {isLoading ? (
+              {isLoading || !isUserLoaded ? (
                 <div className="space-y-4">
                   {[...Array(3)].map((_, i) => (
                     <Skeleton key={i} className="h-12 w-full" />

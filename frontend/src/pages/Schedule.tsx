@@ -76,7 +76,7 @@ const Schedule = () => {
     // Or a more integrated loading state within your page layout
     return <div className="p-4">Loading user data...</div>;
   }
-  const { updateUserSettings, isUpdating } = useScheduleSettings();
+  const { updateUserSettings, isUpdating } = useScheduleSettings(user?.id);
   
   const [previewDialogOpen, setPreviewDialogOpen] = useState(false);
   const [selectedPost, setSelectedPost] = useState<ScheduledPost | null>(null);

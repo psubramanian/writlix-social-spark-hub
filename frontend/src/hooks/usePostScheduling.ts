@@ -2,29 +2,28 @@
 import { useState } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/components/ui/use-toast';
-import { getCurrentUser, useAuthRedirect } from '@/utils/supabaseUserUtils';
+import { useAuthRedirect } from '@/utils/supabaseUserUtils';
 import { calculateNextRunTime } from '@/utils/scheduleUtils';
 import type { ScheduleSettings } from './useScheduleSettings';
 
-export function usePostScheduling() {
+export function usePostScheduling(userId: string | undefined) {
   const { toast } = useToast();
   const { redirectToLogin } = useAuthRedirect();
 
   const scheduleContentIdea = async (contentId: number) => {
     try {
-      const user = await getCurrentUser();
-      if (!user) {
+      if (!userId) {
         redirectToLogin();
         return false;
       }
 
-      console.log(`Scheduling content idea with ID: ${contentId} for user: ${user.id}`);
+      console.log(`Scheduling content idea with ID: ${contentId} for user: ${userId}`);
 
       // Get user's default schedule settings
       const { data: userSettings, error: settingsError } = await supabase
         .from('schedule_settings')
         .select('*')
-        .eq('user_id', user.id as any)
+        .eq('user_id', userId as any)
         .is('post_id', null)
         .maybeSingle();
 
@@ -43,7 +42,7 @@ export function usePostScheduling() {
         tomorrow.setHours(9, 0, 0, 0);
         
         const defaultSettings = {
-          user_id: user.id,
+          user_id: userId,
           frequency: 'daily' as const,
           time_of_day: '09:00:00',
           timezone: 'UTC',
@@ -88,7 +87,7 @@ export function usePostScheduling() {
 
         // Create the scheduled post with the validated next available slot
         const scheduledPostData = {
-          user_id: user.id,
+          user_id: userId,
           content_id: contentId,
           status: 'pending',
           next_run_at: nextAvailableSlot,
@@ -156,7 +155,7 @@ export function usePostScheduling() {
 
       // Create the scheduled post with the validated next available slot
       const scheduledPostData = {
-        user_id: user.id,
+        user_id: userId,
         content_id: contentId,
         status: 'pending',
         next_run_at: String(nextAvailableSlot),

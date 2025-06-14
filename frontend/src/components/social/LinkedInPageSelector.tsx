@@ -97,13 +97,6 @@ const LinkedInPageSelector = ({ isOpen, onClose, onSave }: LinkedInPageSelectorP
     }
   };
 
-  useEffect(() => {
-    if (isOpen) {
-      setLoading(true);
-      fetchPages();
-    }
-  }, [isOpen, user?.id]);
-
   const handlePageToggle = (pageId: string, checked: boolean) => {
     setPages(prev => 
       prev.map(page => 
