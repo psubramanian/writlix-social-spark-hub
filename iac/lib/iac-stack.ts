@@ -24,24 +24,10 @@ export class IacStack extends cdk.Stack {
       ],
     });
 
-    // DynamoDB Table - WritlixSocialHub
-    const writlixSocialHubTable = new dynamodb.Table(this, 'WritlixSocialHubTable', {
-      tableName: 'WritlixSocialHub',
-      partitionKey: { name: 'PK', type: dynamodb.AttributeType.STRING },
-      sortKey: { name: 'SK', type: dynamodb.AttributeType.STRING },
-      billingMode: dynamodb.BillingMode.PAY_PER_REQUEST,
-      removalPolicy: cdk.RemovalPolicy.DESTROY, // Change to RETAIN or SNAPSHOT for production
-      // pointInTimeRecovery: true, // Recommended for production
-    });
+    // Reference existing DynamoDB Table - WritlixSocialHub (already exists in LocalStack)
+    const writlixSocialHubTable = dynamodb.Table.fromTableName(this, 'WritlixSocialHubTable', 'WritlixSocialHub');
 
-    writlixSocialHubTable.addGlobalSecondaryIndex({
-      indexName: 'GSI1',
-      partitionKey: { name: 'GSI1PK', type: dynamodb.AttributeType.STRING },
-      sortKey: { name: 'GSI1SK', type: dynamodb.AttributeType.STRING },
-      projectionType: dynamodb.ProjectionType.ALL,
-    });
-
-    // Grant Lambda role read/write permissions to the DynamoDB table
+    // Grant Lambda role read/write permissions to the existing DynamoDB table
     writlixSocialHubTable.grantReadWriteData(lambdaRole);
 
     // Lambda Function: process-scheduled-posts
@@ -52,7 +38,8 @@ export class IacStack extends cdk.Stack {
       role: lambdaRole,
       environment: {
         DYNAMODB_TABLE_NAME: writlixSocialHubTable.tableName,
-        CLERK_SECRET_KEY: 'TODO_FETCH_FROM_SECRETS_MANAGER', // Placeholder -  IMPORTANT: Replace with Secrets Manager integration
+        CLERK_SECRET_KEY: 'sk_test_zvHcHODs87jNs66ZySJrRJnkyWb3VQI329DuKK7ynt', // Using test key for LocalStack
+        DYNAMODB_ENDPOINT: 'http://host.docker.internal:4566', // LocalStack endpoint for Lambda containers
         // AWS_REGION is automatically provided by the Lambda runtime
       },
       timeout: cdk.Duration.minutes(1),
@@ -66,6 +53,7 @@ export class IacStack extends cdk.Stack {
       role: lambdaRole,
       environment: {
         DYNAMODB_TABLE_NAME: writlixSocialHubTable.tableName,
+        DYNAMODB_ENDPOINT: 'http://host.docker.internal:4566', // LocalStack endpoint for Lambda containers
         // AWS_REGION is automatically provided by the Lambda runtime
       },
       timeout: cdk.Duration.seconds(30),
@@ -109,6 +97,13 @@ export class IacStack extends cdk.Stack {
       path: '/api/scheduled-posts',
       methods: [apigwv2.HttpMethod.POST],
       integration: apiHandlerIntegration,
+    });
+
+    // Add GET /api/scheduled-posts route
+    httpApi.addRoutes({
+      path: '/api/scheduled-posts',
+      methods: [apigwv2.HttpMethod.GET],
+      integration: apiHandlerIntegration, // Re-use the same integration for the same Lambda
     });
 
     // Output the API Gateway URL

@@ -1,7 +1,7 @@
 const express = require('express');
 const serverless = require('serverless-http');
 const cors = require('cors');
-const { DynamoDBClient, GetItemCommand, PutItemCommand, UpdateItemCommand } = require('@aws-sdk/client-dynamodb');
+const { DynamoDBClient, GetItemCommand, PutItemCommand, UpdateItemCommand, QueryCommand } = require('@aws-sdk/client-dynamodb');
 const { marshall, unmarshall } = require('@aws-sdk/util-dynamodb');
 const { v4: uuidv4 } = require('uuid');
 
@@ -206,6 +206,54 @@ app.put('/api/schedule-settings', async (req, res) => {
     console.error('Error updating schedule settings in DynamoDB:', error);
     // Consider specific error handling, e.g., if the item to update doesn't exist (ConditionalCheckFailedException)
     res.status(500).json({ error: 'Failed to update schedule settings', details: error.message });
+  }
+});
+
+// GET /api/scheduled-posts - Fetch scheduled posts for a user
+app.get('/api/scheduled-posts', async (req, res) => {
+  const { userId, status: queryStatus } = req.query;
+
+  if (!userId) {
+    return res.status(400).json({ error: 'Missing required query parameter: userId' });
+  }
+
+  console.log(`GET /api/scheduled-posts for userId: ${userId}, status: ${queryStatus || 'any'}`);
+
+  try {
+    const params = {
+      TableName: DYNAMODB_TABLE_NAME,
+      KeyConditionExpression: 'PK = :pkval AND begins_with(SK, :skprefix)',
+      ExpressionAttributeNames: {},
+    };
+
+    const expressionAttributeValues = {
+      ':pkval': `USER#${userId}`,
+      ':skprefix': 'SCHEDULED_POST#',
+    };
+
+    if (queryStatus) {
+      params.FilterExpression = '#status = :statusval';
+      params.ExpressionAttributeNames['#status'] = 'status';
+      expressionAttributeValues[':statusval'] = queryStatus;
+    }
+    params.ExpressionAttributeValues = marshall(expressionAttributeValues);
+    
+    // If ExpressionAttributeNames is empty, remove it as DynamoDB expects it to be undefined or non-empty
+    if (Object.keys(params.ExpressionAttributeNames).length === 0) {
+      delete params.ExpressionAttributeNames;
+    }
+
+    console.log('DynamoDB Query params for scheduled posts:', JSON.stringify(params, null, 2));
+
+    const { Items } = await dynamoDBClient.send(new QueryCommand(params));
+    const posts = Items ? Items.map(item => unmarshall(item)) : [];
+    
+    console.log(`Found ${posts.length} scheduled posts for userId: ${userId}`);
+    res.status(200).json(posts);
+
+  } catch (error) {
+    console.error('Error fetching scheduled posts from DynamoDB:', error);
+    res.status(500).json({ error: 'Failed to fetch scheduled posts', details: error.message });
   }
 });
 

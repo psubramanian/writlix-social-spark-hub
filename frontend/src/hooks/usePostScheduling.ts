@@ -52,9 +52,10 @@ export function usePostScheduling(userId: string | undefined) {
       console.log(`Scheduling content idea with ID: ${contentIdeaId} for user: ${userId} on platform: ${platform}`);
 
       // API Call: Get user's default schedule settings
+      const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || '';
       let userSettings: ApiScheduleSettings | null = null;
       try {
-        const settingsResponse = await fetch(`/api/schedule-settings?userId=${userId}`); // Adjust API path as needed
+        const settingsResponse = await fetch(`${API_BASE_URL}/api/schedule-settings?userId=${userId}`);
         if (!settingsResponse.ok) {
           const errorData = await settingsResponse.json().catch(() => ({ message: 'Failed to fetch schedule settings' }));
           throw new Error(errorData.message || 'Failed to fetch schedule settings');
@@ -90,7 +91,7 @@ export function usePostScheduling(userId: string | undefined) {
 
         console.log('Attempting to create default settings via API with payload:', defaultSettingsPayload);
         
-        const createSettingsResponse = await fetch('/api/schedule-settings', {
+        const createSettingsResponse = await fetch(`${API_BASE_URL}/api/schedule-settings`, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify(defaultSettingsPayload),
@@ -132,7 +133,7 @@ export function usePostScheduling(userId: string | undefined) {
         
         console.log('Creating scheduled post via API with payload:', scheduledPostPayload);
         
-        const postResponse = await fetch('/api/scheduled-posts', {
+        const postResponse = await fetch(`${API_BASE_URL}/api/scheduled-posts`, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify(scheduledPostPayload),
@@ -191,7 +192,7 @@ export function usePostScheduling(userId: string | undefined) {
       
       console.log('Creating scheduled post via API with payload:', scheduledPostPayload);
       
-      const postResponse = await fetch('/api/scheduled-posts', {
+      const postResponse = await fetch(`${API_BASE_URL}/api/scheduled-posts`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(scheduledPostPayload),
@@ -239,10 +240,10 @@ export function usePostScheduling(userId: string | undefined) {
             // API Call: Update the schedule settings with the new fallback next_run_at
             if (userSettings.id) { // Assuming 'id' is the identifier for schedule settings
               try {
-                const updateSettingsResponse = await fetch(`/api/schedule-settings/${userSettings.id}`, { // Or a general update endpoint
+                const updateSettingsResponse = await fetch(`${API_BASE_URL}/api/schedule-settings`, {
                   method: 'PUT',
                   headers: { 'Content-Type': 'application/json' },
-                  body: JSON.stringify({ nextRunAt: updatedNextRunAtString }),
+                  body: JSON.stringify({ userId, nextRunAt: updatedNextRunAtString }),
                 });
                 if (!updateSettingsResponse.ok) {
                   console.warn('Failed to update schedule settings with fallback next run time via API.');
@@ -258,10 +259,10 @@ export function usePostScheduling(userId: string | undefined) {
             // API Call: Update the schedule settings with the new next_run_at
             if (userSettings.id) { // Assuming 'id' is the identifier for schedule settings
               try {
-                const updateSettingsResponse = await fetch(`/api/schedule-settings/${userSettings.id}`, { // Or a general update endpoint
+                const updateSettingsResponse = await fetch(`${API_BASE_URL}/api/schedule-settings`, {
                    method: 'PUT',
                    headers: { 'Content-Type': 'application/json' },
-                   body: JSON.stringify({ nextRunAt: updatedNextRunAtString }),
+                   body: JSON.stringify({ userId, nextRunAt: updatedNextRunAtString }),
                 });
                 if (!updateSettingsResponse.ok) {
                     console.error('Error updating schedule settings via API:', await updateSettingsResponse.text());

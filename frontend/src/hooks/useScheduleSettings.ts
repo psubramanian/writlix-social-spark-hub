@@ -1,8 +1,6 @@
 
 import { useState, useEffect } from 'react';
-import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/components/ui/use-toast';
-import { useAuthRedirect } from '@/utils/supabaseUserUtils';
 import { calculateNextRunTime } from '@/utils/scheduleUtils';
 
 export interface ScheduleSettings {
@@ -19,40 +17,56 @@ export function useScheduleSettings(userId: string | undefined) {
   const [userSettings, setUserSettings] = useState<ScheduleSettings | null>(null);
   const [isUpdating, setIsUpdating] = useState(false);
   const { toast } = useToast();
-  const { redirectToLogin } = useAuthRedirect();
 
   const fetchUserSettings = async () => {
     try {
       if (!userId) {
-        redirectToLogin();
+        toast({
+          title: "Authentication Required",
+          description: "Please log in to view schedule settings.",
+          variant: "destructive",
+        });
         return;
       }
 
-      const { data: settings, error } = await supabase
-        .from('schedule_settings')
-        .select('*')
-        .eq('user_id', userId as any)
-        .is('post_id', null)
-        .maybeSingle();
+      const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || '';
+      const response = await fetch(`${API_BASE_URL}/api/schedule-settings?userId=${userId}`, {
+        method: 'GET',
+        headers: { 'Content-Type': 'application/json' },
+      });
 
-      if (error) {
-        console.error('Error fetching schedule settings:', error);
+      if (response.status === 404) {
+        // No settings found yet - this is expected for new users
+        setUserSettings(null);
         return;
       }
 
-      if (settings && typeof settings === 'object' && 'id' in settings && 'frequency' in settings && 'time_of_day' in settings) {
+      if (!response.ok) {
+        const errorData = await response.json().catch(() => ({ message: 'Failed to fetch schedule settings' }));
+        throw new Error(errorData.message || 'Failed to fetch schedule settings');
+      }
+
+      const settings = await response.json();
+      console.log('Fetched schedule settings:', settings);
+
+      if (settings && typeof settings === 'object') {
         setUserSettings({
-          id: String(settings.id),
+          id: settings.SK || settings.id, // Use SK from DynamoDB or fallback to id
           frequency: settings.frequency as 'daily' | 'weekly' | 'monthly',
-          timeOfDay: String(settings.time_of_day),
-          dayOfWeek: ('day_of_week' in settings && settings.day_of_week !== null) ? Number(settings.day_of_week) : undefined,
-          dayOfMonth: ('day_of_month' in settings && settings.day_of_month !== null) ? Number(settings.day_of_month) : undefined,
-          timezone: ('timezone' in settings && settings.timezone) ? String(settings.timezone) : 'UTC',
-          nextRunAt: ('next_run_at' in settings && settings.next_run_at) ? String(settings.next_run_at) : undefined,
+          timeOfDay: settings.timeOfDay,
+          dayOfWeek: settings.dayOfWeek !== undefined ? Number(settings.dayOfWeek) : undefined,
+          dayOfMonth: settings.dayOfMonth !== undefined ? Number(settings.dayOfMonth) : undefined,
+          timezone: settings.timezone || 'UTC',
+          nextRunAt: settings.nextRunAt,
         });
       }
     } catch (error: any) {
       console.error('Error fetching user settings:', error);
+      toast({
+        title: "Error",
+        description: "Failed to load schedule settings.",
+        variant: "destructive",
+      });
     }
   };
 
