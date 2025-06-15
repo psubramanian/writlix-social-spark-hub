@@ -1,0 +1,142 @@
+// This is your Prisma schema file,
+// learn more about it in the docs: https://pris.ly/d/prisma-schema
+
+// Looking for ways to speed up your queries, or scale easily with your serverless or edge functions?
+// Try Prisma Accelerate: https://pris.ly/cli/accelerate-init
+
+generator client {
+  provider = "prisma-client-js"
+  output   = "../src/generated/prisma" // Path for the generated Prisma Client
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+// --------------------------- 
+// ENUMS
+// --------------------------- 
+
+enum ContentIdeaStatus {
+  DRAFT
+  APPROVED
+  SCHEDULED
+  PUBLISHED
+  FAILED
+  ARCHIVED
+}
+
+enum ScheduledPostStatus {
+  PENDING
+  PROCESSING
+  POSTED
+  FAILED
+  CANCELLED
+}
+
+enum SubscriptionPlanTier {
+  FREE
+  PRO
+  BUSINESS
+}
+
+enum ScheduleFrequency {
+  DAILY
+  WEEKLY
+  MONTHLY
+  CUSTOM_DAYS
+}
+
+// --------------------------- 
+// MODELS
+// --------------------------- 
+
+model User {
+  id        String @id @unique // Clerk User ID
+
+  // App-specific preferences can be added here if needed in the future
+  // e.g. default_timezone String?
+
+  // Relations
+  contentIdeas     ContentIdea[]
+  scheduleSettings ScheduleSetting[]
+  scheduledPosts   ScheduledPost[]
+  subscription     UserSubscription?
+}
+
+model ContentIdea {
+  id              String            @id @default(cuid())
+  userId          String
+  textContent     String            @db.Text
+  mediaReferences String[] // URLs to images/videos
+  status          ContentIdeaStatus @default(DRAFT)
+  sourcePrompt    String?           @db.Text // If AI-generated
+  createdAt       DateTime          @default(now())
+  updatedAt       DateTime          @updatedAt
+
+  user           User            @relation(fields: [userId], references: [id], onDelete: Cascade)
+  scheduledPosts ScheduledPost[]
+
+  @@index([userId])
+  @@map("content_ideas")
+}
+
+model ScheduleSetting {
+  id              String            @id @default(cuid())
+  userId          String            @unique // Assuming one main schedule setting per user
+  frequency       ScheduleFrequency
+  // If frequency is CUSTOM_DAYS, these specific days could be stored, e.g., in a String[]
+  // customDays    String[]?      // e.g., ["MONDAY", "WEDNESDAY", "FRIDAY"]
+  timesOfDay      String[]          // List of preferred times, e.g., "09:00", "17:30" in user's timezone
+  timezone        String            // User's preferred timezone, e.g., "America/New_York"
+  targetPlatforms String[]          // e.g., ["linkedin", "facebook", "twitter"]
+  createdAt       DateTime          @default(now())
+  updatedAt       DateTime          @updatedAt
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@map("schedule_settings")
+}
+
+model ScheduledPost {
+  id               String              @id @default(cuid())
+  userId           String
+  contentIdeaId    String
+  platform         String              // e.g., "linkedin", "facebook"
+  scheduledAtUtc   DateTime            // Exact UTC time for posting
+  status           ScheduledPostStatus @default(PENDING)
+  postedAtUtc      DateTime?
+  platformPostId   String?             // ID of the post on the social media platform, once posted
+  errorMessage     String?             @db.Text // If posting failed
+  retryCount       Int?                @default(0)
+  createdAt        DateTime            @default(now())
+  updatedAt        DateTime            @updatedAt
+
+  user        User        @relation(fields: [userId], references: [id], onDelete: Cascade)
+  contentIdea ContentIdea @relation(fields: [contentIdeaId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+  @@index([contentIdeaId])
+  @@index([scheduledAtUtc, status]) // Useful for querying posts to be processed
+  @@map("scheduled_posts")
+}
+
+model UserSubscription {
+  id                     String               @id @default(cuid())
+  userId                 String               @unique
+  subscriptionProviderId String?              @unique // e.g., Stripe Subscription ID or Clerk Subscription ID
+  currentPlanTier        SubscriptionPlanTier @default(FREE)
+  isActive               Boolean              @default(false)
+  // featuresEnabled can be derived from currentPlanTier in application logic
+  // or stored as JSON if highly variable:
+  // featuresJson        Json?
+  planPeriodEndsAt       DateTime?            // When the current billing period ends
+  trialEndsAt            DateTime?            // If on a trial
+  lastSyncedAt           DateTime             @updatedAt // When this record was last synced from Clerk/Stripe
+  createdAt              DateTime             @default(now())
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@map("user_subscriptions")
+}

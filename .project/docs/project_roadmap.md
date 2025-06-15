@@ -7,20 +7,20 @@ This roadmap outlines the key phases and tasks for migrating the Writlix Social 
 ---
 
 ## 🚩 Phase 1: Next.js Project Initialization & Basic Frontend Setup 🏗️
-*   [ ] ➡️ **Initialize Next.js Project (`writlix-social-spark-hub`)**
-    *   [ ] 💡 Command: `npx create-next-app@latest . --typescript --tailwind --eslint --app --src-dir --import-alias "@/*"`
-    *   [ ] 💡 Confirm App Router, TypeScript, Tailwind CSS, ESLint during setup.
+*   [x] ➡️ **Initialize Next.js Project (`writlix-social-spark-hub`)**
+    *   [x] 💡 Command: `npx create-next-app@latest . --typescript --tailwind --eslint --app --src-dir --import-alias "@/*"`
+    *   [x] 💡 Confirm App Router, TypeScript, Tailwind CSS, ESLint during setup.
 *   [ ] ➡️ **Install Additional Core Dependencies**
     *   [ ] 💡 `@clerk/nextjs`
-    *   [ ] 💡 `prisma`, `@prisma/client`, `pg`
-    *   [ ] 💡 `class-variance-authority`, `clsx`, `lucide-react`, `tailwind-merge`, `tailwindcss-animate` (for shadcn/ui)
+    *   [x] 💡 `prisma`, `@prisma/client`, `pg` - *Installed as part of `prisma init` and general setup*
+    *   [x] 💡 `class-variance-authority`, `clsx`, `lucide-react`, `tailwind-merge`, `tailwindcss-animate` (for shadcn/ui) - *Installed by `shadcn-ui init`*
     *   [ ] 💡 `@tanstack/react-query`, `react-hook-form`, `zod`, `next-themes`, `sonner`, `recharts`, `date-fns`, `date-fns-tz`.
-*   [ ] ➡️ **Basic Project Structure & Styling Configuration**
-    *   [ ] 💡 Verify/Set up basic layout components (e.g., `src/app/layout.tsx`).
-    *   [ ] 💡 Ensure `tailwind.config.ts` and `postcss.config.js` are correctly configured. Verify `src/app/globals.css`.
-    *   [ ] 💡 Initialize shadcn/ui: `npx shadcn-ui@latest init`.
-*   [ ] ➡️ **Migrate Static Assets**
-    *   [ ] 💡 Move relevant contents from old `frontend/public/` to Next.js `public/`.
+*   [x] ➡️ **Basic Project Structure & Styling Configuration**
+    *   [ ] 💡 Verify/Set up basic layout components (e.g., `src/app/layout.tsx`). - *Default layout exists, further customization pending*
+    *   [x] 💡 Ensure `tailwind.config.ts` and `postcss.config.js` are correctly configured. Verify `src/app/globals.css`.
+    *   [x] 💡 Initialize shadcn/ui: `npx shadcn-ui@latest init`.
+*   [x] ➡️ **Migrate Static Assets**
+    *   [x] 💡 Move relevant contents from old `frontend/public/` to Next.js `public/`.
 *   [ ] ➡️ **Database Connection String Acquisition (via Temporary Vercel Project)**
     *   [ ] 💡 Objective: Obtain `DATABASE_URL` for "Prisma Postgres".
     *   [ ] 💡 Create a minimal, temporary Next.js app.
@@ -28,11 +28,11 @@ This roadmap outlines the key phases and tasks for migrating the Writlix Social 
     *   [ ] 💡 Add "Prisma Postgres" integration to the temporary Vercel project.
     *   [ ] 💡 Copy and securely store the provisioned `DATABASE_URL`.
     *   [ ] 💡 Delete temporary resources.
-*   [ ] ➡️ **Prisma Setup in Main Project**
-    *   [ ] 💡 Initialize Prisma: `npx prisma init`.
-    *   [ ] 💡 Add `DATABASE_URL` to `.env.local`.
-    *   [ ] 💡 Define an initial Prisma schema (`prisma/schema.prisma`).
-    *   [ ] 💡 Run `npx prisma db push` or `npx prisma migrate dev --name initial-setup`.
+*   [x] ➡️ **Prisma Setup in Main Project**
+    *   [x] 💡 Initialize Prisma: `npx prisma init`.
+    *   [x] 💡 Add `DATABASE_URL` to `.env.local`. - *Placeholder added to `.env`*
+    *   [x] 💡 Define an initial Prisma schema (`prisma/schema.prisma`).
+    *   [ ] 💡 Run `npx prisma db push` or `npx prisma migrate dev --name initial-setup`. - *Blocked: Needs DB URL*
 *   [ ] ➡️ **Migrate Core React Components (Initial Pass - No Data)**
     *   [ ] 💡 Migrate simple, presentational components.
     *   [ ] 💡 Adapt import paths.
@@ -89,6 +89,6 @@ This roadmap outlines the key phases and tasks for migrating the Writlix Social 
 ---
 *Last updated: 2025-06-15. Based on `next-migration.md` (Version 0.1).*
 
-## <Q_current_year> Overview
+## Q2-2025 Overview
 
 *(Define goals, milestones for the current/next quarter)*

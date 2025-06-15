@@ -1,0 +1,76 @@
+```mermaid
+erDiagram
+    USER {
+        string id PK "Clerk User ID"
+    }
+
+    CONTENT_IDEA {
+        string id PK
+        string userId FK
+        text textContent
+        string_array mediaReferences
+        ContentIdeaStatus status "DRAFT, APPROVED, SCHEDULED, PUBLISHED, FAILED, ARCHIVED"
+        text sourcePrompt
+        datetime createdAt
+        datetime updatedAt
+    }
+
+    SCHEDULE_SETTING {
+        string id PK
+        string userId FK "Unique"
+        ScheduleFrequency frequency "DAILY, WEEKLY, MONTHLY, CUSTOM_DAYS"
+        string_array timesOfDay
+        string timezone
+        string_array targetPlatforms
+        datetime createdAt
+        datetime updatedAt
+    }
+
+    SCHEDULED_POST {
+        string id PK
+        string userId FK
+        string contentIdeaId FK
+        string platform
+        datetime scheduledAtUtc
+        ScheduledPostStatus status "PENDING, PROCESSING, POSTED, FAILED, CANCELLED"
+        datetime postedAtUtc
+        string platformPostId
+        text errorMessage
+        int retryCount
+        datetime createdAt
+        datetime updatedAt
+    }
+
+    USER_SUBSCRIPTION {
+        string id PK
+        string userId FK "Unique"
+        string subscriptionProviderId "Unique"
+        SubscriptionPlanTier currentPlanTier "FREE, PRO, BUSINESS"
+        boolean isActive
+        datetime planPeriodEndsAt
+        datetime trialEndsAt
+        datetime lastSyncedAt
+        datetime createdAt
+    }
+
+    USER ||--o{ CONTENT_IDEA : "has"
+    USER ||--o{ SCHEDULE_SETTING : "has"
+    USER ||--o{ SCHEDULED_POST : "has"
+    USER ||--o| USER_SUBSCRIPTION : "has"
+    CONTENT_IDEA ||--o{ SCHEDULED_POST : "generates"
+
+    classDef ENUM fill:#f9f,stroke:#333,stroke-width:2px,color:black;
+    classDef PK fill:#lightgrey,stroke:#333,stroke-width:2px,color:black,font-weight:bold;
+    classDef FK fill:#e6e6fa,stroke:#333,stroke-width:2px,color:black;
+
+    class USER PK
+    class CONTENT_IDEA PK
+    class SCHEDULE_SETTING PK
+    class SCHEDULED_POST PK
+    class USER_SUBSCRIPTION PK
+
+    class CONTENT_IDEA FK
+    class SCHEDULE_SETTING FK
+    class SCHEDULED_POST FK
+    class USER_SUBSCRIPTION FK
+```
