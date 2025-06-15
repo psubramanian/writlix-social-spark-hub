@@ -101,6 +101,19 @@ const Schedule = () => {
 
   return (
     <AppLayout>
+      {/* Placeholder for selected post preview */}
+      {selectedPostForPreview && (
+        <div className="fixed bottom-5 right-5 bg-slate-800 text-white p-4 rounded-lg shadow-xl z-50 border border-purple-500">
+          <p className="text-sm font-semibold mb-1">Previewing Post:</p>
+          <p className="text-xs mb-2 truncate max-w-xs">{selectedPostForPreview.title}</p>
+          <button 
+            onClick={() => setSelectedPostForPreview(null)} 
+            className="text-xs bg-purple-600 hover:bg-purple-700 px-2 py-1 rounded w-full"
+          >
+            Close Preview
+          </button>
+        </div>
+      )}
       <div className="h-[calc(100vh-8rem)] flex flex-col overflow-hidden">
         {/* Fixed Header */}
         <div className="flex-shrink-0 pb-2">
