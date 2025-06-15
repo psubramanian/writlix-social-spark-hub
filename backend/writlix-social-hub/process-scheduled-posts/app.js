@@ -1,7 +1,10 @@
 const { DynamoDBClient, GetItemCommand } = require("@aws-sdk/client-dynamodb");
 const { DynamoDBDocumentClient, QueryCommand, UpdateCommand } = require("@aws-sdk/lib-dynamodb");
 const { Clerk } = require("@clerk/clerk-sdk-node"); // Or require('@clerk/backend') depending on version and usage
-const axios = require("axios");
+// Axios will be used by linkedinService, not directly here anymore for posting.
+const { postToLinkedIn } = require('./utils/linkedinService.js');
+const { postToFacebook } = require('./utils/facebookService.js');
+const { postToInstagram } = require('./utils/instagramService.js');
 
 const TABLE_NAME = 'WritlixSocialHub';
 const AWS_REGION = process.env.AWS_REGION || 'us-east-1';
@@ -24,55 +27,6 @@ const dynamoDbClient = new DynamoDBClient({
 const docClient = DynamoDBDocumentClient.from(dynamoDbClient);
 
 const clerkClient = CLERK_SECRET_KEY ? Clerk({ secretKey: CLERK_SECRET_KEY }) : null;
-
-// --- Social Media Posting Helpers (Placeholders) ---
-async function postToLinkedIn(accessToken, contentIdea, userId) {
-    console.log(`Attempting to post to LinkedIn for user ${userId}, content: ${contentIdea.contentIdeaId}`);
-    // LinkedIn API V2 URL for creating a share: https://api.linkedin.com/v2/ugcPosts
-    const LINKEDIN_API_URL = 'https://api.linkedin.com/v2/ugcPosts';
-    try {
-        const response = await axios.post(LINKEDIN_API_URL, {
-            author: `urn:li:person:${userId}`, // This needs the LinkedIn person URN, not Clerk user_id. Clerk might provide this via user.publicMetadata or an API call.
-            lifecycleState: 'PUBLISHED',
-            specificContent: {
-                'com.linkedin.ugc.ShareContent': {
-                    shareCommentary: {
-                        text: contentIdea.textContent // Assuming textContent is the field
-                    },
-                    shareMediaCategory: 'NONE'
-                }
-            },
-            visibility: { 'com.linkedin.ugc.MemberNetworkVisibility': 'PUBLIC' }
-        }, {
-            headers: {
-                'Authorization': `Bearer ${accessToken}`,
-                'Content-Type': 'application/json',
-                'X-Restli-Protocol-Version': '2.0.0'
-            }
-        });
-        console.log('LinkedIn post successful:', response.data);
-        return { success: true, postId: response.data.id };
-    } catch (error) {
-        console.error('Error posting to LinkedIn:', error.response ? error.response.data : error.message);
-        return { success: false, error: error.response ? error.response.data : error.message };
-    }
-}
-
-async function postToFacebook(accessToken, contentIdea, userId) {
-    console.log(`Attempting to post to Facebook for user ${userId}, content: ${contentIdea.contentIdeaId}`);
-    // Placeholder: Implement Facebook Graph API call
-    // const FACEBOOK_API_URL = `https://graph.facebook.com/vX.X/me/feed`; // or /<page_id>/feed
-    // Needs page ID and specific permissions.
-    console.warn('Facebook posting not yet implemented.');
-    return { success: false, error: 'Facebook posting not implemented' };
-}
-
-async function postToInstagram(accessToken, contentIdea, userId) {
-    console.log(`Attempting to post to Instagram for user ${userId}, content: ${contentIdea.contentIdeaId}`);
-    // Placeholder: Implement Instagram Graph API call (usually for business accounts, involves media uploads first)
-    console.warn('Instagram posting not yet implemented.');
-    return { success: false, error: 'Instagram posting not implemented' };
-}
 
 // --- Main Handler ---
 exports.handler = async (event) => {
@@ -159,21 +113,45 @@ exports.handler = async (event) => {
 
                 // 2. Get OAuth Token from Clerk
                 let accessToken;
+                let authorUrn; // Declare here for broader scope
                 try {
                     // Note: Clerk's getToken might require a specific session ID or actor, 
                     // depending on your Clerk setup for backend tokens.
                     // For long-lived access for backend processes, you might use user.publicMetadata or specific API calls to Clerk.
                     // The template name (e.g., 'linkedin_writlix') must match what's configured in your Clerk instance.
-                    const providerString = `oauth_${platform.toLowerCase()}`;
-                    const tokenResult = await clerkClient.users.getUserOauthAccessToken(userId, providerString); // Corrected provider string
-                    
-                    if (tokenResult && tokenResult.length > 0 && tokenResult[0].token) {
-                        accessToken = tokenResult[0].token;
-                    } else {
-                        console.error(`Failed to get ${platform} access token for user ${userId} from Clerk. Response:`, JSON.stringify(tokenResult));
+                    // providerString = `oauth_${platform.toLowerCase()}`; // Original attempt
+                    providerString = `oauth_${platform.toLowerCase()}_oidc`; // Trying OIDC specific provider string
+                    // If platform is 'linkedin', this will become 'oauth_linkedin_oidc'
+                    console.log(`DEBUG: Attempting to get OAuth token for user ${userId}, provider: ${providerString}`);
+                    const clerkTokenResponse = await clerkClient.users.getUserOauthAccessToken(userId, providerString);
+                    console.log(`DEBUG: Clerk token response for ${platform} for user ${userId}:`, JSON.stringify(clerkTokenResponse, null, 2));
+
+                    if (!clerkTokenResponse || clerkTokenResponse.length === 0 || !clerkTokenResponse[0].token) {
+                        console.error(`Failed to get ${platform} access token for user ${userId} from Clerk. Response:`, JSON.stringify(clerkTokenResponse));
                         failureCount++;
                         // Update post to 'failed_auth' or similar. The main catch block will handle updating status.
                         throw new Error(`Failed to get ${platform} access token from Clerk.`); // Throw to be caught by main try-catch
+                    } else {
+                        accessToken = clerkTokenResponse[0].token;
+                        // Attempt to get the full user object to find LinkedIn URN
+                        try {
+                            const clerkUser = await clerkClient.users.getUser(userId);
+                            console.log(`DEBUG: Full Clerk user object for ${userId}:`, JSON.stringify(clerkUser, null, 2));
+                            
+                            if (platform === 'linkedin') {
+                                const linkedInAccount = clerkUser.externalAccounts?.find(acc => acc.provider === 'oauth_linkedin_oidc');
+                                if (linkedInAccount && linkedInAccount.externalId) {
+                                    authorUrn = `urn:li:person:${linkedInAccount.externalId}`;
+                                    console.log(`DEBUG: Constructed LinkedIn Author URN: ${authorUrn}`);
+                                } else {
+                                    console.error(`ERROR: Could not find LinkedIn externalId in Clerk user object for user ${userId}.`);
+                                    throw new Error(`Missing LinkedIn externalId for user ${userId}, cannot construct author URN.`);
+                                }
+                            }
+                        } catch (userFetchErr) { // Renamed userErr for clarity
+                            console.error(`ERROR: Failed to fetch Clerk user object to get LinkedIn externalId for user ${userId}:`, userFetchErr);
+                            throw new Error(`Failed to fetch Clerk user details for LinkedIn URN for user ${userId}. Cause: ${userFetchErr.message}`);
+                        }
                     }
                 } catch (err) {
                     console.error(`Error getting ${platform} access token for user ${userId} (provider: ${providerString}) from Clerk. Full error:`, JSON.stringify(err, Object.getOwnPropertyNames(err), 2));
@@ -186,17 +164,19 @@ exports.handler = async (event) => {
                 let postResult;
                 switch (platform.toLowerCase()) {
                     case 'linkedin':
-                        // The LinkedIn post helper needs the LinkedIn URN, not Clerk user ID.
-                        // This is a simplification for now. In reality, you'd fetch the LinkedIn member URN associated with the user's Clerk account.
-                        // This might be stored in user.publicMetadata or obtained via another Clerk API call.
-                        // For now, we'll pass userId, but this will fail for the actual LinkedIn API call if it's not the URN.
-                        postResult = await postToLinkedIn(accessToken, contentIdea, userId /* This should be LinkedIn URN */);
+                        if (!authorUrn) {
+                            console.error(`ERROR: LinkedIn Author URN not constructed for user ${userId}. Cannot post.`);
+                            postResult = { success: false, error: 'LinkedIn Author URN missing.' };
+                        } else {
+                            console.log(`Handler: Attempting to post to LinkedIn. Author URN: ${authorUrn}, Content: ${contentIdea.content ? contentIdea.content.substring(0,50) + '...' : 'undefined'}`);
+                            postResult = await postToLinkedIn(authorUrn, contentIdea.content, accessToken);
+                        }
                         break;
                     case 'facebook':
-                        postResult = await postToFacebook(accessToken, contentIdea, userId);
+                        postResult = await postToFacebook(accessToken, contentIdea.content, userId);
                         break;
                     case 'instagram':
-                        postResult = await postToInstagram(accessToken, contentIdea, userId);
+                        postResult = await postToInstagram(accessToken, contentIdea.content, userId);
                         break;
                     default:
                         console.warn(`Unsupported platform: ${platform} for post ${scheduledPostId}`);
