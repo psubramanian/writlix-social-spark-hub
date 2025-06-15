@@ -46,7 +46,7 @@ export default function LoginPage() {
         </div>
         
         <p className="mt-8 text-sm text-gray-400 text-center">
-          Don't have an account? The sign-up option is available within the login form above.
+          Don&apos;t have an account? The sign-up option is available within the login form above.
         </p>
       </div>
     </div>

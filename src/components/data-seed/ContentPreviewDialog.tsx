@@ -132,7 +132,7 @@ const ContentPreviewDialog: React.FC<ContentPreviewDialogProps> = ({
                 </Badge>
                 <div className="flex items-center gap-1 text-sm text-slate-500">
                   <Clock className="h-4 w-4" />
-                  {new Date(content.createdAt).toLocaleDateString()}
+                  {content.createdAt ? new Date(content.createdAt).toLocaleDateString() : 'No date'}
                 </div>
               </div>
             </div>

@@ -38,7 +38,7 @@ const TopBar = () => {
           <h1 className="text-lg font-semibold bg-gradient-to-r from-black via-slate-800 to-purple-600 bg-clip-text text-transparent">
             Welcome back, {displayName}!
           </h1>
-          <p className="text-sm text-slate-700 font-medium">Here's your content overview</p>
+          <p className="text-sm text-slate-700 font-medium">Here&apos;s your content overview</p>
         </div>
       </div>
       
