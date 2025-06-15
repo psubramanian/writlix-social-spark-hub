@@ -17,6 +17,7 @@ export default function LoginPage() {
         <div className="w-full max-w-md">
           <div className="bg-white/10 backdrop-blur-md border border-white/20 shadow-2xl rounded-xl p-6">
             <SignIn
+              forceRedirectUrl="/dashboard"
               appearance={{
                 elements: {
                   rootBox: "w-full",

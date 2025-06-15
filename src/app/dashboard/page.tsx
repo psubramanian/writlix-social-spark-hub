@@ -4,12 +4,22 @@ import { useUser } from '@clerk/nextjs';
 import { DashboardStatCard } from '@/components/dashboard/DashboardStatCard';
 import { UpcomingPosts } from '@/components/dashboard/UpcomingPosts';
 import { QuickActions } from '@/components/dashboard/QuickActions';
+import AppLayout from '@/components/layout/AppLayout';
 
 export default function Dashboard() {
   const { user, isLoaded } = useUser();
 
   if (!isLoaded) {
-    return <div>Loading dashboard...</div>;
+    return (
+      <AppLayout>
+        <div className="flex items-center justify-center h-64">
+          <div className="text-center">
+            <div className="w-8 h-8 border-4 border-purple-600 border-t-transparent rounded-full animate-spin mx-auto mb-4"></div>
+            <p className="text-slate-600 dark:text-slate-300">Loading dashboard...</p>
+          </div>
+        </div>
+      </AppLayout>
+    );
   }
 
   // Mock data for now - will be replaced with Prisma queries later
@@ -21,16 +31,7 @@ export default function Dashboard() {
   };
 
   return (
-    <div className="p-6">
-      <div className="flex justify-between items-center mb-8">
-        <div>
-          <h1 className="text-2xl font-bold">Dashboard</h1>
-          <p className="text-muted-foreground">
-            Welcome back, {user?.firstName || 'there'}! Here's your content overview.
-          </p>
-        </div>
-      </div>
-      
+    <AppLayout>
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
         <DashboardStatCard
           title="Posts Created"
@@ -54,6 +55,6 @@ export default function Dashboard() {
         <UpcomingPosts scheduledPostsCount={stats.postsScheduled} />
         <QuickActions />
       </div>
-    </div>
+    </AppLayout>
   );
 }
