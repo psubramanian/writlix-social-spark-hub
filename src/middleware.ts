@@ -1,10 +1,8 @@
 import { clerkMiddleware, createRouteMatcher } from '@clerk/nextjs/server';
 
-
 // Define routes that should be accessible without authentication
 const isPublicRoute = createRouteMatcher([
   '/login(.*)',         // Your sign-in page
-  '/sign-up(.*)',       // Your sign-up page (if you plan one)
   '/api/(.*)',          // Clerk and other API routes
   // Add any other specific public marketing pages, etc. here.
   // The root '/' is NOT listed, so it will be protected.
@@ -14,7 +12,8 @@ export default clerkMiddleware(async (auth, req) => {
   // If the request is not for a public route, protect it.
   // Unauthenticated users will be redirected to the sign-in page.
   if (!isPublicRoute(req)) {
-    return (await auth()).redirectToSignIn();
+    const { redirectToSignIn } = await auth();
+    return redirectToSignIn({ returnBackUrl: req.url });
   }
   // For public routes, or if auth().protect() handled the request,
   // the middleware allows the request to proceed.
