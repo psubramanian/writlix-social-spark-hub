@@ -7,7 +7,7 @@ import { QuickActions } from '@/components/dashboard/QuickActions';
 import AppLayout from '@/components/layout/AppLayout';
 
 export default function Dashboard() {
-  const { user, isLoaded } = useUser();
+  const { isLoaded } = useUser();
 
   if (!isLoaded) {
     return (

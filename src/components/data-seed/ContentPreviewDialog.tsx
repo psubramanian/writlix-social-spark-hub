@@ -4,7 +4,6 @@ import React, { useState } from 'react';
 import {
   Dialog,
   DialogContent,
-  DialogDescription,
   DialogHeader,
   DialogTitle,
 } from '@/components/ui/dialog';
@@ -16,10 +15,8 @@ import {
   Edit3, 
   Save, 
   X, 
-  Calendar,
   Hash,
   AtSign,
-  MapPin,
   Clock
 } from 'lucide-react';
 import type { ContentItem } from '@/types/content';

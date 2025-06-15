@@ -33,10 +33,9 @@ const ScheduledPostsList: React.FC<ScheduledPostsListProps> = ({
   socialConnections,
   isLoading
 }) => {
-  const now = new Date();
-
   // Group posts by time periods
   const groupedPosts = React.useMemo(() => {
+    const now = new Date();
     const groups = {
       overdue: { label: 'Past Due', posts: [] as ScheduledPost[], isOverdue: true },
       today: { label: 'Today', posts: [] as ScheduledPost[], isOverdue: false },
@@ -77,7 +76,7 @@ const ScheduledPostsList: React.FC<ScheduledPostsListProps> = ({
     });
 
     return groups;
-  }, [posts, now]);
+  }, [posts]);
 
   const getSocialConnection = (platform: SocialPlatform) => {
     return socialConnections.find(conn => conn.platform === platform);

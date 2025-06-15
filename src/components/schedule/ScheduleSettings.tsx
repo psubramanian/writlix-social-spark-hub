@@ -12,8 +12,6 @@ import {
 } from '@/components/ui/select';
 import { 
   Clock, 
-  Calendar,
-  Globe,
   Settings,
   Play,
   Pause,
