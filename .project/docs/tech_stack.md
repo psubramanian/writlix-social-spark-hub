@@ -1,6 +1,36 @@
 # Tech Stack & Architecture Decisions
 
-*(Document key technology choices and architectural decision records (ADRs) here)*
+## Current Technology Stack
+
+### Frontend Framework
+- **Next.js 15** - App Router, TypeScript, SSR/SSG capabilities
+- **React 18** - Component-based UI with hooks and modern patterns
+- **TypeScript** - Type safety and developer experience
+
+### Styling & UI
+- **Tailwind CSS v4** - Utility-first CSS with custom gradients 
+- **shadcn/ui** - Modern component library with consistent design
+- **Lucide React** - Icon library for UI elements
+- **Custom Design System** - Black-to-purple gradients with glassmorphism
+
+### Authentication & User Management  
+- **Clerk** - Complete authentication solution with styled components
+- **JWT Tokens** - Secure user session management
+- **Route Protection** - Middleware-based auth guards
+
+### Database & Backend
+- **PostgreSQL** - Primary database with ACID compliance
+- **Prisma ORM** - Type-safe database access with schema management
+- **Next.js API Routes** - Serverless backend functions
+
+### AI & Content Generation
+- **OpenAI API** - GPT models for social media content generation
+- **Content Templates** - Platform-specific formatting (LinkedIn, Facebook, Instagram)
+
+### Development & Deployment
+- **Vercel** - Hosting platform optimized for Next.js
+- **ESLint** - Code quality and consistency
+- **Git** - Version control with feature branches
 
 ## Project Structure & Naming Conventions (Next.js Migration)
 
