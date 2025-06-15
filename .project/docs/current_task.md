@@ -13,11 +13,15 @@
     - [x] Configure `.env` with PostgreSQL database URL - *Placeholder added*
     - [x] Define initial Prisma schema (`schema.prisma`) based on legacy DB and new requirements
     - [ ] Run initial migration (`npx prisma migrate dev --name init`) - *Blocked: Needs DB URL*
-- [ ] Integrate Clerk for authentication:
-    - [ ] Install Clerk Next.js SDK
-    - [ ] Configure Clerk environment variables
-    - [ ] Set up Clerk provider and middleware
-    - [ ] Create basic sign-in, sign-up, and protected routes
+### Phase 1.3: Clerk Integration & Initial Page Migration
+- [x] Install Clerk Next.js SDK (`npm install @clerk/nextjs`)
+- [x] Configure Clerk environment variables (`NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY`, `CLERK_SECRET_KEY`, redirect URLs) in `.env`
+- [x] Migrate `LoginPageHeader.tsx` to `src/components/auth/` (LoginForm & SocialLoginButtons removed as redundant with Clerk)
+- [x] Create Next.js `/login` catch-all route (`src/app/login/[[...rest]]/page.tsx`) using Clerk's `<SignIn />` component and `LoginPageHeader`
+- [x] Configure Clerk Provider (`<ClerkProvider>`) in `src/app/layout.tsx`
+- [x] Create `middleware.ts` for route protection
+- [ ] Test login/signup flow
+- [ ] Migrate Dashboard page (basic structure)
 
 ##  backlog / upcoming
 - [ ] Phase 2: Backend API Migration
