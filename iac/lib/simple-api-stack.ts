@@ -49,7 +49,7 @@ export class SimpleApiStack extends cdk.Stack {
         LOCALSTACK_HOSTNAME: '172.17.0.2', // LocalStack container IP for Lambda containers
         DYNAMODB_ENDPOINT: 'http://172.17.0.2:4566', // LocalStack DynamoDB endpoint using container IP
       },
-      timeout: cdk.Duration.seconds(30),
+      timeout: cdk.Duration.minutes(5),
     });
 
     // REST API Gateway for api-handler Lambda (compatible with LocalStack Community)

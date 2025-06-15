@@ -14,7 +14,6 @@ import Schedule from "./pages/Schedule";
 import Settings from "./pages/Settings";
 import NotFound from "./pages/NotFound";
 import PublishedContent from "./pages/PublishedContent";
-import Subscription from "./pages/Subscription";
 import InstantPost from "./pages/InstantPost";
 import AppLayout from "./components/layout/AppLayout";
 import { Loader2 } from "lucide-react";
@@ -139,11 +138,6 @@ const AppRoutes = memo(() => {
         </ProtectedRoute>
       } />
       
-      <Route path="/subscription" element={
-        <ProtectedRoute>
-          <Subscription />
-        </ProtectedRoute>
-      } />
       
       <Route path="/instant-post" element={
         <ProtectedRoute>

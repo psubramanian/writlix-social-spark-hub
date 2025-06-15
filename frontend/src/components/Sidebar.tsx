@@ -2,8 +2,7 @@
 import React from 'react';
 import { Link, useLocation } from "react-router-dom";
 import { useClerk } from '@clerk/clerk-react'; // Changed to use Clerk's useClerk hook
-import { useSubscription } from '../hooks/useSubscription';
-import { BarChart, Settings, LogOut, FileText, Calendar, CreditCard, Send, Lock } from 'lucide-react';
+import { BarChart, Settings, LogOut, FileText, Calendar, Send } from 'lucide-react';
 import {
   Sidebar as ShadcnSidebar,
   SidebarContent,
@@ -19,20 +18,6 @@ import { cn } from "@/lib/utils";
 const Sidebar = () => {
   const location = useLocation();
   const { signOut } = useClerk(); // Use Clerk's signOut function
-  // const { user } = useUser(); // We might need user.id for useSubscription later
-  const { 
-    subscription, 
-    loading, 
-    formatSubscriptionStatus,
-    isTrialActive,
-    isSubscriptionActive,
-    isSubscriptionCanceled
-  } = useSubscription();
-  
-  // A user has access if they have an active trial, active subscription, or canceled subscription that hasn't expired
-  // const hasActiveSubscription = isTrialActive || isSubscriptionActive || 
-  //   (isSubscriptionCanceled && subscription?.active_till && new Date(subscription.active_till) > new Date());
-  // This variable is no longer needed for sidebar item gating.
 
   const menuItems = [
     { icon: BarChart, label: 'Dashboard', path: '/dashboard' },
@@ -40,7 +25,6 @@ const Sidebar = () => {
     { icon: Calendar, label: 'Schedule', path: '/schedule' },
     { icon: Send, label: 'Instant Post', path: '/instant-post' },
     { icon: Settings, label: 'Settings', path: '/settings' },
-    { icon: CreditCard, label: 'Subscription', path: '/subscription' },
   ];
   
   return (
@@ -77,9 +61,6 @@ const Sidebar = () => {
       </SidebarContent>
       
       <SidebarFooter className="p-4 border-t">
-        <div className="text-xs text-sidebar-foreground/70 mb-2">
-          {loading ? "Loading subscription..." : formatSubscriptionStatus()}
-        </div>
         <SidebarMenuButton
           onClick={() => signOut({ redirectUrl: '/login' })}
           className="w-full"

@@ -4,14 +4,12 @@ import { useUser, UserButton } from '@clerk/clerk-react'; // Changed to use Cler
 import { Button } from '@/components/ui/button';
 import { Avatar, AvatarImage, AvatarFallback } from '@/components/ui/avatar';
 import { Bell, Menu } from 'lucide-react';
-import { useSubscription } from '@/hooks/useSubscription';
 import { useSidebar } from '@/components/ui/sidebar';
 import { ThemeToggle } from './ThemeToggle';
 
 const TopBar = () => {
   const { user, isLoaded: isUserLoaded } = useUser(); // Use Clerk's useUser hook
-  // const { subscription, loading, formatSubscriptionStatus } = useSubscription(); // This line is already present
-  // const { toggleSidebar } = useSidebar(); // This line is already present
+  const { toggleSidebar } = useSidebar();
 
   if (!isUserLoaded) {
     // You might want a more sophisticated loading state, or just render minimal UI
@@ -24,10 +22,6 @@ const TopBar = () => {
 
   // Construct a display name, Clerk provides firstName, lastName, fullName
   const displayName = user?.fullName || user?.firstName || 'User';
-  const avatarFallback = displayName?.charAt(0)?.toUpperCase() || 'U';
-  const emailAddress = user?.primaryEmailAddress?.emailAddress || '';
-  const { subscription, loading, formatSubscriptionStatus } = useSubscription();
-  const { toggleSidebar } = useSidebar();
   
   return (
     <div className="h-16 border-b bg-white dark:bg-background-dark dark:border-border-dark flex items-center justify-between px-6">
@@ -46,7 +40,7 @@ const TopBar = () => {
           <Bell className="h-5 w-5" />
         </Button>
         
-        <UserButton afterSignOutUrl="/login" />
+        <UserButton />
       </div>
     </div>
   );

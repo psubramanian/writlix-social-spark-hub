@@ -1,6 +1,9 @@
-# AWS Deployment Preparation: `process-scheduled-posts` Lambda
+# AWS Deployment Preparation: Full Application Stack
 
-This document outlines the necessary steps and considerations for deploying the `process-scheduled-posts` Lambda function from the local development environment (using LocalStack) to a live AWS environment.
+This document outlines the necessary steps and considerations for deploying the complete Writlix Social Spark Hub application from the local development environment (using LocalStack) to a live AWS environment.
+
+## CRITICAL PRE-DEPLOYMENT NOTE (June 15, 2025)
+🚨 **LocalStack Lambda Code Update Issue**: Before AWS deployment, fix the LocalStack Lambda code update problem that prevents schedule settings from updating properly. This must be resolved and tested locally first.
 
 ## 1. Secrets Management
 
@@ -44,7 +47,8 @@ This document outlines the necessary steps and considerations for deploying the 
 -   [ ] **`AWS_REGION`:** Set to the target AWS region (e.g., `us-east-1`).
 -   [ ] **`CLERK_SECRET_NAME`:** (Recommended) Set to the name or ARN of the secret in AWS Secrets Manager (e.g., `writlix/clerk/secret_key`). This tells the code which secret to fetch.
 -   [ ] **`NODE_ENV`:** Set to `production` or similar, to differentiate from `development`.
--   [ ] **Remove `DYNAMODB_ENDPOINT`**.
+-   [ ] **Remove `DYNAMODB_ENDPOINT`** - Critical for AWS deployment (currently set to LocalStack endpoint).
+-   [ ] **Remove `LOCALSTACK_HOSTNAME`** - LocalStack-specific variable not needed in AWS.
 
 ## 5. Lambda Function Configuration (in AWS Console/IaC)
 
@@ -79,8 +83,54 @@ This document outlines the necessary steps and considerations for deploying the 
     -   `package.json` and `package-lock.json` (or `yarn.lock`).
 -   [ ] **File/Folder Structure:** Maintain the same relative paths as in the development environment.
 
-## 10. Pre-Deployment Testing
+## 10. Frontend Configuration for AWS
+
+-   [ ] **Environment Variables Update:**
+    -   [ ] **`VITE_API_BASE_URL`:** Change from LocalStack URL to AWS API Gateway URL
+        -   Current: `https://7flpdj3bgn.execute-api.localhost.localstack.cloud:4566/prod`
+        -   AWS: `https://{api-id}.execute-api.{region}.amazonaws.com/prod`
+    -   [ ] **Clerk Keys:** Update to production Clerk keys if different from dev
+-   [ ] **Build Configuration:**
+    -   [ ] Run `npm run build` to create production build
+    -   [ ] Test production build locally with `npm run preview`
+-   [ ] **S3 + CloudFront Deployment:**
+    -   [ ] Create S3 bucket for static hosting
+    -   [ ] Configure CloudFront distribution
+    -   [ ] Update CORS settings for new domain
+
+## 11. CDK Stack Modifications for AWS
+
+-   [ ] **Remove LocalStack-specific configurations:**
+    -   [ ] Remove `DYNAMODB_ENDPOINT` environment variable from Lambda
+    -   [ ] Remove `LOCALSTACK_HOSTNAME` environment variable
+    -   [ ] Update timeout from 5 minutes to appropriate production value (30-60 seconds)
+-   [ ] **API Gateway Configuration:**
+    -   [ ] Ensure CORS allows production frontend domain
+    -   [ ] Configure custom domain if needed
+-   [ ] **DynamoDB Table:**
+    -   [ ] Configure appropriate read/write capacity or on-demand billing
+    -   [ ] Set up backup and point-in-time recovery
+
+## 12. Critical Testing Before AWS Deployment
+
+-   [ ] **🚨 MUST FIX FIRST**: Resolve LocalStack Lambda code update issue
+    -   [ ] Ensure schedule updates work properly in LocalStack
+    -   [ ] Verify all CRUD operations function correctly
+    -   [ ] Test with real user data and scenarios
+-   [ ] **End-to-End Testing:**
+    -   [ ] Complete schedule creation/modification workflow
+    -   [ ] Verify frontend-backend integration
+    -   [ ] Test error handling and edge cases
+
+## 13. Pre-Deployment Testing
 
 -   [ ] **Staging Environment (Recommended):** If possible, deploy to a non-production AWS account or staging environment first.
 -   [ ] **Test with Live AWS Services:** After deploying, test the Lambda with actual AWS DynamoDB and Secrets Manager.
 -   [ ] **Monitor Initial Runs:** Closely monitor CloudWatch Logs for the first few executions after deployment.
+
+## 14. Post-Deployment Verification
+
+-   [ ] **API Endpoints:** Test all endpoints with production URLs
+-   [ ] **Database Operations:** Verify schedule CRUD operations work
+-   [ ] **Authentication:** Confirm Clerk integration works with production keys
+-   [ ] **Frontend:** Test complete user workflows in production environment

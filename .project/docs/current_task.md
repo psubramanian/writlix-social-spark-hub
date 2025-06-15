@@ -1,75 +1,89 @@
-# Current Task: Implement Multi-Platform Social Posting & Refine Lambda
+# Current Task: LocalStack Frontend-Backend Integration & Schedule Management
 
-**Branch:** (Assuming current branch or feature branch name)
+**Branch:** aws-development
 
-**Overall Goal:** Extend the `process-scheduled-posts` Lambda to support Facebook and Instagram posting, building upon the successful LinkedIn implementation. Ensure robust error handling, OAuth token management, and status updates for all platforms, using LocalStack for local testing.
+**Overall Goal:** Complete frontend migration from Supabase to LocalStack AWS services. Fix schedule settings CRUD operations and test full end-to-end functionality before deploying to production AWS.
 
-## Progress & Checklist:
+## Current Status (June 15, 2025 - 11:41 PM):
 
-- [x] **Fix DynamoDB `ValidationException` for `ContentIdea` Fetch:**
-    - [x] Investigated `GetItemCommand` usage with AWS SDK v3 and LocalStack.
-    - [x] Confirmed `ContentIdea` item exists via AWS CLI.
-    - [x] Switched from `DynamoDBDocumentClient`'s `GetCommand` to base `DynamoDBClient`'s `GetItemCommand`.
-    - [x] Implemented manual marshalling for the `Key` parameter (e.g., `PK: { S: 'USER#...' }`).
-    - [x] **RESOLVED:** `GetItemCommand` now successfully fetches `ContentIdea` items.
-    - [x] Cleaned up Lambda code structure, removed duplicated blocks, and resolved lint errors.
-    - [x] Corrected iteration logic for `QueryCommand` results (`duePosts.Items` vs. `duePosts`).
+### ✅ COMPLETED TODAY:
+- [x] **Removed All Subscription Service Code:**
+  - [x] Deleted subscription hooks (`useSubscription.ts`, `useSubscriptionPlan.ts`)
+  - [x] Deleted subscription components and pages (`Subscription.tsx`, `/subscription/` directory)
+  - [x] Removed subscription routes from `App.tsx`
+  - [x] Cleaned up all subscription imports and references
+  - [x] Removed newsletter popup functionality
 
-- [x] **Resolve Clerk OAuth Token Retrieval for Social Platforms:**
-    - [x] **RESOLVED:** Lambda now successfully retrieves LinkedIn OAuth token from Clerk using `oauth_linkedin_oidc` provider string.
-        - Initial issue was a delay in the connected account appearing in Clerk dashboard.
-        - Subsequent issue was using `oauth_linkedin` instead of `oauth_linkedin_oidc` provider string.
+- [x] **Fixed Frontend Hook Migration:**
+  - [x] **`useScheduleSettings.ts`**: Fully migrated from Supabase to LocalStack API
+    - [x] Updated `fetchUserSettings()` to use `GET /api/schedule-settings`
+    - [x] Updated `updateUserSettings()` to use `PUT /api/schedule-settings`
+  - [x] **`useScheduledPostsFetch.ts`**: Fully migrated from Supabase to LocalStack API
+    - [x] Updated to use `GET /api/scheduled-posts` endpoint
+    - [x] Added proper data transformation for DynamoDB structure
 
-- [x] **Resolve LinkedIn Post Author URN Issue:**
-    - [x] **RESOLVED:** `postToLinkedIn` no longer fails with 422 error. Clerk `userId` is used to fetch `externalId` for the LinkedIn Member URN.
-    - [x] **Action:** Modified Lambda to fetch the full Clerk user object (`clerkClient.users.getUser(userId)`).
-    - [x] **Action:** Implemented logic to extract `externalId` from `clerkUser.externalAccounts` (where provider is `oauth_linkedin_oidc`) and construct the LinkedIn Author URN (e.g., `urn:li:person:{externalId}`).
-    - [x] **Action:** Added robust error handling: if `externalId` is not found for LinkedIn or Clerk user fetch fails, an error is thrown to fail the specific post.
-    - [x] **Action:** Corrected `postToLinkedIn` function signature and parameter passing from the handler to use the proper `authorUrn` and `content`.
-    - [x] **Refactoring:** Moved `postToLinkedIn` function to `utils/linkedinService.js`.
-    - [x] **Fixing `app.js`:** Reconstructed the main handler loop in `app.js`, imported and integrated `linkedinService.postToLinkedIn`, and removed old posting helper functions. This should resolve previous structural damage and lint errors.
-        - Verify Clerk dashboard configuration for LinkedIn OAuth provider (credentials, redirect URIs).
-        - Verify LinkedIn developer app configuration (redirect URIs).
-        - Ensure the frontend components (`<SignIn />`, `<UserProfile />`, or custom flow) correctly establish the connection and associate it with the Clerk user.
-    - [ ] Add detailed logging for Clerk API calls (provider string, full error response) - *Done in Lambda, scope issue for `providerString` in catch block also fixed.*
+- [x] **Database Setup & Testing:**
+  - [x] Verified DynamoDB table `WritlixSocialHub` exists in LocalStack
+  - [x] Confirmed API endpoints work via direct curl testing
+  - [x] Fixed incomplete user schedule record in database
 
-- [ ] **Next Steps (Social Platforms):**
-    - [x] Created `utils/facebookService.js` with placeholder `postToFacebook`.
-    - [x] Created `utils/instagramService.js` with placeholder `postToInstagram`.
-    - [x] Updated `app.js` to import and call these new service functions.
-    - [ ] Implement actual posting logic in `postToFacebook` in `utils/facebookService.js` (requires Facebook App setup, Page ID, permissions).
-    - [ ] Implement actual posting logic in `postToInstagram` in `utils/instagramService.js` (requires Instagram Business Account, Facebook Page link, permissions).
-    - [ ] Add logic to `app.js` to fetch specific OAuth tokens for Facebook (`oauth_facebook`) and Instagram (likely via Facebook `oauth_facebook` with `instagram_basic`, `instagram_content_publish` permissions).
+### 🔄 IN PROGRESS:
+- [ ] **Backend PUT Endpoint Bug (CRITICAL):**
+  - **ISSUE**: Lambda function in LocalStack is running old code despite redeployment
+  - **SYMPTOM**: PUT `/api/schedule-settings` still returns old response format, only updates `nextRunAt` field
+  - **EXPECTED**: Should update all fields (`frequency`, `timeOfDay`, `timezone`, `dayOfWeek`) and return complete record
+  - **STATUS**: CDK deployment succeeded but LocalStack not picking up new Lambda code
 
-- [x] **Test Full Scheduled Post Processing Flow (End-to-End for LinkedIn):**
-    - [x] Re-ran `process-scheduled-posts` Lambda after LinkedIn fixes.
-    - [x] Verified successful posting to LinkedIn (actual post made).
-    - [x] Verified `scheduled_post` item status is correctly updated to `posted` or `failed` in DynamoDB for LinkedIn.
-    - [x] Verified error messages are logged correctly for failed posts for LinkedIn.
-- [ ] **Test Full Scheduled Post Processing Flow (End-to-End for Facebook & Instagram):**
-    - [ ] Verify successful posting to Facebook (mocked initially, then actual).
-    - [ ] Verify successful posting to Instagram (mocked initially, then actual).
-    - [ ] Verify `scheduled_post` item status updates for Facebook & Instagram.
-    - [ ] Verify error message logging for Facebook & Instagram.
+### ❌ IMMEDIATE BLOCKERS:
+1. **Lambda Code Update Issue**: LocalStack still running old Lambda despite fresh deployment
+2. **Frontend Environment Variable**: May need to update API Gateway URL after fresh deployment
 
-- [ ] **Frontend: Wire up Scheduling to Backend**
-    - [ ] Refactor `usePostScheduling.ts` to use Clerk `userId` and call new backend APIs (instead of Supabase).
-        - [ ] Remove Supabase auth utilities (`useAuthRedirect`).
-        - [ ] Replace Supabase DB calls with `fetch` to API endpoints.
-    - [ ] **Backend: Create APIs for Frontend Scheduling**
-        - [ ] Create `GET /api/schedule-settings` endpoint (reads from DynamoDB).
-        - [ ] Create `POST /api/schedule-settings` endpoint (writes to DynamoDB).
-        - [ ] Create `POST /api/scheduled-posts` endpoint (writes to DynamoDB, potentially updates schedule settings).
-        - [ ] Create `PUT /api/schedule-settings/:id` endpoint (updates DynamoDB).
+## Database Current State:
+```json
+{
+  "PK": "USER#user_2yVhrQ5sN1TMfQ5Ux2he41z2HXn",
+  "SK": "SCHEDULE_SETTINGS#GENERAL", 
+  "frequency": "daily",
+  "timeOfDay": "09:00",
+  "timezone": "America/Chicago",
+  "nextRunAt": "2025-06-16T14:00:00.000Z",
+  "userId": "user_2yVhrQ5sN1TMfQ5Ux2he41z2HXn"
+}
+```
 
-- [ ] **AWS Deployment Preparation:**
-    - [ ] Review and complete tasks in `aws_deployment_prep.md`.
+## Frontend Environment:
+```bash
+VITE_API_BASE_URL=https://7flpdj3bgn.execute-api.localhost.localstack.cloud:4566/prod
+VITE_CLERK_PUBLISHABLE_KEY=pk_test_c3VpdGVkLXBob2VuaXgtMTAuY2xlcmsuYWNjb3VudHMuZGV2JA
+```
 
-- [ ] **Refactor and Cleanup (Future):**
-    - [ ] Review and potentially refactor error counting logic if discrepancies persist.
-    - [ ] Complete migration of remaining frontend components from Supabase to Clerk (as per memory `d253437b-fc86-4857-87c6-40da3e14bc4d`).
+## Testing Workflow:
+1. **Current Schedule Display**: Working (shows daily 09:00 America/Chicago)
+2. **Schedule Updates**: NOT WORKING (backend not updating all fields)
+3. **Posts Loading**: Working (returns empty array, no errors)
 
-## Key Learnings/Notes:
+## Next Session Tasks:
+1. **FIX CRITICAL**: Investigate why LocalStack Lambda not updating despite CDK deployment
+   - Try restarting LocalStack container
+   - Verify Lambda function code is actually updated
+   - Check CloudWatch logs in LocalStack
+2. **Test**: Weekly Friday 11am schedule update end-to-end
+3. **Test**: Frontend schedule creation/modification flows
+4. **Prepare**: For AWS production deployment
 
-*   When using AWS SDK v3 base `DynamoDBClient` (from `@aws-sdk/client-dynamodb`) with `GetItemCommand` against LocalStack, manual marshalling of the `Key` attribute (e.g., `Key: { PK: { S: '...' } }`) is required for it to work correctly. Using `DynamoDBDocumentClient` with an unmarshalled `Key` object caused `ValidationException` in this environment.
-*   Clerk token retrieval (`clerkClient.users.getUserOauthAccessToken`) requires the user to have actively connected the specific social media account via the Clerk-managed interface, AND this connection must be successfully recorded and visible in the Clerk user's profile under "Social accounts".
+## Recent File Changes:
+- `backend/writlix-social-hub/api-handler/app.js`: Fixed PUT endpoint (lines 172-235)
+- `frontend/src/hooks/useScheduleSettings.ts`: Migrated to LocalStack API
+- `frontend/src/hooks/useScheduledPostsFetch.ts`: Migrated to LocalStack API
+- `frontend/.env.local`: Updated API base URL
+- `iac/lib/simple-api-stack.ts`: Increased Lambda timeout to 5 minutes
+
+## API Endpoints Status:
+- ✅ `GET /api/schedule-settings` - Working
+- ✅ `GET /api/scheduled-posts` - Working  
+- ❌ `PUT /api/schedule-settings` - **BROKEN** (not updating all fields)
+
+## User Context:
+- **User ID**: `user_2yVhrQ5sN1TMfQ5Ux2he41z2HXn`
+- **Current Schedule**: Daily at 09:00 America/Chicago
+- **Test Scenario**: Trying to update to Weekly Friday 11am

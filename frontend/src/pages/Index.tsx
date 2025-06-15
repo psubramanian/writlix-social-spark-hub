@@ -7,7 +7,6 @@ import Hero from '../components/landing/Hero';
 import Features from '../components/landing/Features';
 import CTASection from '../components/landing/CTASection';
 import Footer from '../components/landing/Footer';
-import { NewsletterPopup } from '../components/NewsletterPopup';
 
 const Index = () => {
   const { isLoaded, isSignedIn, userId } = useAuth(); // Clerk's useAuth hook
@@ -15,7 +14,6 @@ const Index = () => {
   const isAuthenticated = isSignedIn; // Map Clerk's isSignedIn to isAuthenticated
   const isLoading = !isLoaded; // Map Clerk's !isLoaded to isLoading
   const navigate = useNavigate();
-  const [isNewsletterPopupOpen, setIsNewsletterPopupOpen] = useState(false);
   const [contentLoaded, setContentLoaded] = useState(false);
   
   // Start loading the content immediately but defer rendering for a smoother experience
@@ -41,27 +39,6 @@ const Index = () => {
     }
   }, [isAuthenticated, isLoading, navigate]);
   
-  // Show newsletter popup after a delay if not seen before
-  useEffect(() => {
-    // Skip newsletter if user is authenticated or auth is still loading
-    if (isLoading || isAuthenticated) {
-      return;
-    }
-    
-    // Check if the user has already seen the popup in this session
-    const hasSeenPopup = sessionStorage.getItem('newsletterPopupSeen');
-    
-    if (!hasSeenPopup) {
-      // Open popup after 3 seconds
-      const timer = setTimeout(() => {
-        console.log("[INDEX] Showing newsletter popup");
-        setIsNewsletterPopupOpen(true);
-        sessionStorage.setItem('newsletterPopupSeen', 'true');
-      }, 3000);
-
-      return () => clearTimeout(timer);
-    }
-  }, [isLoading, isAuthenticated]);
   
   // Show loading screen while checking authentication
   if (isLoading || !isLoaded) { // Ensure both Clerk's isLoaded and our derived isLoading are checked
@@ -90,10 +67,6 @@ const Index = () => {
         </>
       )}
       
-      <NewsletterPopup 
-        isOpen={isNewsletterPopupOpen} 
-        onClose={() => setIsNewsletterPopupOpen(false)} 
-      />
     </div>
   );
 };

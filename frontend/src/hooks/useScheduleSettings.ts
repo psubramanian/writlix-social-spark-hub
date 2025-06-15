@@ -74,7 +74,11 @@ export function useScheduleSettings(userId: string | undefined) {
     setIsUpdating(true);
     try {
       if (!userId) {
-        redirectToLogin();
+        toast({
+          title: "Authentication Required",
+          description: "Please log in to update schedule settings.",
+          variant: "destructive",
+        });
         return false;
       }
 
@@ -88,41 +92,27 @@ export function useScheduleSettings(userId: string | undefined) {
       });
 
       const settingsData = {
-        user_id: userId,
+        userId: userId,
         frequency: newSettings.frequency,
-        time_of_day: newSettings.timeOfDay,
-        day_of_week: newSettings.dayOfWeek,
-        day_of_month: newSettings.dayOfMonth,
+        timeOfDay: newSettings.timeOfDay,
+        dayOfWeek: newSettings.dayOfWeek,
+        dayOfMonth: newSettings.dayOfMonth,
         timezone: newSettings.timezone || 'UTC',
-        next_run_at: nextRunAt.toISOString(),
+        nextRunAt: nextRunAt.toISOString(),
       };
 
-      if (userSettings?.id) {
-        // Update existing settings
-        const { error } = await supabase
-          .from('schedule_settings')
-          .update(settingsData as any)
-          .eq('id', userSettings.id as any);
+      const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || '';
+      
+      // Use PUT for both create and update
+      const response = await fetch(`${API_BASE_URL}/api/schedule-settings`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(settingsData),
+      });
 
-        if (error) throw error;
-      } else {
-        // Create new settings
-        const { error } = await supabase
-          .from('schedule_settings')
-          .insert(settingsData as any);
-
-        if (error) throw error;
-      }
-
-      // Update all existing scheduled posts to use the new timezone
-      const { error: updatePostsError } = await supabase
-        .from('scheduled_posts')
-        .update({ timezone: newSettings.timezone || 'UTC' } as any)
-        .eq('user_id', userId as any);
-
-      if (updatePostsError) {
-        console.error('Error updating posts timezone:', updatePostsError);
-        // Don't throw - settings were saved successfully
+      if (!response.ok) {
+        const errorData = await response.json().catch(() => ({ message: 'Failed to update schedule settings' }));
+        throw new Error(errorData.message || 'Failed to update schedule settings');
       }
 
       await fetchUserSettings();

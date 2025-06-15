@@ -1,84 +1,61 @@
 
 import { useState } from 'react';
-import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/components/ui/use-toast';
-import { useAuthRedirect } from '@/utils/supabaseUserUtils';
 import type { ScheduledPost } from './useScheduledPosts';
 
 export function useScheduledPostsFetch(userId: string | undefined) {
   const [posts, setPosts] = useState<ScheduledPost[]>([]);
   const [loading, setLoading] = useState(true);
   const { toast } = useToast();
-  const { redirectToLogin } = useAuthRedirect();
 
   const fetchPosts = async () => {
     try {
       if (!userId) {
-        redirectToLogin();
-        return;
+        toast({
+          title: "Authentication Required",
+          description: "Please log in to view scheduled posts.",
+          variant: "destructive",
+        });
+        return [];
       }
 
-      console.log('Fetching all scheduled posts');
+      console.log('Fetching all scheduled posts from LocalStack API');
 
-      // Only get pending posts, not published ones
-      const { data: postsData, error: postsError } = await supabase
-        .from('scheduled_posts')
-        .select(`
-          *,
-          content_ideas (
-            id,
-            title,
-            content,
-            status
-          )
-        `)
-        .eq('user_id', userId as any)
-        .eq('status', 'pending' as any)
-        .order('next_run_at', { ascending: true });
+      const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || '';
+      const response = await fetch(`${API_BASE_URL}/api/scheduled-posts?userId=${userId}&status=pending`, {
+        method: 'GET',
+        headers: { 'Content-Type': 'application/json' },
+      });
 
-      if (postsError) throw postsError;
-
-      console.log('Fetched scheduled posts:', postsData);
-      
-      // Filter to only include posts where content_ideas status is 'Scheduled'
-      // This is the key change to fix the issue
-      const filteredPosts = postsData ? postsData.filter(post => {
-        // Type guard to ensure post has content_ideas
-        if (!post || typeof post !== 'object' || !('content_ideas' in post) || !post.content_ideas) {
-          return false;
-        }
-        const contentIdeas = post.content_ideas;
-        return contentIdeas && typeof contentIdeas === 'object' && 'status' in contentIdeas && contentIdeas.status === 'Scheduled';
-      }) : [];
-      
-      console.log('After filtering for Scheduled status:', filteredPosts);
-      
-      // Improved deduplication: Consider both date and content ID
-      const uniquePosts = [];
-      const seenContentIds = new Set();
-      
-      for (const post of filteredPosts) {
-        if (!post || typeof post !== 'object' || !('content_ideas' in post) || !post.content_ideas) {
-          continue;
-        }
-        const contentIdeas = post.content_ideas;
-        const contentId = contentIdeas && typeof contentIdeas === 'object' && 'id' in contentIdeas ? contentIdeas.id : null;
-        
-        // Skip this post if we've already seen this content ID
-        if (contentId && seenContentIds.has(contentId)) {
-          console.log(`Skipping duplicate post for content ID: ${contentId}`);
-          continue;
-        }
-        
-        // Add this content ID to our tracking set if it exists
-        if (contentId) {
-          seenContentIds.add(contentId);
-        }
-        
-        uniquePosts.push(post);
+      if (!response.ok) {
+        const errorData = await response.json().catch(() => ({ message: 'Failed to fetch scheduled posts' }));
+        throw new Error(errorData.message || 'Failed to fetch scheduled posts');
       }
 
-      const postsArray = uniquePosts as ScheduledPost[];
+      const postsData = await response.json();
+      console.log('Fetched scheduled posts from API:', postsData);
+
+      // Transform DynamoDB data structure to match frontend expectations
+      const transformedPosts = postsData.map((post: any) => ({
+        id: post.SK || post.id,
+        content_ideas: {
+          id: post.contentId || 1,
+          title: post.title || 'Generated Content',
+          content: post.content || '',
+          status: post.status === 'pending' ? 'Scheduled' : post.status
+        },
+        next_run_at: post.scheduledAt || post.nextRunAt,
+        timezone: post.timezone || 'UTC',
+        user_id: post.userId || userId,
+        status: post.status || 'pending'
+      }));
+
+      // Sort by scheduled time
+      transformedPosts.sort((a: any, b: any) => new Date(a.next_run_at).getTime() - new Date(b.next_run_at).getTime());
+
+      console.log('Transformed scheduled posts:', transformedPosts);
+      
+      const postsArray = transformedPosts as ScheduledPost[];
       setPosts(postsArray);
       
       return postsArray;

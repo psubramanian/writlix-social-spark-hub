@@ -169,42 +169,67 @@ app.post('/api/scheduled-posts', async (req, res) => {
   }
 });
 
-// PUT /api/schedule-settings/:id (or a more general update endpoint)
-// For now, let's assume a general update based on userId for the main user settings
+// PUT /api/schedule-settings - Update complete schedule settings
 app.put('/api/schedule-settings', async (req, res) => {
-  const { userId, nextRunAt } = req.body;
-   if (!userId || !nextRunAt) {
-    return res.status(400).json({ error: 'Missing required fields: userId, nextRunAt' });
+  const { userId, frequency, timeOfDay, timezone, nextRunAt, dayOfWeek, dayOfMonth } = req.body;
+  
+  if (!userId || !frequency || !timeOfDay) {
+    return res.status(400).json({ error: 'Missing required fields: userId, frequency, timeOfDay' });
   }
-  console.log(`PUT /api/schedule-settings for userId: ${userId} to update nextRunAt: ${nextRunAt}`);
+  
+  console.log(`PUT /api/schedule-settings for userId: ${userId}`, req.body);
+  
   try {
+    // Build update expression dynamically based on provided fields
+    let updateExpression = 'SET frequency = :frequency, timeOfDay = :timeOfDay, #timezone = :timezone, #updatedAt = :updatedAt';
+    let expressionAttributeNames = {
+      '#timezone': 'timezone',
+      '#updatedAt': 'updatedAt'
+    };
+    let expressionAttributeValues = {
+      ':frequency': frequency,
+      ':timeOfDay': timeOfDay,
+      ':timezone': timezone || 'UTC',
+      ':updatedAt': new Date().toISOString()
+    };
+
+    // Add optional fields if provided
+    if (nextRunAt) {
+      updateExpression += ', nextRunAt = :nextRunAt';
+      expressionAttributeValues[':nextRunAt'] = nextRunAt;
+    }
+    
+    if (dayOfWeek !== undefined) {
+      updateExpression += ', dayOfWeek = :dayOfWeek';
+      expressionAttributeValues[':dayOfWeek'] = dayOfWeek;
+    }
+    
+    if (dayOfMonth !== undefined) {
+      updateExpression += ', dayOfMonth = :dayOfMonth';
+      expressionAttributeValues[':dayOfMonth'] = dayOfMonth;
+    }
+
     const params = {
       TableName: DYNAMODB_TABLE_NAME,
       Key: marshall({
         PK: `USER#${userId}`,
         SK: `SCHEDULE_SETTINGS#GENERAL`
       }),
-      UpdateExpression: 'SET #nextRunAt = :nextRunAt, #updatedAt = :updatedAt',
-      ExpressionAttributeNames: {
-        '#nextRunAt': 'nextRunAt',
-        '#updatedAt': 'updatedAt'
-      },
-      ExpressionAttributeValues: marshall({
-        ':nextRunAt': nextRunAt,
-        ':updatedAt': new Date().toISOString()
-      }),
-      ReturnValues: 'UPDATED_NEW' // Returns the new values of the updated attributes
+      UpdateExpression: updateExpression,
+      ExpressionAttributeNames: expressionAttributeNames,
+      ExpressionAttributeValues: marshall(expressionAttributeValues),
+      ReturnValues: 'ALL_NEW' // Return the entire updated item
     };
-    console.log('DynamoDB UpdateItem params for schedule settings:', params);
+    
+    console.log('DynamoDB UpdateItem params for schedule settings:', JSON.stringify(params, null, 2));
     const { Attributes } = await dynamoDBClient.send(new UpdateItemCommand(params));
-    console.log('Successfully updated schedule settings nextRunAt for user:', userId, Attributes ? unmarshall(Attributes) : '');
-    res.status(200).json({ 
-      message: 'Schedule settings updated successfully.', 
-      updatedAttributes: Attributes ? unmarshall(Attributes) : {}
-    });
+    const updatedSettings = Attributes ? unmarshall(Attributes) : {};
+    
+    console.log('Successfully updated complete schedule settings for user:', userId, updatedSettings);
+    res.status(200).json(updatedSettings);
+    
   } catch (error) {
     console.error('Error updating schedule settings in DynamoDB:', error);
-    // Consider specific error handling, e.g., if the item to update doesn't exist (ConditionalCheckFailedException)
     res.status(500).json({ error: 'Failed to update schedule settings', details: error.message });
   }
 });
