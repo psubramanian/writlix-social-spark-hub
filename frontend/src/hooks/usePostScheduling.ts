@@ -1,35 +1,74 @@
 
 import { useState } from 'react';
-import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/components/ui/use-toast';
-import { useAuthRedirect } from '@/utils/supabaseUserUtils';
+// import { supabase } from '@/integrations/supabase/client'; // To be replaced by API calls
+// import { useAuthRedirect } from '@/utils/supabaseUserUtils'; // Clerk will handle auth redirects at component level
 import { calculateNextRunTime } from '@/utils/scheduleUtils';
-import type { ScheduleSettings } from './useScheduleSettings';
+import type { ScheduleSettings } from './useScheduleSettings'; // Ensure this type aligns with DynamoDB/API response
+
+// Define a type for the expected API response for a scheduled post (matches DynamoDB structure)
+interface ScheduledPost {
+  PK: string; // USER#<userId>
+  SK: string; // SCHEDULED_POST#<platform>#<uuid>
+  userId: string;
+  platform: string;
+  contentIdeaId: string; // Or the actual content if denormalized
+  scheduledAtUTC: string; // ISO string
+  status: 'pending' | 'posted' | 'failed';
+  // add other relevant fields from your DynamoDB scheduled_post item
+  createdAt?: string;
+  updatedAt?: string;
+  postId?: string; // Social media post ID after successful posting
+  errorMessage?: string;
+  timezone?: string; // User's original timezone for the schedule
+}
+
+// Define a type for ScheduleSettings, assuming it might come from an API now
+// This should align with what your backend API for schedule_settings returns
+// For now, we'll keep it similar to the existing one, but it might need adjustments.
+interface ApiScheduleSettings extends ScheduleSettings {
+  // Potentially add PK/SK or other DynamoDB specific fields if API returns them directly
+  // Or ensure the API transforms DynamoDB items into this existing ScheduleSettings structure.
+  id?: string; // If 'id' is used as a primary key for settings in DynamoDB or API
+}
+
 
 export function usePostScheduling(userId: string | undefined) {
   const { toast } = useToast();
-  const { redirectToLogin } = useAuthRedirect();
+  // const { redirectToLogin } = useAuthRedirect(); // Removed, Clerk handles auth state
 
-  const scheduleContentIdea = async (contentId: number) => {
+  const scheduleContentIdea = async (contentIdeaId: string, platform: string, contentText: string /* or other content identifiers */) => {
     try {
       if (!userId) {
-        redirectToLogin();
+        // redirectToLogin(); // Component using this hook should handle this based on Clerk's useUser()
+        toast({
+          title: "User not authenticated",
+          description: "Please log in to schedule posts.",
+          variant: "destructive",
+        });
         return false;
       }
 
-      console.log(`Scheduling content idea with ID: ${contentId} for user: ${userId}`);
+      console.log(`Scheduling content idea with ID: ${contentIdeaId} for user: ${userId} on platform: ${platform}`);
 
-      // Get user's default schedule settings
-      const { data: userSettings, error: settingsError } = await supabase
-        .from('schedule_settings')
-        .select('*')
-        .eq('user_id', userId as any)
-        .is('post_id', null)
-        .maybeSingle();
-
-      if (settingsError) {
-        console.error('Error fetching settings:', settingsError);
-        throw settingsError;
+      // API Call: Get user's default schedule settings
+      let userSettings: ApiScheduleSettings | null = null;
+      try {
+        const settingsResponse = await fetch(`/api/schedule-settings?userId=${userId}`); // Adjust API path as needed
+        if (!settingsResponse.ok) {
+          const errorData = await settingsResponse.json().catch(() => ({ message: 'Failed to fetch schedule settings' }));
+          throw new Error(errorData.message || 'Failed to fetch schedule settings');
+        }
+        userSettings = await settingsResponse.json();
+      } catch (settingsError: any) {
+        console.error('Error fetching settings via API:', settingsError);
+        // throw settingsError; // Decide if this should be a fatal error or if defaults can still be created
+        // For now, we'll allow proceeding to create default settings if fetch fails or returns null/empty
+        toast({
+          title: "Could not fetch schedule settings",
+          description: settingsError.message + ". Attempting to use/create defaults.",
+          variant: "default", // Changed from "warning" as it's not a standard variant
+        });
       }
       
       // If no user settings exist, create default settings
@@ -41,73 +80,72 @@ export function usePostScheduling(userId: string | undefined) {
         tomorrow.setDate(tomorrow.getDate() + 1);
         tomorrow.setHours(9, 0, 0, 0);
         
-        const defaultSettings = {
-          user_id: userId,
+        const defaultSettingsPayload = {
+          userId: userId,
           frequency: 'daily' as const,
-          time_of_day: '09:00:00',
-          timezone: 'UTC',
-          next_run_at: tomorrow.toISOString()
+          timeOfDay: '09:00:00', // Ensure this matches backend expectations
+          timezone: 'UTC', // Consider making this user-configurable
+          // nextRunAt: tomorrow.toISOString(), // Backend should ideally calculate initial nextRunAt
         };
+
+        console.log('Attempting to create default settings via API with payload:', defaultSettingsPayload);
         
-        console.log('Creating default settings with next_run_at:', defaultSettings.next_run_at);
-        
-        const { data: newSettings, error: newSettingsError } = await supabase
-          .from('schedule_settings')
-          .insert(defaultSettings as any)
-          .select()
-          .single();
-          
-        if (newSettingsError) {
-          console.error('Error creating default settings:', newSettingsError);
-          throw new Error("Could not create default user schedule settings");
+        const createSettingsResponse = await fetch('/api/schedule-settings', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(defaultSettingsPayload),
+        });
+
+        if (!createSettingsResponse.ok) {
+          const errorData = await createSettingsResponse.json().catch(() => ({ message: 'Failed to create default schedule settings' }));
+          console.error('Error creating default settings via API:', errorData.message);
+          throw new Error(errorData.message || "Could not create default user schedule settings");
         }
         
-        console.log('Created default user settings:', newSettings);
-        
-        // Use the newly created settings - but check if it exists first
-        if (!newSettings || typeof newSettings !== 'object') {
-          throw new Error('Failed to create default settings');
+        const newSettings: ApiScheduleSettings = await createSettingsResponse.json();
+        console.log('Created default user settings via API:', newSettings);
+
+        if (!newSettings || typeof newSettings !== 'object' || !newSettings.nextRunAt || !newSettings.timezone) {
+          console.error('Invalid or incomplete default settings data received from API:', newSettings);
+          throw new Error('Failed to create or retrieve valid default settings from API.');
         }
         
-        // Type guard for newSettings - ensure it's not null before accessing properties
-        if (!('next_run_at' in newSettings) || !('timezone' in newSettings)) {
-          throw new Error('Invalid settings data structure');
-        }
-          
-        // CRITICAL VALIDATION: Ensure next_run_at exists and is valid
-        const nextAvailableSlot = String(newSettings.next_run_at);
-        
-        console.log(`Next available scheduling slot: ${nextAvailableSlot}`);
-        
-        // Validation for empty string or invalid date
-        if (!nextAvailableSlot || nextAvailableSlot === "" || isNaN(new Date(nextAvailableSlot).getTime())) {
-          console.error('Invalid date format for next_run_at:', nextAvailableSlot);
-          throw new Error('Failed to determine a valid time to schedule the post');
+        const nextAvailableSlot = String(newSettings.nextRunAt);
+        console.log(`Next available scheduling slot from new default settings: ${nextAvailableSlot}`);
+
+        if (!nextAvailableSlot || isNaN(new Date(nextAvailableSlot).getTime())) {
+          console.error('Invalid date format for nextRunAt in new default settings from API:', nextAvailableSlot);
+          throw new Error('API provided an invalid time to schedule the post after creating default settings');
         }
 
         // Create the scheduled post with the validated next available slot
-        const scheduledPostData = {
-          user_id: userId,
-          content_id: contentId,
-          status: 'pending',
-          next_run_at: nextAvailableSlot,
-          timezone: String(newSettings.timezone) || 'UTC'
+        // API Call: Create the scheduled post
+        const scheduledPostPayload = {
+          userId: userId,
+          contentIdeaId: contentIdeaId,
+          platform: platform,
+          // textContent: contentText, // Or send contentIdeaId and let backend fetch content
+          scheduledAtUTC: nextAvailableSlot, // This is the 'nextRunAt' from settings
+          timezone: String(newSettings.timezone) || 'UTC',
+          status: 'pending' // Backend should set initial status
         };
         
-        console.log('Creating scheduled post with data:', scheduledPostData);
+        console.log('Creating scheduled post via API with payload:', scheduledPostPayload);
         
-        const { data: postData, error: postError } = await supabase
-          .from('scheduled_posts')
-          .insert(scheduledPostData as any)
-          .select()
-          .single();
+        const postResponse = await fetch('/api/scheduled-posts', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(scheduledPostPayload),
+        });
 
-        if (postError) {
-          console.error('Error creating scheduled post:', postError);
-          throw postError;
+        if (!postResponse.ok) {
+          const errorData = await postResponse.json().catch(() => ({ message: 'Failed to schedule post' }));
+          console.error('Error creating scheduled post via API:', errorData.message);
+          throw new Error(errorData.message || 'Failed to schedule post');
         }
 
-        console.log('Post scheduled successfully:', postData);
+        const postData: ScheduledPost = await postResponse.json();
+        console.log('Post scheduled successfully via API:', postData);
         
         // Successfully created with new settings
         return true;
@@ -133,54 +171,45 @@ export function usePostScheduling(userId: string | undefined) {
         fallbackDate.setDate(fallbackDate.getDate() + 1);
         fallbackDate.setHours(9, 0, 0, 0);
         nextAvailableSlot = fallbackDate.toISOString();
-        
-        // Update the settings with this valid value
-        if ('id' in userSettings && userSettings.id) {
-          await supabase
-            .from('schedule_settings')
-            .update({ next_run_at: nextAvailableSlot } as any)
-            .eq('id', userSettings.id as any);
-        }
-          
-        console.log('Updated settings with fallback next_run_at:', nextAvailableSlot);
       }
 
-      console.log(`Next available scheduling slot: ${nextAvailableSlot}`);
-      
-      // Validation for empty string or invalid date
-      if (nextAvailableSlot === "" || isNaN(new Date(String(nextAvailableSlot)).getTime())) {
-        console.error('Invalid date format for next_run_at:', nextAvailableSlot);
-        throw new Error('Failed to determine a valid time to schedule the post');
+      if (!nextAvailableSlot || isNaN(new Date(String(nextAvailableSlot)).getTime())) {
+        console.error('Invalid date format for nextRunAt in existing settings:', nextAvailableSlot);
+        throw new Error('Failed to determine a valid time to schedule the post from existing settings');
       }
 
-      // Create the scheduled post with the validated next available slot
-      const scheduledPostData = {
-        user_id: userId,
-        content_id: contentId,
-        status: 'pending',
-        next_run_at: String(nextAvailableSlot),
-        timezone: String(userSettings.timezone) || 'UTC'
+      // API Call: Create the scheduled post
+      const scheduledPostPayload = {
+        userId: userId,
+        contentIdeaId: contentIdeaId,
+        platform: platform,
+        // textContent: contentText, // Or send contentIdeaId and let backend fetch content
+        scheduledAtUTC: String(nextAvailableSlot),
+        timezone: String(userSettings.timezone) || 'UTC',
+        status: 'pending' // Backend should set initial status
       };
       
-      console.log('Creating scheduled post with data:', scheduledPostData);
+      console.log('Creating scheduled post via API with payload:', scheduledPostPayload);
       
-      const { data: postData, error: postError } = await supabase
-        .from('scheduled_posts')
-        .insert(scheduledPostData as any)
-        .select()
-        .single();
+      const postResponse = await fetch('/api/scheduled-posts', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(scheduledPostPayload),
+      });
 
-      if (postError) {
-        console.error('Error creating scheduled post:', postError);
-        throw postError;
+      if (!postResponse.ok) {
+        const errorData = await postResponse.json().catch(() => ({ message: 'Failed to schedule post' }));
+        console.error('Error creating scheduled post via API:', errorData.message);
+        throw new Error(errorData.message || 'Failed to schedule post');
       }
 
-      console.log('Post scheduled successfully:', postData);
+      const postData: ScheduledPost = await postResponse.json();
+      console.log('Post scheduled successfully via API:', postData);
 
       // Calculate the next available slot based on frequency if we have valid settings
-      if ('frequency' in userSettings && 'time_of_day' in userSettings && userSettings.frequency && userSettings.time_of_day) {
+      if ('frequency' in userSettings && 'timeOfDay' in userSettings && userSettings.frequency && userSettings.timeOfDay) {
         const frequency = userSettings.frequency;
-        const timeOfDay = userSettings.time_of_day;
+        const timeOfDay = userSettings.timeOfDay;
         
         if (frequency === 'daily' || frequency === 'weekly' || frequency === 'monthly') {
           const nextRunSettings = {
@@ -207,28 +236,39 @@ export function usePostScheduling(userId: string | undefined) {
             const updatedNextRunAtString = fallbackNextRun.toISOString();
             console.log(`Using fallback next run time: ${updatedNextRunAtString}`);
             
-            // Update the schedule settings with the new fallback next_run_at
-            if ('id' in userSettings && userSettings.id) {
-              await supabase
-                .from('schedule_settings')
-                .update({ next_run_at: updatedNextRunAtString } as any)
-                .eq('id', userSettings.id as any);
+            // API Call: Update the schedule settings with the new fallback next_run_at
+            if (userSettings.id) { // Assuming 'id' is the identifier for schedule settings
+              try {
+                const updateSettingsResponse = await fetch(`/api/schedule-settings/${userSettings.id}`, { // Or a general update endpoint
+                  method: 'PUT',
+                  headers: { 'Content-Type': 'application/json' },
+                  body: JSON.stringify({ nextRunAt: updatedNextRunAtString }),
+                });
+                if (!updateSettingsResponse.ok) {
+                  console.warn('Failed to update schedule settings with fallback next run time via API.');
+                }
+              } catch (updateError) {
+                console.warn('Error calling API to update schedule settings with fallback:', updateError);
+              }
             }
           } else {
             const updatedNextRunAtString = updatedNextRunAt.toISOString();
             console.log(`Updated next available slot: ${updatedNextRunAtString}`);
 
-            // Update the schedule settings with the new next_run_at
-            if ('id' in userSettings && userSettings.id) {
-              const { error: updateError } = await supabase
-                .from('schedule_settings')
-                .update({ next_run_at: updatedNextRunAtString } as any)
-                .eq('id', userSettings.id as any);
-
-              if (updateError) {
-                console.error('Error updating schedule settings:', updateError);
-                // We don't throw here as the post is already scheduled
-                // But we should log this error
+            // API Call: Update the schedule settings with the new next_run_at
+            if (userSettings.id) { // Assuming 'id' is the identifier for schedule settings
+              try {
+                const updateSettingsResponse = await fetch(`/api/schedule-settings/${userSettings.id}`, { // Or a general update endpoint
+                   method: 'PUT',
+                   headers: { 'Content-Type': 'application/json' },
+                   body: JSON.stringify({ nextRunAt: updatedNextRunAtString }),
+                });
+                if (!updateSettingsResponse.ok) {
+                    console.error('Error updating schedule settings via API:', await updateSettingsResponse.text());
+                     // We don't throw here as the post is already scheduled
+                }
+              } catch (updateError) {
+                console.error('Error calling API to update schedule settings:', updateError);
               }
             }
           }

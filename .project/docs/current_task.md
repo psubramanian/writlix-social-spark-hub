@@ -52,6 +52,19 @@
     - [ ] Verify `scheduled_post` item status updates for Facebook & Instagram.
     - [ ] Verify error message logging for Facebook & Instagram.
 
+- [ ] **Frontend: Wire up Scheduling to Backend**
+    - [ ] Refactor `usePostScheduling.ts` to use Clerk `userId` and call new backend APIs (instead of Supabase).
+        - [ ] Remove Supabase auth utilities (`useAuthRedirect`).
+        - [ ] Replace Supabase DB calls with `fetch` to API endpoints.
+    - [ ] **Backend: Create APIs for Frontend Scheduling**
+        - [ ] Create `GET /api/schedule-settings` endpoint (reads from DynamoDB).
+        - [ ] Create `POST /api/schedule-settings` endpoint (writes to DynamoDB).
+        - [ ] Create `POST /api/scheduled-posts` endpoint (writes to DynamoDB, potentially updates schedule settings).
+        - [ ] Create `PUT /api/schedule-settings/:id` endpoint (updates DynamoDB).
+
+- [ ] **AWS Deployment Preparation:**
+    - [ ] Review and complete tasks in `aws_deployment_prep.md`.
+
 - [ ] **Refactor and Cleanup (Future):**
     - [ ] Review and potentially refactor error counting logic if discrepancies persist.
     - [ ] Complete migration of remaining frontend components from Supabase to Clerk (as per memory `d253437b-fc86-4857-87c6-40da3e14bc4d`).
