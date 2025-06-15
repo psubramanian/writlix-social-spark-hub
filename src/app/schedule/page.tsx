@@ -12,6 +12,7 @@ import type { ScheduledPost, ScheduleSettings as ScheduleSettingsType, SocialCon
 const Schedule = () => {
   const [viewMode, setViewMode] = useState<'list' | 'calendar'>('list');
   const [selectedDate, setSelectedDate] = useState(new Date());
+  const [selectedPostForPreview, setSelectedPostForPreview] = useState<ScheduledPost | null>(null);
   
   // Mock data - will replace with real data later
   const [scheduleSettings, setScheduleSettings] = useState<ScheduleSettingsType | null>({
@@ -88,7 +89,7 @@ const Schedule = () => {
   };
 
   const handlePreviewPost = (post: ScheduledPost) => {
-    setSelectedPost(post);
+    setSelectedPostForPreview(post);
     // TODO: Open preview dialog
     console.log('Preview post:', post);
   };
