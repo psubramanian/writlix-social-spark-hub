@@ -4,6 +4,7 @@ import React, { useState } from 'react';
 import AppLayout from '@/components/layout/AppLayout';
 import GenerationForm from '@/components/data-seed/GenerationForm';
 import ContentTable from '@/components/data-seed/ContentTable';
+import ContentPreviewDialog from '@/components/data-seed/ContentPreviewDialog';
 import { Loader } from 'lucide-react';
 import type { ContentItem } from '@/types/content';
 
@@ -11,6 +12,7 @@ const DataSeed = () => {
   const [generating, setGenerating] = useState(false);
   const [generatedContent, setGeneratedContent] = useState<ContentItem[]>([]);
   const [selectedContent, setSelectedContent] = useState<ContentItem | null>(null);
+  const [previewDialogOpen, setPreviewDialogOpen] = useState(false);
 
   // Mock content generation
   const handleGenerate = async (topic: string, quantity: number) => {
@@ -49,8 +51,15 @@ const DataSeed = () => {
 
   const handlePreview = (content: ContentItem) => {
     setSelectedContent(content);
-    // TODO: Open preview dialog
-    console.log('Preview content:', content);
+    setPreviewDialogOpen(true);
+  };
+
+  const handleSaveContent = (updatedContent: ContentItem) => {
+    setGeneratedContent(prev =>
+      prev.map(item =>
+        item.id === updatedContent.id ? updatedContent : item
+      )
+    );
   };
 
   return (
@@ -110,6 +119,14 @@ const DataSeed = () => {
           </div>
         </div>
       </div>
+
+      {/* Content Preview Dialog */}
+      <ContentPreviewDialog
+        content={selectedContent}
+        open={previewDialogOpen}
+        onOpenChange={setPreviewDialogOpen}
+        onSave={handleSaveContent}
+      />
     </AppLayout>
   );
 };
