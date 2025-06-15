@@ -7,13 +7,11 @@ yarn-error.log*
 pnpm-debug.log*
 lerna-debug.log*
 
-# Frontend folder
-frontend/node_modules/
-frontend/dist/
-frontend/dist-ssr/
-frontend/.env
-frontend/.env.*
-!frontend/.env.example
+# Reference Directories
+.0-backend-reference/
+.0-frontend-reference/
+.0-supabase-reference/
+
 
 # Misc
 .DS_Store
@@ -34,4 +32,7 @@ corelift-dev_accessKeys.csv
 client-docs/
 project-docs/
 CLAUDE.md
+
+# Archived directories from Vite/Express setup
+
 
