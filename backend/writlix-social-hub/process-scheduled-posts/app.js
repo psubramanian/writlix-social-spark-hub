@@ -1,4 +1,4 @@
-const { DynamoDBClient } = require("@aws-sdk/client-dynamodb");
+const { DynamoDBClient, GetItemCommand } = require("@aws-sdk/client-dynamodb");
 const { DynamoDBDocumentClient, QueryCommand, UpdateCommand } = require("@aws-sdk/lib-dynamodb");
 const { Clerk } = require("@clerk/clerk-sdk-node"); // Or require('@clerk/backend') depending on version and usage
 const axios = require("axios");
@@ -16,7 +16,10 @@ if (!CLERK_SECRET_KEY) {
 const dynamoDbClient = new DynamoDBClient({
     region: AWS_REGION,
     endpoint: DYNAMODB_ENDPOINT,
-    credentials: { accessKeyId: 'test', secretAccessKey: 'test' },
+    credentials: { 
+        accessKeyId: 'local',
+        secretAccessKey: 'local'
+    }
 });
 const docClient = DynamoDBDocumentClient.from(dynamoDbClient);
 
@@ -87,7 +90,7 @@ exports.handler = async (event) => {
         IndexName: 'ScheduledPostsByStatusAndDate',
         KeyConditionExpression: 'GSI1PK = :gsi1pk AND GSI1SK <= :now_utc',
         ExpressionAttributeValues: {
-            ':gsi1pk': 'POST_STATUS#pending', // Global query for all pending posts
+            ':gsi1pk': `POST_STATUS#pending#USER#user_2yVhrQ5sN1TMfQ5Ux2he41z2HXn`, // TEMP: Target specific user for testing
             ':now_utc': `SCHEDULED_AT_UTC#${nowUTC}`
         },
         // Limit to process a certain number of posts per invocation if needed
@@ -96,135 +99,150 @@ exports.handler = async (event) => {
 
     try {
         console.log('Querying for due posts with params:', JSON.stringify(params));
-        const { Items: duePosts } = await docClient.send(new QueryCommand(params));
+        const { Items: scheduledPostItems } = await docClient.send(new QueryCommand(params));
 
-        if (!duePosts || duePosts.length === 0) {
+        if (!scheduledPostItems || scheduledPostItems.length === 0) {
             console.log('No posts currently due for publishing.');
             return { statusCode: 200, body: 'No posts due.' };
         }
 
-        console.log(`Found ${duePosts.length} posts to process.`);
+        console.log(`Found ${scheduledPostItems.length} posts to process.`);
         let successCount = 0;
         let failureCount = 0;
 
-        for (const post of duePosts) {
-            console.log('Processing post:', JSON.stringify(post));
-            const { PK, SK, userId, contentIdeaId, platform, scheduledPostId } = post;
+        for (const post of scheduledPostItems) {
+            console.log('DEBUG: Raw post object from duePosts.Items:', JSON.stringify(post, null, 2));
+            let success = false; // Reset success flag for each post
+            let contentIdea; // Declare contentIdea here
 
-            // 1. Fetch Content Idea
-            let contentIdea;
-            try {
-                const contentParams = {
-                    TableName: TABLE_NAME,
-                    Key: { PK: `USER#${userId}`, SK: `CONTENT_IDEA#${contentIdeaId}` }
-                };
-                const { Item } = await docClient.send(new QueryCommand(contentParams)); // QueryCommand is for GSI, GetCommand for specific item
-                // Correction: Use GetCommand for fetching a single item by its primary key.
-                // const { Item } = await docClient.send(new GetCommand(contentParams)); 
-                // For now, assuming contentIdeaId is the SK part of the content idea.
-                // This needs to be robust. If contentIdeaId is just an attribute, the SK might be different.
-                // Let's assume for now contentIdeaId IS the sort key part for CONTENT_IDEA item.
-                const contentIdeaResponse = await docClient.send(new QueryCommand({
-                    TableName: TABLE_NAME,
-                    KeyConditionExpression: 'PK = :pk AND SK = :sk',
-                    ExpressionAttributeValues: {
-                        ':pk': `USER#${userId}`,
-                        ':sk': `CONTENT_IDEA#${contentIdeaId}`
+            try { // This is the main try block for processing a single post
+                const { userId, contentIdeaId, platform, scheduledPostId } = post;
+                console.log(`DEBUG: Extracted from post - userId: ${userId}, contentIdeaId: ${contentIdeaId}, platform: ${platform}, scheduledPostId: ${scheduledPostId}`);
+
+                // 1. Fetch Content Idea
+                try { // Inner try-catch specifically for fetching contentIdea
+                    const getParams = {
+                        TableName: TABLE_NAME,
+                        Key: {
+                            PK: { S: `USER#${userId}` }, // Correctly prefix USER#
+                            SK: { S: `CONTENT_IDEA#${contentIdeaId}` }
+                        }
+                    };
+                    console.log(`DEBUG: TABLE_NAME for GetItem: ${TABLE_NAME}`);
+                    console.log(`DEBUG: getParams for GetItem (raw):`, getParams);
+                    try {
+                        console.log('DEBUG: getParams for GetItem (stringified):', JSON.stringify(getParams));
+                    } catch (e) {
+                        console.error('DEBUG: Error stringifying getParams:', e);
                     }
-                }));
-                if (contentIdeaResponse.Items && contentIdeaResponse.Items.length > 0) {
-                    contentIdea = contentIdeaResponse.Items[0];
-                } else {
-                    console.error(`Content idea ${contentIdeaId} not found for user ${userId}. Skipping post.`);
+                    const { Item: rawContentIdea } = await dynamoDbClient.send(new GetItemCommand(getParams));
+
+                    if (rawContentIdea) {
+                        contentIdea = {};
+                        for (const keyInRaw in rawContentIdea) {
+                            if (rawContentIdea[keyInRaw].S) contentIdea[keyInRaw] = rawContentIdea[keyInRaw].S;
+                            else if (rawContentIdea[keyInRaw].N) contentIdea[keyInRaw] = Number(rawContentIdea[keyInRaw].N);
+                            else if (rawContentIdea[keyInRaw].BOOL) contentIdea[keyInRaw] = rawContentIdea[keyInRaw].BOOL;
+                            else contentIdea[keyInRaw] = Object.values(rawContentIdea[keyInRaw])[0];
+                        }
+                        console.log('DEBUG: Successfully fetched and unmarshalled contentIdea:', contentIdea);
+                    } else {
+                        console.error(`Content idea ${contentIdeaId} not found for user ${userId}. Skipping post.`);
+                        failureCount++;
+                        continue; // Skip to the next post in the outer loop
+                    }
+                } catch (err) {
+                    console.error(`Error fetching content idea ${contentIdeaId} for user ${userId}:`, err);
                     failureCount++;
-                    // Optionally update post to 'failed' status here
-                    continue;
+                    continue; // Skip to the next post in the outer loop
                 }
 
-            } catch (err) {
-                console.error(`Error fetching content idea ${contentIdeaId} for user ${userId}:`, err);
-                failureCount++;
-                continue; // Skip to next post
-            }
-
-            // 2. Get Social Token from Clerk
-            let accessToken;
-            try {
-                // Note: Clerk's getToken might require a specific session ID or actor, 
-                // depending on your Clerk setup for backend tokens.
-                // For long-lived access for backend processes, you might use user.publicMetadata or specific API calls to Clerk.
-                // The template name (e.g., 'linkedin_writlix') must match what's configured in your Clerk instance.
-                const tokenResult = await clerkClient.users.getUserOauthAccessToken(userId, platform); // platform should match provider ID in Clerk e.g. 'oauth_linkedin'
-                
-                if (tokenResult && tokenResult.length > 0 && tokenResult[0].token) {
-                    accessToken = tokenResult[0].token;
-                } else {
-                    console.error(`Failed to get ${platform} access token for user ${userId} from Clerk. Response:`, JSON.stringify(tokenResult));
+                // 2. Get OAuth Token from Clerk
+                let accessToken;
+                try {
+                    // Note: Clerk's getToken might require a specific session ID or actor, 
+                    // depending on your Clerk setup for backend tokens.
+                    // For long-lived access for backend processes, you might use user.publicMetadata or specific API calls to Clerk.
+                    // The template name (e.g., 'linkedin_writlix') must match what's configured in your Clerk instance.
+                    const providerString = `oauth_${platform.toLowerCase()}`;
+                    const tokenResult = await clerkClient.users.getUserOauthAccessToken(userId, providerString); // Corrected provider string
+                    
+                    if (tokenResult && tokenResult.length > 0 && tokenResult[0].token) {
+                        accessToken = tokenResult[0].token;
+                    } else {
+                        console.error(`Failed to get ${platform} access token for user ${userId} from Clerk. Response:`, JSON.stringify(tokenResult));
+                        failureCount++;
+                        // Update post to 'failed_auth' or similar. The main catch block will handle updating status.
+                        throw new Error(`Failed to get ${platform} access token from Clerk.`); // Throw to be caught by main try-catch
+                    }
+                } catch (err) {
+                    console.error(`Error getting ${platform} access token for user ${userId} (provider: ${providerString}) from Clerk. Full error:`, JSON.stringify(err, Object.getOwnPropertyNames(err), 2));
                     failureCount++;
-                    // Update post to 'failed_auth' or similar
-                    continue;
+                    // The main catch block will handle updating status.
+                    throw err; // Re-throw to be caught by main try-catch, ensuring post status is updated to failed
                 }
-            } catch (err) {
-                console.error(`Error getting ${platform} access token for user ${userId} from Clerk:`, err);
+
+                // 3. Post to Social Media
+                let postResult;
+                switch (platform.toLowerCase()) {
+                    case 'linkedin':
+                        // The LinkedIn post helper needs the LinkedIn URN, not Clerk user ID.
+                        // This is a simplification for now. In reality, you'd fetch the LinkedIn member URN associated with the user's Clerk account.
+                        // This might be stored in user.publicMetadata or obtained via another Clerk API call.
+                        // For now, we'll pass userId, but this will fail for the actual LinkedIn API call if it's not the URN.
+                        postResult = await postToLinkedIn(accessToken, contentIdea, userId /* This should be LinkedIn URN */);
+                        break;
+                    case 'facebook':
+                        postResult = await postToFacebook(accessToken, contentIdea, userId);
+                        break;
+                    case 'instagram':
+                        postResult = await postToInstagram(accessToken, contentIdea, userId);
+                        break;
+                    default:
+                        console.warn(`Unsupported platform: ${platform} for post ${scheduledPostId}`);
+                        postResult = { success: false, error: 'Unsupported platform' };
+                }
+
+                // 4. Update Post Status in DynamoDB
+                const newStatus = postResult.success ? 'posted' : 'failed';
+                const updateParams = {
+                    TableName: TABLE_NAME,
+                    Key: { PK: `USER#${userId}`, SK: `SCHEDULED_POST#${scheduledPostId}` }, // Original PK and SK of the scheduled_post item
+                    UpdateExpression: 'SET #status = :status, GSI1PK = :gsi1pk, GSI1SK = :gsi1sk_val', // GSI1SK might be removed or set to posted time
+                    ExpressionAttributeNames: { '#status': 'status' }, // 'status' is a reserved keyword
+                    ExpressionAttributeValues: {
+                        ':status': newStatus,
+                        ':gsi1pk': `POST_STATUS#${newStatus}#USER#${userId}`,
+                        ':gsi1sk_val': `POSTED_AT_UTC#${new Date().toISOString()}` // Or remove GSI1SK if not needed for posted items
+                    },
+                    ReturnValues: 'UPDATED_NEW'
+                };
+                if (newStatus === 'failed' && postResult.error) {
+                    updateParams.UpdateExpression += ', #errorMsg = :errorMsg';
+                    updateParams.ExpressionAttributeNames['#errorMsg'] = 'errorMessage';
+                    updateParams.ExpressionAttributeValues[':errorMsg'] = JSON.stringify(postResult.error).substring(0, 400); // Limit error message size
+                }
+
+                try {
+                    await docClient.send(new UpdateCommand(updateParams));
+                    console.log(`Post ${scheduledPostId} status updated to ${newStatus}.`);
+                    if (postResult.success) successCount++; else failureCount++;
+                } catch (err) {
+                    console.error(`Error updating post ${scheduledPostId} status to ${newStatus}:`, err);
+                    failureCount++; // Count as failure even if posting worked but DB update failed
+                }
+            } catch (err) { // Catch for the main try block within the for...of loop (processing a single post)
+                console.error(`Error processing post ${post && post.scheduledPostId ? post.scheduledPostId : 'unknown_post_in_loop_catch'}:`, err);
                 failureCount++;
+                // General error for the post, continue to the next one
                 continue;
             }
-
-            // 3. Post to Social Media
-            let postResult;
-            switch (platform.toLowerCase()) {
-                case 'linkedin':
-                    // The LinkedIn post helper needs the LinkedIn URN, not Clerk user ID.
-                    // This is a simplification for now. In reality, you'd fetch the LinkedIn member URN associated with the user's Clerk account.
-                    // This might be stored in user.publicMetadata or obtained via another Clerk API call.
-                    // For now, we'll pass userId, but this will fail for the actual LinkedIn API call if it's not the URN.
-                    postResult = await postToLinkedIn(accessToken, contentIdea, userId /* This should be LinkedIn URN */);
-                    break;
-                case 'facebook':
-                    postResult = await postToFacebook(accessToken, contentIdea, userId);
-                    break;
-                case 'instagram':
-                    postResult = await postToInstagram(accessToken, contentIdea, userId);
-                    break;
-                default:
-                    console.warn(`Unsupported platform: ${platform} for post ${scheduledPostId}`);
-                    postResult = { success: false, error: 'Unsupported platform' };
-            }
-
-            // 4. Update Post Status in DynamoDB
-            const newStatus = postResult.success ? 'posted' : 'failed';
-            const updateParams = {
-                TableName: TABLE_NAME,
-                Key: { PK: `USER#${userId}`, SK: SK }, // Original PK and SK of the scheduled_post item
-                UpdateExpression: 'SET #status = :status, GSI1PK = :gsi1pk, GSI1SK = :gsi1sk_val', // GSI1SK might be removed or set to posted time
-                ExpressionAttributeNames: { '#status': 'status' }, // 'status' is a reserved keyword
-                ExpressionAttributeValues: {
-                    ':status': newStatus,
-                    ':gsi1pk': `POST_STATUS#${newStatus}#USER#${userId}`,
-                    ':gsi1sk_val': `POSTED_AT_UTC#${new Date().toISOString()}` // Or remove GSI1SK if not needed for posted items
-                },
-                ReturnValues: 'UPDATED_NEW'
-            };
-            if (newStatus === 'failed' && postResult.error) {
-                updateParams.UpdateExpression += ', #errorMsg = :errorMsg';
-                updateParams.ExpressionAttributeNames['#errorMsg'] = 'errorMessage';
-                updateParams.ExpressionAttributeValues[':errorMsg'] = JSON.stringify(postResult.error).substring(0, 400); // Limit error message size
-            }
-
-            try {
-                await docClient.send(new UpdateCommand(updateParams));
-                console.log(`Post ${scheduledPostId} status updated to ${newStatus}.`);
-                if (postResult.success) successCount++; else failureCount++;
-            } catch (err) {
-                console.error(`Error updating post ${scheduledPostId} status to ${newStatus}:`, err);
-                failureCount++; // Count as failure even if posting worked but DB update failed
-            }
-        }
+        } // End of for...of loop
 
         console.log(`Processing complete. Success: ${successCount}, Failures: ${failureCount}`);
         return { statusCode: 200, body: JSON.stringify({ message: 'Processing complete.', successCount, failureCount }) };
 
-    } catch (error) {
+    } catch (error) { // Catch for the main try block of the exports.handler
         console.error('Error in ProcessScheduledPostsLambda handler:', error);
         return { statusCode: 500, body: JSON.stringify({ message: 'Internal server error.', error: error.message }) };
     }

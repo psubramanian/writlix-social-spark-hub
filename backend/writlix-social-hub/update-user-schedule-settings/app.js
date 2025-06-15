@@ -269,7 +269,7 @@ exports.handler = async (event) => {
                     SK: `SCHEDULED_POST#${platform}#${scheduledPostId}`, // Platform first for potential platform-specific queries on SK
                     scheduledPostId,
                     userId: user_id,
-                    contentIdeaId: idea.contentIdeaId, // Ensure contentIdeaId is an attribute on the idea item
+                    contentIdeaId: idea.SK.split('#')[1], // Extract from SK like 'CONTENT_IDEA#idea001'
                     platform,
                     status: 'pending',
                     scheduledAtUTC: nextRunTime, // Add the scheduledAtUTC attribute to the main item
